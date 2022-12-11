@@ -1,0 +1,19 @@
+{
+  "config": {
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid credentials",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "username": "UserName",
+          "password": "Password",
+          "name": "Name"
+        },
+        "title": "Sensi"
+      }
+    }
+  }
+}

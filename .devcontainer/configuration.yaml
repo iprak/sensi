@@ -1,0 +1,18 @@
+#Limited configuration instead of default_config
+#https://github.com/home-assistant/core/tree/dev/homeassistant/components/default_config
+automation:
+frontend:
+history:
+logbook:
+
+homeassistant:
+  name: Home
+  unit_system: imperial
+  country: US
+  time_zone: "America/Chicago"
+  temperature_unit: F
+
+logger:
+  default: info
+  logs:
+    custom_components.sensi: debug

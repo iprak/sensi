@@ -1,0 +1,3 @@
+# Custom requirements
+websockets
+homeassistant==2022.12.0
