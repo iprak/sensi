@@ -85,10 +85,11 @@ class SensiDevice:
             self.model = registration.get("product_type")
 
         state = data_json.get("state")
-        _LOGGER.debug(state)
-        print(self.name, self.identifier)
+        _LOGGER.info(f"Updating {self.name} {self.identifier}")
 
         if state:
+            _LOGGER.debug(state)
+
             if "display_temp" in state:
                 self.temperature = state.get("display_temp")
 
@@ -142,17 +143,10 @@ class SensiDevice:
             if self.attributes["circulating_fan"] == "on":
                 self.fan_mode = SENSI_FAN_CIRCULATE
 
-            print(
-                self.temperature,
-                self.temperature_unit,
-                self.humidity,
-                "%",
-            )
-            print(f"min_temp={self.min_temp}, max_temp={self.max_temp}")
-            print(f"cool_target={self.cool_target}, heat_target={self.heat_target}")
-            print(
-                f"hvac_mode={self.hvac_mode} fan_mode={self.fan_mode} hvac_action={hvac_action}"
-            )
+            _LOGGER.info(f"{self.temperature}{self.temperature_unit} {self.humidity}% hvac_mode={self.hvac_mode} fan_mode={self.fan_mode} hvac_action={hvac_action}")
+
+            #print(f"min_temp={self.min_temp}, max_temp={self.max_temp}")
+            #print(f"cool_target={self.cool_target}, heat_target={self.heat_target}")
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""

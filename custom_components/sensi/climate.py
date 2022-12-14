@@ -50,7 +50,7 @@ async def async_setup_entry(
     ]
 
     async_add_entities(entities)
-    _LOGGER.info("Added %s sensors", len(entities))
+    _LOGGER.info("Added %s thermostats", len(entities))
 
 
 class SensiThermostat(CoordinatorEntity, ClimateEntity):
