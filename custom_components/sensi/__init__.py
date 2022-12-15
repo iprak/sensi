@@ -35,12 +35,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     coordinator = SensiUpdateCoordinator(hass, config)
     await coordinator.async_config_entry_first_refresh()
 
-    # entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     hass.data[SENSI_DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "sensi_config": config,
     }
-    # hass.config_entries.async_setup_platforms(entry, SUPPORTED_PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
     return True

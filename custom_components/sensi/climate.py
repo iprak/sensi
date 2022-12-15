@@ -50,7 +50,7 @@ async def async_setup_entry(
     ]
 
     async_add_entities(entities)
-    _LOGGER.info("Added %s thermostats", len(entities))
+    _LOGGER.info("Added %d thermostats", len(entities))
 
 
 class SensiThermostat(CoordinatorEntity, ClimateEntity):
@@ -113,7 +113,6 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
     @property
     def current_temperature(self):
         """Return the current temperature."""
-        print("current_temperature", self._device.temperature)
         return self._device.temperature
 
     @property
@@ -162,6 +161,8 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
         # and ATTR_TARGET_TEMP_LOW,ATTR_TARGET_TEMP_HIGH for TARGET_TEMPERATURE_RANGE
         temp = kwargs.get(ATTR_TEMPERATURE)
         await self._device.async_set_temp(round(temp))
+        self.async_write_ha_state()
+        _LOGGER.info("Set temperature to %d", temp)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new operating mode."""
@@ -170,6 +171,7 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
 
         await self._device.async_set_operating_mode(HA_TO_SENSI_HVACMode[hvac_mode])
         self.async_write_ha_state()
+        _LOGGER.info("Set hvac_mode to %s", hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
@@ -186,9 +188,9 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
             await self._device.async_set_circulating_fan_mode(False, 0)
 
         self.async_write_ha_state()
+        _LOGGER.info("Set fan_mode to %s", fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
         await self._device.async_set_fan_mode(HVACMode.AUTO)
-        # await self.coordinator.async_request_refresh()
         self.async_write_ha_state()

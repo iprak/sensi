@@ -44,8 +44,8 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
 
         except (asyncio.TimeoutError, aiohttp.ClientError):
             return {"base": "cannot_connect"}
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.exception("Unexpected exception")
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.exception(str(err))
             return {"base": "unknown"}
 
         return None

@@ -69,7 +69,7 @@ async def async_setup_entry(
         entities.extend(sub_entities)
 
     async_add_entities(entities)
-    _LOGGER.info("Added %s sensors", len(entities))
+    _LOGGER.info("Added %d sensors", len(entities))
 
 
 class SensiSensorEntity(CoordinatorEntity, SensorEntity):

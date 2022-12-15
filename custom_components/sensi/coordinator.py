@@ -85,7 +85,7 @@ class SensiDevice:
             self.model = registration.get("product_type")
 
         state = data_json.get("state")
-        _LOGGER.info(f"Updating {self.name} {self.identifier}")
+        _LOGGER.info("Updating %s %s", self.name, self.identifier)
 
         if state:
             _LOGGER.debug(state)
@@ -143,10 +143,15 @@ class SensiDevice:
             if self.attributes["circulating_fan"] == "on":
                 self.fan_mode = SENSI_FAN_CIRCULATE
 
-            _LOGGER.info(f"{self.temperature}{self.temperature_unit} {self.humidity}% hvac_mode={self.hvac_mode} fan_mode={self.fan_mode} hvac_action={hvac_action}")
-
-            #print(f"min_temp={self.min_temp}, max_temp={self.max_temp}")
-            #print(f"cool_target={self.cool_target}, heat_target={self.heat_target}")
+            _LOGGER.info(
+                "%d%s humidity=%d hvac_mode=%s fan_mode=%s hvac_action=%s",
+                self.temperature,
+                self.temperature_unit,
+                self.humidity,
+                self.hvac_mode,
+                self.fan_mode,
+                hvac_action,
+            )
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
@@ -260,6 +265,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, SensiDevice]:
         """Update data."""
         if datetime.now().timestamp() >= self._expires_at:
+            _LOGGER.info("Token expired, re-logging")
             await login(self._hass, self._sensi_config, True)
 
         async with websockets.connect(WS_URL, extra_headers=self._headers) as websocket:
@@ -277,21 +283,19 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                                 if icd_id in self._devices:
                                     self._devices[icd_id].update(device_data)
                                 else:
-                                    print("Creating device for", icd_id)
+                                    _LOGGER.info("Creating device %s", icd_id)
                                     self._devices[icd_id] = SensiDevice(
                                         self, device_data
                                     )
 
                 except asyncio.TimeoutError:
-                    print("timeout error - no data")
-                    # await websocket.send('2')
+                    _LOGGER.warning("Timed out waiting for data")
                     done = True
                 except websockets.exceptions.WebSocketException as socket_exception:
-                    print("websockets.exceptions.WebSocketException")
-                    print(socket_exception)
+                    _LOGGER.warning(str(socket_exception))
                     done = True
-                except Exception as exception:
-                    print(exception)
+                except Exception as err:  # pylint: disable=broad-except
+                    _LOGGER.warning(str(err))
                     done = True
 
         return self._devices
@@ -302,6 +306,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             try:
                 await websocket.send("421" + data)
                 msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-                print(msg)
-            except Exception as exception:
-                print("async_send_event", data, exception)
+                _LOGGER.debug("async_send_event response=%s", msg)
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.warning("Sending event with %s failed", data)
+                _LOGGER.warning(str(err))
