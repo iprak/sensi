@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.sensi.const import (
     ATTRIBUTION,
+    DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
@@ -43,7 +44,7 @@ async def async_setup_entry(
 ):
     """Set up Sensi thermostat."""
     data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data["coordinator"]
+    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
 
     entities = [
         SensiThermostat(device, coordinator) for device in coordinator.get_devices()

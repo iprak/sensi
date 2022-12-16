@@ -9,3 +9,6 @@ SENSI_FAN_AUTO: Final = "auto"
 SENSI_FAN_ON: Final = "on"
 SENSI_FAN_CIRCULATE: Final = "Circulate"
 FAN_CIRCULATE_DEFAULT_DUTY_CYCLE = 10
+
+
+DOMAIN_DATA_COORDINATOR_KEY: Final = "coordinator"

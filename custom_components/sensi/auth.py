@@ -23,8 +23,8 @@ CLIENT_ID: Final = "android"
 
 
 @dataclass
-class SensiConfig:
-    """Internal Sensi integration configuration."""
+class AuthenticationConfig:
+    """Internal Sensi authentication configuration."""
 
     username: str | None = None
     password: str | None = None
@@ -33,7 +33,7 @@ class SensiConfig:
     expires_at: float | None = None
 
 
-async def login(hass, config: SensiConfig, renew_token: bool = False) -> bool:
+async def login(hass, config: AuthenticationConfig, renew_token: bool = False) -> bool:
     """Login."""
 
     persistent_file = hass.config.path("sensi_device.json")

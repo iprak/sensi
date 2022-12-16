@@ -12,7 +12,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 import voluptuous as vol
 
-from custom_components.sensi.auth import SensiConfig, login
+from custom_components.sensi.auth import AuthenticationConfig, login
 
 from .const import SENSI_DOMAIN
 
@@ -57,7 +57,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            config = SensiConfig(
+            config = AuthenticationConfig(
                 username=user_input[CONF_USERNAME], password=user_input[CONF_PASSWORD]
             )
             errors = await self._async_validate_input(config)
@@ -75,6 +75,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
+        # pylint: disable=unused-argument
         """Handle reauth."""
         self._reauth_unique_id = self.context["unique_id"]
         return await self.async_step_reauth_confirm()
@@ -84,7 +85,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         errors = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
         if user_input is not None:
-            config = SensiConfig(
+            config = AuthenticationConfig(
                 username=existing_entry.data[CONF_USERNAME],
                 password=user_input[CONF_PASSWORD],
             )

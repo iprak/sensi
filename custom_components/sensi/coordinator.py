@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import websockets
 
-from custom_components.sensi.auth import SensiConfig, login
+from custom_components.sensi.auth import AuthenticationConfig, login
 from custom_components.sensi.const import SENSI_FAN_CIRCULATE
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +38,9 @@ HA_TO_SENSI_HVACMode = {
 
 class SensiDevice:
     """Class representing a Sensi thermostat device."""
+
+    # pylint: disable=too-many-instance-attributes
+    # These attributes are meant to be here.
 
     coordinator: SensiUpdateCoordinator = None
 
@@ -114,7 +117,6 @@ class SensiDevice:
             )
             self.attributes["battery_voltage"] = state.get("battery_voltage")
 
-            # TODO: circulating_fan': {'enabled': 'on', 'duty_cycle': 10},
             self.min_temp = state.get("cool_min_temp", 45)
             self.max_temp = state.get("heat_max_temp", 99)
 
@@ -168,6 +170,9 @@ class SensiDevice:
         ]
         await self.coordinator.async_send_event(json.dumps(data))
 
+        # Assume the operation to succeed, update attribute immediately
+        self.temperature = value
+
     async def async_set_fan_mode(self, mode: str) -> None:
         """Set the fan mode."""
 
@@ -181,6 +186,8 @@ class SensiDevice:
         ]
 
         await self.coordinator.async_send_event(json.dumps(data))
+
+        # Assume the operation to succeed, update attribute immediately
         self.fan_mode = mode
 
     async def async_set_circulating_fan_mode(
@@ -199,6 +206,8 @@ class SensiDevice:
         ]
 
         await self.coordinator.async_send_event(json.dumps(data))
+
+        # Assume the operation to succeed, update attribute immediately
         self.attributes["circulating_fan"] = status
         self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
 
@@ -214,6 +223,8 @@ class SensiDevice:
             },
         ]
         await self.coordinator.async_send_event(json.dumps(data))
+
+        # Assume the operation to succeed, update attribute immediately
         self.hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
 
 
@@ -236,16 +247,15 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        sensi_config: SensiConfig,
+        config: AuthenticationConfig,
     ) -> None:
         """Initialize Sensi coordinator."""
 
         self._hass = hass
-        self._sensi_config = sensi_config
-        self._access_token = sensi_config.access_token
+        self._auth_config: AuthenticationConfig = None
         self._devices: dict[str, SensiDevice] = {}
-        self._headers = {"Authorization": "bearer " + sensi_config.access_token}
-        self._expires_at = sensi_config.expires_at
+
+        self._setup(config)
 
         super().__init__(
             hass,
@@ -253,6 +263,12 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             name="SensiUpdateCoordinator",
             update_interval=timedelta(seconds=30),
         )
+
+    def _setup(self, config: AuthenticationConfig):
+        self._auth_config = config
+        self._access_token = config.access_token
+        self._headers = {"Authorization": "bearer " + config.access_token}
+        self._expires_at = config.expires_at
 
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""
@@ -262,31 +278,42 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         """Return a specific Sensi device."""
         return self._devices.get(icd_id)
 
+    def _parse_socket_response(self, msg: str, devices: dict[str, SensiDevice]) -> bool:
+        """Parse the websocket device response."""
+        if not msg or not msg.startswith("42"):
+            return False
+
+        found_data = False
+        parsed_json = json.loads(msg[2:])
+        if parsed_json[0] == "state":
+            for device_data in parsed_json[1]:
+                icd_id = device_data.get("icd_id")
+                found_data = SensiDevice.data_has_state(device_data)
+
+                if icd_id in devices:
+                    devices[icd_id].update(device_data)
+                else:
+                    _LOGGER.info("Creating device %s", icd_id)
+                    devices[icd_id] = SensiDevice(self, device_data)
+
+        return found_data
+
     async def _async_update_data(self) -> dict[str, SensiDevice]:
         """Update data."""
         if datetime.now().timestamp() >= self._expires_at:
-            _LOGGER.info("Token expired, re-logging")
-            await login(self._hass, self._sensi_config, True)
+            _LOGGER.info("Token expired, getting new token")
+            if not await login(self._hass, self._auth_config, True):
+                _LOGGER.error("Failed to renew token")
+                return
+
+            self._setup(self._auth_config)
 
         async with websockets.connect(WS_URL, extra_headers=self._headers) as websocket:
             done = False
             while not done:
                 try:
                     msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-                    if msg.startswith("42"):
-                        parsed_json = json.loads(msg[2:])
-                        if parsed_json[0] == "state":
-                            for device_data in parsed_json[1]:
-                                icd_id = device_data.get("icd_id")
-                                done = SensiDevice.data_has_state(device_data)
-
-                                if icd_id in self._devices:
-                                    self._devices[icd_id].update(device_data)
-                                else:
-                                    _LOGGER.info("Creating device %s", icd_id)
-                                    self._devices[icd_id] = SensiDevice(
-                                        self, device_data
-                                    )
+                    done = self._parse_socket_response(msg, self._devices)
 
                 except asyncio.TimeoutError:
                     _LOGGER.warning("Timed out waiting for data")

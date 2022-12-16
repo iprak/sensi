@@ -26,7 +26,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from custom_components.sensi.const import ATTRIBUTION
 from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
 
-from .const import SENSI_DOMAIN
+from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ async def async_setup_entry(
 ):
     """Set up Sensi sensors."""
     data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data["coordinator"]
+    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
 
     entities = []
     for device in coordinator.get_devices():
@@ -74,6 +74,9 @@ async def async_setup_entry(
 
 class SensiSensorEntity(CoordinatorEntity, SensorEntity):
     """Representation of a Sensi sensor."""
+
+    # pylint: disable=too-many-instance-attributes
+    # These attributes are okay.
 
     def __init__(
         self,
