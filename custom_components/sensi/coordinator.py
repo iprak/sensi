@@ -88,7 +88,7 @@ class SensiDevice:
             self.model = registration.get("product_type")
 
         state = data_json.get("state")
-        _LOGGER.info("Updating %s %s", self.name, self.identifier)
+        _LOGGER.info("Updating %s (%s)", self.name, self.identifier)
 
         if state:
             _LOGGER.debug(state)
@@ -288,6 +288,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         if parsed_json[0] == "state":
             for device_data in parsed_json[1]:
                 icd_id = device_data.get("icd_id")
+
+                # Assuimg that data will be present for all devices in consistent manner.
                 found_data = SensiDevice.data_has_state(device_data)
 
                 if icd_id in devices:

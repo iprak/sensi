@@ -1,23 +1,27 @@
 """Config flow for Sensi thermostat."""
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
 import logging
 from typing import Any
 
-import aiohttp
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 import voluptuous as vol
 
-from custom_components.sensi.auth import AuthenticationConfig, login
+from custom_components.sensi.auth import (
+    AuthenticationConfig,
+    AuthenticationError,
+    SensiConnectionError,
+    login,
+)
 
 from .const import SENSI_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
 
 AUTH_DATA_SCHEMA = vol.Schema(
     {
@@ -36,14 +40,14 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Start a config flow."""
         self._reauth_unique_id = None
 
-    async def _async_validate_input(self, config):
+    async def _async_validate_input(self, config: AuthenticationConfig):
         """Validate the user input allows us to connect."""
         try:
-            if not await login(self.hass, config, True):
-                return {"base": "invalid_auth"}
-
-        except (asyncio.TimeoutError, aiohttp.ClientError):
+            await login(self.hass, config, True)
+        except SensiConnectionError:
             return {"base": "cannot_connect"}
+        except AuthenticationError:
+            return {"base": "invalid_auth"}
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.exception(str(err))
             return {"base": "unknown"}
@@ -84,9 +88,10 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Handle reauthentication."""
         errors = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
+        username = existing_entry.data[CONF_USERNAME]
         if user_input is not None:
             config = AuthenticationConfig(
-                username=existing_entry.data[CONF_USERNAME],
+                username=username,
                 password=user_input[CONF_PASSWORD],
             )
             errors = await self._async_validate_input(config)
@@ -102,14 +107,8 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
                 return self.async_abort(reason="reauth_successful")
 
         return self.async_show_form(
-            description_placeholders={
-                CONF_USERNAME: existing_entry.data[CONF_USERNAME]
-            },
+            description_placeholders={CONF_USERNAME: username},
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_PASSWORD): str,
-                }
-            ),
+            data_schema=REAUTH_SCHEMA,
             errors=errors,
         )

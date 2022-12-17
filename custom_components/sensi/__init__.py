@@ -2,17 +2,43 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from custom_components.sensi.auth import AuthenticationConfig, login
+from custom_components.sensi.auth import (
+    AuthenticationConfig,
+    AuthenticationError,
+    SensiConnectionError,
+    login,
+)
 from custom_components.sensi.coordinator import SensiUpdateCoordinator
 
 from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
 
 SUPPORTED_PLATFORMS = [Platform.CLIMATE, Platform.SENSOR]
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def send_notification(
+    hass: HomeAssistant, notification_id: str, title: str, message: str
+) -> None:
+    """Display a persistent notification."""
+    hass.async_create_task(
+        hass.services.async_call(
+            domain="persistent_notification",
+            service="create",
+            service_data={
+                "title": title,
+                "message": message,
+                "notification_id": f"{SENSI_DOMAIN}.{notification_id}",
+            },
+        )
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -27,10 +53,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
 
     try:
-        if not await login(hass, auth_config, True):
-            raise ConfigEntryAuthFailed
-    except Exception as exception:
-        raise ConfigEntryNotReady from exception
+        await login(hass, auth_config)
+    except AuthenticationError as err:
+        raise ConfigEntryAuthFailed from err
+
+    except Exception as err:
+        _LOGGER.warning("Unable to authenticate", exc_info=True)
+        raise ConfigEntryNotReady(
+            "Unable to authenticate. Sensi integration is not ready."
+        ) from err
 
     coordinator = SensiUpdateCoordinator(hass, auth_config)
     await coordinator.async_config_entry_first_refresh()
@@ -41,3 +72,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # pylint: disable=unused-argument
+    """Unload a config entry."""
+    hass.data.pop(SENSI_DOMAIN)
