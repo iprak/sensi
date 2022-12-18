@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 import json
 import logging
+from multiprocessing import AuthenticationError
 from typing import Final
 
 from homeassistant.components.climate import HVACMode
@@ -14,7 +15,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import websockets
 
-from custom_components.sensi.auth import AuthenticationConfig, login
+from custom_components.sensi.auth import (
+    AuthenticationConfig,
+    SensiConnectionError,
+    login,
+)
 from custom_components.sensi.const import SENSI_FAN_CIRCULATE
 
 _LOGGER = logging.getLogger(__name__)
@@ -301,11 +306,17 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         return found_data
 
     async def _async_update_data(self) -> dict[str, SensiDevice]:
-        """Update data."""
+        """Update device data."""
         if datetime.now().timestamp() >= self._expires_at:
             _LOGGER.info("Token expired, getting new token")
-            if not await login(self._hass, self._auth_config, True):
-                _LOGGER.error("Failed to renew token")
+
+            try:
+                await login(self._hass, self._auth_config, True)
+            except AuthenticationError:
+                _LOGGER.warning("Unable to authenticate", exc_info=True)
+                return
+            except SensiConnectionError:
+                _LOGGER.warning("Failed to connect", exc_info=True)
                 return
 
             self._setup(self._auth_config)

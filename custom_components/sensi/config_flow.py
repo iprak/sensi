@@ -41,7 +41,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         self._reauth_unique_id = None
 
     async def _async_validate_input(self, config: AuthenticationConfig):
-        """Validate the user input allows us to connect."""
+        """Validate user input."""
         try:
             await login(self.hass, config, True)
         except SensiConnectionError:
@@ -80,7 +80,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
         # pylint: disable=unused-argument
-        """Handle reauth."""
+        """Handle reauthentication."""
         self._reauth_unique_id = self.context["unique_id"]
         return await self.async_step_reauth_confirm()
 

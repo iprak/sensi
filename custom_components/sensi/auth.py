@@ -41,7 +41,7 @@ class AuthenticationConfig:
 
 async def login(
     hass: HomeAssistant, config: AuthenticationConfig, renew_token: bool = False
-) -> bool:
+):
     """Login."""
 
     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)

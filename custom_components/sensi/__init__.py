@@ -12,7 +12,6 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from custom_components.sensi.auth import (
     AuthenticationConfig,
     AuthenticationError,
-    SensiConnectionError,
     login,
 )
 from custom_components.sensi.coordinator import SensiUpdateCoordinator
