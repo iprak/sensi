@@ -25,6 +25,7 @@ from custom_components.sensi.const import SENSI_FAN_CIRCULATE
 _LOGGER = logging.getLogger(__name__)
 
 WS_URL: Final = "wss://rt.sensiapi.io/thermostat/?transport=websocket"
+MAX_LOGIN_RETRY: Final = 4
 
 SENSI_TO_HVACMode = {
     "heat": HVACMode.HEAT,
@@ -259,6 +260,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         self._hass = hass
         self._auth_config: AuthenticationConfig = None
         self._devices: dict[str, SensiDevice] = {}
+        self._login_retry = 0
 
         self._setup(config)
 
@@ -306,9 +308,17 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         return found_data
 
     async def _async_update_data(self) -> dict[str, SensiDevice]:
-        """Update device data."""
+        """Update device data. This is invoked by DataUpdateCoordinator."""
         if datetime.now().timestamp() >= self._expires_at:
             _LOGGER.info("Token expired, getting new token")
+
+            self._login_retry = self._login_retry + 1
+            if self._login_retry > MAX_LOGIN_RETRY:
+                _LOGGER.info(
+                    "Login failed %d times. Suspending data update.", self._login_retry
+                )
+                self.update_interval = None
+                return
 
             try:
                 await login(self._hass, self._auth_config, True)

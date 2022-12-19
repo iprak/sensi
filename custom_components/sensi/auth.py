@@ -57,7 +57,7 @@ async def login(
             config.access_token = access_token
             config.expires_at = expires_at
 
-            _LOGGER.info("Using saved authentication")
+            _LOGGER.debug("Using saved authentication")
             return
 
     if not device_id:

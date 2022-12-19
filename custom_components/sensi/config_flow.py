@@ -17,7 +17,7 @@ from custom_components.sensi.auth import (
     login,
 )
 
-from .const import SENSI_DOMAIN
+from .const import SENSI_DOMAIN, SENSI_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,9 +68,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
             if not errors:
                 await self.async_set_unique_id(user_input[CONF_USERNAME])
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title="Sensi Thermostat", data=user_input
-                )
+                return self.async_create_entry(title=SENSI_NAME, data=user_input)
 
         return self.async_show_form(
             step_id="user",

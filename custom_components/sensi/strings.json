@@ -4,11 +4,10 @@
       "user": {
         "data": {
           "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "name": "Sensi"
+          "password": "[%key:common::config_flow::data::password%]"
         },
         "description": "Set up Sensi integration. Login with yout mobile app credentials.",
-        "title": "Sensi"
+        "title": "Sensi Thermostat"
       }
     },
     "error": {

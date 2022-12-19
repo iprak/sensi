@@ -3,6 +3,7 @@
 from typing import Final
 
 SENSI_DOMAIN: Final = "sensi"
+SENSI_NAME: Final = "Sensi Thermostat"
 ATTRIBUTION: Final = "Data provided by Sensi"
 
 SENSI_FAN_AUTO: Final = "auto"
