@@ -94,9 +94,8 @@ class SensiDevice:
             self.model = registration.get("product_type")
 
         state = data_json.get("state")
-        _LOGGER.info("Updating %s (%s)", self.name, self.identifier)
-
         if state:
+            _LOGGER.info("Updating %s (%s)", self.name, self.identifier)
             _LOGGER.debug(state)
 
             if "display_temp" in state:
@@ -322,6 +321,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
             try:
                 await login(self._hass, self._auth_config, True)
+                self._login_retry = 0
             except AuthenticationError:
                 _LOGGER.warning("Unable to authenticate", exc_info=True)
                 return

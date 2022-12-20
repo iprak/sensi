@@ -89,7 +89,11 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
     @property
     def available(self) -> bool:
         """Return if data is available."""
-        return self._device and self.coordinator.get_device(self._device.identifier)
+        return (
+            self._device
+            and self.coordinator.data
+            and self.coordinator.data.get(self._device.identifier)
+        )
 
     @property
     def extra_state_attributes(self) -> Union[Mapping[str, Any], None]:
