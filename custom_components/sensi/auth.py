@@ -40,7 +40,7 @@ class AuthenticationConfig:
 
 
 async def login(
-    hass: HomeAssistant, config: AuthenticationConfig, renew_token: bool = False
+    hass: HomeAssistant, config: AuthenticationConfig, new_token: bool = False
 ):
     """Login."""
 
@@ -48,7 +48,7 @@ async def login(
     persistent_data = await store.async_load() or {}
     device_id = persistent_data.get(KEY_DEVICE_ID)
 
-    if not renew_token:
+    if not new_token:
         access_token = persistent_data.get(KEY_ACCESS_TOKEN)
         refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
         expires_at = persistent_data.get(KEY_EXPIRES_AT)
@@ -82,6 +82,8 @@ async def login(
 
     persistent_data["device_id"] = device_id
 
+    # Uncomment this to test async_step_reauth
+    # raise AuthenticationError("Invalid login credentials")
     if response.status != HTTPStatus.OK:
         await store.async_save(persistent_data)
         raise AuthenticationError("Invalid login credentials")

@@ -15,12 +15,9 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.sensi.const import (
-    ATTRIBUTION,
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     SENSI_DOMAIN,
@@ -31,6 +28,7 @@ from custom_components.sensi.const import (
 from custom_components.sensi.coordinator import (
     HA_TO_SENSI_HVACMode,
     SensiDevice,
+    SensiEntity,
     SensiUpdateCoordinator,
 )
 
@@ -46,18 +44,14 @@ async def async_setup_entry(
     data = hass.data[SENSI_DOMAIN][entry.entry_id]
     coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
 
-    entities = [
-        SensiThermostat(device, coordinator) for device in coordinator.get_devices()
-    ]
+    entities = [SensiThermostat(device) for device in coordinator.get_devices()]
 
     async_add_entities(entities)
     _LOGGER.info("Added %d thermostats", len(entities))
 
 
-class SensiThermostat(CoordinatorEntity, ClimateEntity):
+class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
-
-    coordinator: SensiUpdateCoordinator
 
     _attr_hvac_modes = [
         HVACMode.AUTO,
@@ -70,30 +64,10 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
     )
     _attr_fan_modes = [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
 
-    def __init__(
-        self, device: SensiDevice, coordinator: SensiUpdateCoordinator
-    ) -> None:
+    def __init__(self, device: SensiDevice) -> None:
         """Initialize the device."""
 
-        super().__init__(coordinator)
-        self._device = device
-        self._unique_id = f"{DOMAIN}.{SENSI_DOMAIN}_{device.identifier}"
-        self._attr_attribution = ATTRIBUTION
-        self._device_info = {
-            "identifiers": {(SENSI_DOMAIN, device.identifier)},
-            "name": self._device.name,
-            "manufacturer": "Sensi",
-            "model": device.model,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if data is available."""
-        return (
-            self._device
-            and self.coordinator.data
-            and self.coordinator.data.get(self._device.identifier)
-        )
+        super().__init__(device, f"{DOMAIN}.{SENSI_DOMAIN}_{device.identifier}")
 
     @property
     def extra_state_attributes(self) -> Union[Mapping[str, Any], None]:
@@ -101,19 +75,9 @@ class SensiThermostat(CoordinatorEntity, ClimateEntity):
         return self._device.attributes
 
     @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._unique_id
-
-    @property
     def name(self) -> str:
         """Return the name of the entity."""
         return self._device.name
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device specific attributes."""
-        return self._device_info
 
     @property
     def current_temperature(self):

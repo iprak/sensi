@@ -105,7 +105,6 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
                 return self.async_abort(reason="reauth_successful")
 
         return self.async_show_form(
-            description_placeholders={CONF_USERNAME: username},
             step_id="reauth_confirm",
             data_schema=REAUTH_SCHEMA,
             errors=errors,

@@ -52,8 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
 
     try:
-        await login(hass, auth_config)
+        await login(hass, auth_config, True)  # Obtain new access_token on startup
     except AuthenticationError as err:
+        # Raising ConfigEntryAuthFailed will automatically put the config entry in a
+        # failure state and start a reauth flow.
+        # https://developers.home-assistant.io/docs/integration_setup_failures/
         raise ConfigEntryAuthFailed from err
 
     except Exception as err:

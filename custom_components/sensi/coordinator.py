@@ -12,7 +12,11 @@ from typing import Final
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 import websockets
 
 from custom_components.sensi.auth import (
@@ -20,7 +24,7 @@ from custom_components.sensi.auth import (
     SensiConnectionError,
     login,
 )
-from custom_components.sensi.const import SENSI_FAN_CIRCULATE
+from custom_components.sensi.const import ATTRIBUTION, SENSI_DOMAIN, SENSI_FAN_CIRCULATE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,6 +44,46 @@ HA_TO_SENSI_HVACMode = {
     HVACMode.AUTO: "auto",
     HVACMode.OFF: "off",
 }
+
+
+class SensiEntity(CoordinatorEntity):
+    """Representation of a Sensi entity."""
+
+    def __init__(self, device: SensiDevice, unique_id: str) -> None:
+        """Initialize the entity."""
+
+        super().__init__(device.coordinator)
+
+        self._attr_attribution = ATTRIBUTION
+
+        self._device = device
+        self._unique_id = unique_id
+
+        self._device_info = {
+            "identifiers": {(SENSI_DOMAIN, device.identifier)},
+            "name": device.name,
+            "manufacturer": "Sensi",
+            "model": device.model,
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return if data is available."""
+        return (
+            self._device
+            and self.coordinator.data
+            and self.coordinator.data.get(self._device.identifier)
+        )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device specific attributes."""
+        return self._device_info
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return self._unique_id
 
 
 class SensiDevice:
@@ -256,7 +300,6 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize Sensi coordinator."""
 
-        self._hass = hass
         self._auth_config: AuthenticationConfig = None
         self._devices: dict[str, SensiDevice] = {}
         self._login_retry = 0
@@ -320,7 +363,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 return
 
             try:
-                await login(self._hass, self._auth_config, True)
+                await login(self.hass, self._auth_config, True)
                 self._login_retry = 0
             except AuthenticationError:
                 _LOGGER.warning("Unable to authenticate", exc_info=True)

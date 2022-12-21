@@ -14,17 +14,15 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, TEMP_CELSIUS
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import (
-    DeviceInfo,
-    EntityDescription,
-    generate_entity_id,
-)
+from homeassistant.helpers.entity import EntityDescription, generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.sensi.const import ATTRIBUTION
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
+from custom_components.sensi.coordinator import (
+    SensiDevice,
+    SensiEntity,
+    SensiUpdateCoordinator,
+)
 
 from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
 
@@ -62,7 +60,7 @@ async def async_setup_entry(
     for device in coordinator.get_devices():
 
         sub_entities = [
-            SensiSensorEntity(device, coordinator, description)
+            SensiSensorEntity(device, description)
             for description in SENSOR_DESCRIPTIONS
         ]
 
@@ -72,7 +70,7 @@ async def async_setup_entry(
     _LOGGER.info("Added %d sensors", len(entities))
 
 
-class SensiSensorEntity(CoordinatorEntity, SensorEntity):
+class SensiSensorEntity(SensiEntity, SensorEntity):
     """Representation of a Sensi sensor."""
 
     # pylint: disable=too-many-instance-attributes
@@ -81,46 +79,26 @@ class SensiSensorEntity(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         device: SensiDevice,
-        coordinator: SensiUpdateCoordinator,
         description: EntityDescription,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
+        super().__init__(device, f"{device.identifier}_{description.key}")
 
         self._device = device
         self._name = f"{device.name} {description.name}"
-        self._unique_id = f"{device.identifier}_{description.key}"
         self.entity_description = description
 
         entity_id_format = description.key + ".{}"
+
+        # Note: self.hass is not set at this point
         self.entity_id = generate_entity_id(
-            entity_id_format, f"{SENSI_DOMAIN}_{self._name}", hass=coordinator.hass
+            entity_id_format,
+            f"{SENSI_DOMAIN}_{self._name}",
+            hass=device.coordinator.hass,
         )
 
         if description.device_class == SensorDeviceClass.TEMPERATURE:
             self._attr_native_unit_of_measurement = device.temperature_unit
-
-        self._attr_attribution = ATTRIBUTION
-        self._device_info = {
-            "identifiers": {(SENSI_DOMAIN, device.identifier)},
-            "name": self._name,
-            "manufacturer": "Sensi",
-            "model": device.model,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if data is available."""
-        return (
-            self._device
-            and self.coordinator.data
-            and self.coordinator.data.get(self._device.identifier)
-        )
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._unique_id
 
     @property
     def name(self) -> str:
@@ -136,8 +114,3 @@ class SensiSensorEntity(CoordinatorEntity, SensorEntity):
             if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
             else self._device.humidity
         )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device specific attributes."""
-        return self._device_info
