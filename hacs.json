@@ -1,5 +1,4 @@
 {
   "name": "Sensi",
-  "iot_class": "cloud_poll",
   "render_readme": true
 }
