@@ -73,9 +73,6 @@ async def async_setup_entry(
 class SensiSensorEntity(SensiEntity, SensorEntity):
     """Representation of a Sensi sensor."""
 
-    # pylint: disable=too-many-instance-attributes
-    # These attributes are okay.
-
     def __init__(
         self,
         device: SensiDevice,
@@ -84,33 +81,30 @@ class SensiSensorEntity(SensiEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(device, f"{device.identifier}_{description.key}")
 
-        self._device = device
-        self._name = f"{device.name} {description.name}"
+        self._attr_name = description.name
         self.entity_description = description
+
+        self._sensi_device: SensiDevice = device
+        self._is_temperature = description.device_class == SensorDeviceClass.TEMPERATURE
 
         entity_id_format = description.key + ".{}"
 
         # Note: self.hass is not set at this point
         self.entity_id = generate_entity_id(
             entity_id_format,
-            f"{SENSI_DOMAIN}_{self._name}",
+            f"{SENSI_DOMAIN}_{description.key}",
             hass=device.coordinator.hass,
         )
 
-        if description.device_class == SensorDeviceClass.TEMPERATURE:
+        if self._is_temperature:
             self._attr_native_unit_of_measurement = device.temperature_unit
-
-    @property
-    def name(self) -> str:
-        """Return the name of the entity."""
-        return self._name
 
     @property
     def native_value(self) -> StateType:
         """Return the value reported by the sensor."""
 
         return (
-            self._device.temperature
-            if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
-            else self._device.humidity
+            self._sensi_device.temperature
+            if self._is_temperature
+            else self._sensi_device.humidity
         )

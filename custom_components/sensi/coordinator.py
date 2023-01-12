@@ -49,12 +49,13 @@ HA_TO_SENSI_HVACMode = {
 class SensiEntity(CoordinatorEntity):
     """Representation of a Sensi entity."""
 
+    _attr_has_entity_name = True
+    _attr_attribution = ATTRIBUTION
+
     def __init__(self, device: SensiDevice, unique_id: str) -> None:
         """Initialize the entity."""
 
         super().__init__(device.coordinator)
-
-        self._attr_attribution = ATTRIBUTION
 
         self._device = device
         self._unique_id = unique_id

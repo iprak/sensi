@@ -76,8 +76,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def name(self) -> str:
-        """Return the name of the entity."""
-        return self._device.name
+        """Return the name of the entity.
+
+        Returning None since this is the primary entity. https://developers.home-assistant.io/docs/core/entity/#entity-naming
+        """
+        return None
 
     @property
     def current_temperature(self):
