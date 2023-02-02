@@ -1,6 +1,4 @@
 {
   "name": "Sensi",
-  "domains": ["sensor", "thermostat"],
-  "iot_class": "cloud_poll",
   "render_readme": true
 }
