@@ -304,6 +304,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         self._auth_config: AuthenticationConfig = None
         self._devices: dict[str, SensiDevice] = {}
         self._login_retry = 0
+        self._last_update_failed = False
 
         self._setup(config)
 
@@ -379,17 +380,23 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             done = False
             while not done:
                 try:
-                    msg = await asyncio.wait_for(websocket.recv(), timeout=5)
+                    msg = await asyncio.wait_for(websocket.recv(), timeout=10)
                     done = self._parse_socket_response(msg, self._devices)
+                    if self._last_update_failed:
+                        _LOGGER.debug("Data updated, it failed last time")
+                        self._last_update_failed = False
 
                 except asyncio.TimeoutError:
                     _LOGGER.warning("Timed out waiting for data")
                     done = True
+                    self._last_update_failed = True
                 except websockets.exceptions.WebSocketException as socket_exception:
                     _LOGGER.warning(str(socket_exception))
+                    self._last_update_failed = True
                     done = True
                 except Exception as err:  # pylint: disable=broad-except
                     _LOGGER.warning(str(err))
+                    self._last_update_failed = True
                     done = True
 
         return self._devices
