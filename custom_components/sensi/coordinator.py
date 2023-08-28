@@ -221,7 +221,10 @@ class SensiDevice:
         await self.coordinator.async_send_event(json.dumps(data))
 
         # Assume the operation to succeed, update attribute immediately
-        self.temperature = value
+        if self.hvac_mode == HVACMode.HEAT:
+            self.heat_target = value
+        else:
+            self.cool_target = value
 
     async def async_set_fan_mode(self, mode: str) -> None:
         """Set the fan mode."""
