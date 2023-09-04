@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-import logging
 from typing import Any, Union
 
-from homeassistant.components.climate import (
-    DOMAIN,
+from homeassistant.components.climate import (  # ClimateEntityDescription,
+    ENTITY_ID_FORMAT,
     ClimateEntity,
     ClimateEntityFeature,
     HVACMode,
@@ -15,24 +14,25 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from custom_components.sensi import SensiEntity
 from custom_components.sensi.const import (
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
+    Capabilities,
 )
 from custom_components.sensi.coordinator import (
     HA_TO_SENSI_HVACMode,
     SensiDevice,
-    SensiEntity,
     SensiUpdateCoordinator,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -43,11 +43,8 @@ async def async_setup_entry(
     """Set up Sensi thermostat."""
     data = hass.data[SENSI_DOMAIN][entry.entry_id]
     coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
-
     entities = [SensiThermostat(device) for device in coordinator.get_devices()]
-
     async_add_entities(entities)
-    _LOGGER.info("Added %d thermostats", len(entities))
 
 
 class SensiThermostat(SensiEntity, ClimateEntity):
@@ -62,12 +59,17 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
     )
-    _attr_fan_modes = [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
 
     def __init__(self, device: SensiDevice) -> None:
         """Initialize the device."""
 
-        super().__init__(device, f"{DOMAIN}.{SENSI_DOMAIN}_{device.identifier}")
+        super().__init__(device)
+
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.identifier}",
+            hass=device.coordinator.hass,
+        )
 
     @property
     def extra_state_attributes(self) -> Union[Mapping[str, Any], None]:
@@ -78,9 +80,20 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def name(self) -> str:
         """Return the name of the entity.
 
-        Returning None since this is the primary entity. https://developers.home-assistant.io/docs/core/entity/#entity-naming
+        Returning None since this is the primary entity.
+        https://developers.home-assistant.io/docs/core/entity/#entity-naming
         """
+
         return None
+
+    @property
+    def fan_modes(self) -> list[str] | None:
+        """Return the list of available fan modes."""
+        return (
+            [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
+            if self._device.supports(Capabilities.CIRCULATING_FAN)
+            else [SENSI_FAN_AUTO, SENSI_FAN_ON]
+        )
 
     @property
     def current_temperature(self):
@@ -129,40 +142,59 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
 
-        # You will ATTR_TEMPERATURE for ClimateEntityFeature.TARGET_TEMPERATURE
-        # and ATTR_TARGET_TEMP_LOW,ATTR_TARGET_TEMP_HIGH for TARGET_TEMPERATURE_RANGE
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
+        # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
+        # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temp = kwargs.get(ATTR_TEMPERATURE)
         await self._device.async_set_temp(round(temp))
         self.async_write_ha_state()
-        _LOGGER.info("Set temperature to %d", temp)
+        LOGGER.info("Set temperature to %d", temp)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new operating mode."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         if hvac_mode not in HA_TO_SENSI_HVACMode:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
         await self._device.async_set_operating_mode(HA_TO_SENSI_HVACMode[hvac_mode])
         self.async_write_ha_state()
-        _LOGGER.info("Set hvac_mode to %s", hvac_mode)
+        LOGGER.info("%s: set hvac_mode to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
         if fan_mode == SENSI_FAN_CIRCULATE:
-            await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
             await self._device.async_set_circulating_fan_mode(
                 True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             )
+            await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
         else:
-            await self._device.async_set_fan_mode(fan_mode)  # on or auto
             await self._device.async_set_circulating_fan_mode(False, 0)
+            await self._device.async_set_fan_mode(fan_mode)  # on or auto
 
         self.async_write_ha_state()
-        _LOGGER.info("Set fan_mode to %s", fan_mode)
+        LOGGER.info("%s: set fan_mode to %s", self._device.name, fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         await self._device.async_set_fan_mode(HVACMode.AUTO)
         self.async_write_ha_state()

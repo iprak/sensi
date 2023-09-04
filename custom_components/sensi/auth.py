@@ -6,7 +6,6 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from http import HTTPStatus
-import logging
 from typing import Any, Final
 import uuid
 
@@ -15,12 +14,13 @@ import async_timeout
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, storage
 
-from custom_components.sensi.const import STORAGE_KEY, STORAGE_VERSION
+from custom_components.sensi.const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 
-_LOGGER = logging.getLogger(__name__)
-
+# Defined in CreateRefreshParams.java
 OAUTH_URL: Final = "https://oauth.sensiapi.io/token?device={}"
 CLIENT_SECRET: Final = "XBF?Z9U6;x3bUwe^FugbL=4ksvGjLnCQ"
+
+# The following constants are mentioned in AuthenticationService.java
 CLIENT_ID: Final = "android"
 KEY_DEVICE_ID: Final = "device_id"
 KEY_ACCESS_TOKEN: Final = "access_token"
@@ -57,7 +57,7 @@ async def login(
             config.access_token = access_token
             config.expires_at = expires_at
 
-            _LOGGER.debug("Using saved authentication")
+            LOGGER.debug("Using saved authentication")
             return
 
     if not device_id:
@@ -77,7 +77,7 @@ async def login(
         async with async_timeout.timeout(10):
             response = await session.post(OAUTH_URL.format(device_id), data=post_data)
     except (asyncio.TimeoutError, aiohttp.ClientError) as err:
-        _LOGGER.warning("Timed out getting access token", exc_info=True)
+        LOGGER.warning("Timed out getting access token", exc_info=True)
         raise SensiConnectionError from err
 
     persistent_data["device_id"] = device_id
