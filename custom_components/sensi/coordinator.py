@@ -5,31 +5,47 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 import json
-import logging
 from multiprocessing import AuthenticationError
-from typing import Final
+from typing import Any, Final
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
-import websockets
+from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+import websockets.client
 
 from custom_components.sensi.auth import (
     AuthenticationConfig,
     SensiConnectionError,
     login,
 )
-from custom_components.sensi.const import ATTRIBUTION, SENSI_DOMAIN, SENSI_FAN_CIRCULATE
+from custom_components.sensi.const import (
+    CAPABILITIES_VALUE_GETTER,
+    COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
+    LOGGER,
+    SENSI_FAN_CIRCULATE,
+    Capabilities,
+    DisplayProperties,
+)
 
-_LOGGER = logging.getLogger(__name__)
-
+# This is based on IOWrapper.java
+# pylint: disable=line-too-long
 WS_URL: Final = "wss://rt.sensiapi.io/thermostat/?transport=websocket"
+CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan"
+
+# # All possible capabilities:
+# display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,
+# continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,compressor_lockout,boost,heat_cycle_rate,
+# heat_cycle_rate_steps,cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,early_start,min_heat_setpoint,
+# max_heat_setpoint,min_cool_setpoint,max_cool_setpoint,circulating_fan,humidity_control,humidity_offset,humidity_offset_lower_bound,
+# humidity_offset_upper_bound,temp_offset_lower_bound,temp_offset_upper_bound,lowest_heat_setpoint_ceiling,heat_setpoint_ceiling,
+# highest_cool_setpoint_floor,cool_setpoint_floor"
+
+# pylint: enable=line-too-long
+
 MAX_LOGIN_RETRY: Final = 4
+MAX_DATA_FETCH_COUNT: Final = 5
 
 SENSI_TO_HVACMode = {
     "heat": HVACMode.HEAT,
@@ -46,45 +62,12 @@ HA_TO_SENSI_HVACMode = {
 }
 
 
-class SensiEntity(CoordinatorEntity):
-    """Representation of a Sensi entity."""
-
-    _attr_has_entity_name = True
-    _attr_attribution = ATTRIBUTION
-
-    def __init__(self, device: SensiDevice, unique_id: str) -> None:
-        """Initialize the entity."""
-
-        super().__init__(device.coordinator)
-
-        self._device = device
-        self._unique_id = unique_id
-
-        self._device_info = {
-            "identifiers": {(SENSI_DOMAIN, device.identifier)},
-            "name": device.name,
-            "manufacturer": "Sensi",
-            "model": device.model,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if data is available."""
-        return (
-            self._device
-            and self.coordinator.data
-            and self.coordinator.data.get(self._device.identifier)
-        )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device specific attributes."""
-        return self._device_info
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._unique_id
+def parse_bool(state: dict[str, Any], key: str) -> bool | None:
+    """Parse on/off into bool value."""
+    if key in state:
+        return state.get(key) == "on"
+    else:
+        return None
 
 
 class SensiDevice:
@@ -100,12 +83,14 @@ class SensiDevice:
     model: str | None = None
 
     temperature: float | None = None
+    temperature_unit = TEMP_FAHRENHEIT
     humidity: int | None = None
     hvac_mode: HVACMode = HVACMode.AUTO
-    temperature_unit = TEMP_FAHRENHEIT
 
     _display_scale = "f"
     """Raw display_scale"""
+
+    _capabilities: dict[Capabilities, bool] = {}
 
     fan_mode: str | None = None
     attributes: dict[str, str | float] = {}
@@ -113,25 +98,34 @@ class SensiDevice:
     max_temp = 99
     cool_target: float | None = None
     heat_target: float | None = None
+    display_properties: dict[DisplayProperties, StateType] = {}
+    battery_voltage: float | None = None
+    offline: bool = True
 
-    def __init__(self, coordinator, data_json):
+    def __init__(self, coordinator, data_json: dict):
         """Initialize a Sensi thermostate device."""
         self.coordinator = coordinator
         self.update(data_json)
 
-    @staticmethod
-    def data_has_state(device_data) -> bool:
-        """Check if the data has device state."""
-        return "state" in device_data
+    def update_capabilities(self, data: dict):
+        """Update device capabilities."""
 
-    def update(self, data_json):
+        for key in Capabilities:
+            getter = CAPABILITIES_VALUE_GETTER.get(key)
+            if getter:
+                value = getter(data.get(key))
+            else:
+                value = data.get(key, "no")
+
+            self._capabilities[key] = value == "yes"
+
+    def supports(self, value: Capabilities) -> bool:
+        """Check if the device has the capability."""
+        return self._capabilities.get(value, False)
+
+    def update(self, data_json: dict):
         """Update device properties."""
-        self.identifier = data_json.get("icd_id")
-
-        # if self.identifier is None:
-        # error
-
-        self.identifier = self.identifier.lower()
+        self.identifier = data_json.get("icd_id").lower()
 
         registration = data_json.get("registration")
         if registration:
@@ -140,14 +134,12 @@ class SensiDevice:
 
         state = data_json.get("state")
         if state:
-            _LOGGER.info("Updating %s (%s)", self.name, self.identifier)
-            _LOGGER.debug(state)
+            LOGGER.info("Updating %s (%s)", self.name, self.identifier)
+            LOGGER.debug(state)
 
-            if "display_temp" in state:
-                self.temperature = state.get("display_temp")
-
-            if "humidity" in state:
-                self.humidity = state.get("humidity")
+            self.offline = state.get("status") == "offline"
+            self.temperature = state.get("display_temp")
+            self.humidity = state.get("humidity")
 
             # current_operating_mode can be auto_heat but operating_mode remains auto
             if "operating_mode" in state:
@@ -165,7 +157,7 @@ class SensiDevice:
             self.attributes["wifi_connection_quality"] = state.get(
                 "wifi_connection_quality"
             )
-            self.attributes["battery_voltage"] = state.get("battery_voltage")
+            self.battery_voltage = state.get("battery_voltage")
 
             self.min_temp = state.get("cool_min_temp", 45)
             self.max_temp = state.get("heat_max_temp", 99)
@@ -185,42 +177,65 @@ class SensiDevice:
             if "fan_mode" in state:
                 self.fan_mode = state.get("fan_mode")
 
-            circulating_fan = state.get(
-                "circulating_fan", {"enabled": "off", "duty_cycle": 0}
-            )
-            self.attributes["circulating_fan"] = circulating_fan["enabled"]
-            self.attributes["circulating_fan_cuty_cycle"] = circulating_fan[
-                "duty_cycle"
-            ]
-            if self.attributes["circulating_fan"] == "on":
-                self.fan_mode = SENSI_FAN_CIRCULATE
+            if self.supports(Capabilities.CIRCULATING_FAN) and (
+                "circulating_fan" in state
+            ):
+                circulating_fan = state.get(
+                    "circulating_fan", {"enabled": "off", "duty_cycle": 0}
+                )
+                self.attributes["circulating_fan"] = circulating_fan["enabled"]
+                self.attributes["circulating_fan_cuty_cycle"] = circulating_fan[
+                    "duty_cycle"
+                ]
 
-            _LOGGER.info(
-                "%d%s humidity=%d hvac_mode=%s fan_mode=%s hvac_action=%s",
+                if self.attributes["circulating_fan"] == "on":
+                    self.fan_mode = SENSI_FAN_CIRCULATE
+
+            self.display_properties[
+                DisplayProperties.CONTINUOUS_BACKLIGHT
+            ] = parse_bool(state, DisplayProperties.CONTINUOUS_BACKLIGHT)
+            self.display_properties[DisplayProperties.DISPLAY_HUMIDITY] = parse_bool(
+                state, DisplayProperties.DISPLAY_HUMIDITY
+            )
+            self.display_properties[DisplayProperties.DISPLAY_TIME] = parse_bool(
+                state, DisplayProperties.DISPLAY_TIME
+            )
+
+            # pylint: disable=line-too-long
+            LOGGER.info(
+                "%d%s humidity=%d hvac_mode=%s fan_mode=%s hvac_action=%s cool_target=%d heat_target=%d",
                 self.temperature,
                 self.temperature_unit,
                 self.humidity,
                 self.hvac_mode,
                 self.fan_mode,
                 hvac_action,
+                self.cool_target,
+                self.heat_target,
             )
+            # pylint: enable=line-too-long
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
 
+        if self.hvac_mode == HVACMode.HEAT:
+            if self.heat_target == value:
+                return
+        else:
+            if self.cool_target == value:
+                return
+
         # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature
-        data = [
-            "set_temperature",
+        data = self.build_set_request_str(
+            "temperature",
             {
-                "icd_id": self.identifier,
                 "target_temp": value,
                 "mode": self._operating_mode.lower(),
                 "scale": self._display_scale,
             },
-        ]
-        await self.coordinator.async_send_event(json.dumps(data))
+        )
+        await self.coordinator.async_send_event(data)
 
-        # Assume the operation to succeed, update attribute immediately
         if self.hvac_mode == HVACMode.HEAT:
             self.heat_target = value
         else:
@@ -229,18 +244,13 @@ class SensiDevice:
     async def async_set_fan_mode(self, mode: str) -> None:
         """Set the fan mode."""
 
+        mode = mode.lower()
+        if self.fan_mode == mode:
+            return
+
         # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode
-        data = [
-            "set_fan_mode",
-            {
-                "icd_id": self.identifier,
-                "value": mode.lower(),
-            },
-        ]
-
-        await self.coordinator.async_send_event(json.dumps(data))
-
-        # Assume the operation to succeed, update attribute immediately
+        data = self.build_set_request_str("fan_mode", {"value": mode})
+        await self.coordinator.async_send_event(data)
         self.fan_mode = mode
 
     async def async_set_circulating_fan_mode(
@@ -248,54 +258,76 @@ class SensiDevice:
     ) -> None:
         """Set the circulating fan mode."""
 
+        if not self.supports(Capabilities.CIRCULATING_FAN):
+            LOGGER.info(
+                "%s: circulating fan mode was set but the device does not support it",
+                self.identifier,
+            )
+            return
+
         status = "on" if enabled else "off"
+
+        if (self.attributes["circulating_fan"] == status) and (
+            self.attributes["circulating_fan_cuty_cycle"] == duty_cycle
+        ):
+            return
+
         # com.emerson.sensi.api.events.SetCirculatingFanEvent > set_fan_mode
-        data = [
-            "set_circulating_fan",
-            {
-                "icd_id": self.identifier,
-                "value": {"enabled": status, "duty_cycle": duty_cycle},
-            },
-        ]
+        data = self.build_set_request_str(
+            "circulating_fan",
+            {"value": {"enabled": status, "duty_cycle": duty_cycle}},
+        )
+        await self.coordinator.async_send_event(data)
 
-        await self.coordinator.async_send_event(json.dumps(data))
-
-        # Assume the operation to succeed, update attribute immediately
         self.attributes["circulating_fan"] = status
         self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
 
     async def async_set_operating_mode(self, mode: str) -> None:
-        """Set the fan mode."""
+        """
+        Set the fan mode.
+        com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode"
+        """
 
-        # com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode"
-        data = [
-            "set_operating_mode",
-            {
-                "icd_id": self.identifier,
-                "value": mode,
-            },
-        ]
-        await self.coordinator.async_send_event(json.dumps(data))
+        new_hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
+        if new_hvac_mode == self.hvac_mode:
+            return
 
-        # Assume the operation to succeed, update attribute immediately
-        self.hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
+        data = self.build_set_request_str("operating_mode", {"value": mode})
+        await self.coordinator.async_send_event(data)
+        self.hvac_mode = new_hvac_mode
 
+    def get_display_setting(self, key: DisplayProperties) -> bool | None:
+        """Get a display configuration."""
+        return self.display_properties.get(key)
 
-# async def async_set_heat_max_temp(self, value) -> None:
-#     """Set the maximum temperature."""
-#     data = [
-#         "set_heat_max_temp",
-#         {
-#             "icd_id": self._device.identifier,
-#             "value": round(value),
-#             "scale": self._device.display_scale,
-#         },
-#     ]
-#     await self.coordinator.async_send_event(json.dumps(data))
+    async def async_set_display_setting(
+        self, key: DisplayProperties, value: bool
+    ) -> None:
+        """Set a display configuration."""
+
+        if key not in DisplayProperties:
+            return
+
+        if value == self.get_display_setting(key):
+            return
+
+        data = self.build_set_request_str(key, {"value": "on" if value else "off"})
+        await self.coordinator.async_send_event(data)
+        self.display_properties[key] = value
+
+    def build_set_request_str(self, key: str, payload: dict[str, str]) -> str:
+        """Prepare the request string for setting data."""
+
+        data = payload.copy()
+        data["icd_id"] = self.identifier
+        json_data = [f"set_{key}", data]
+        return json.dumps(json_data)
 
 
 class SensiUpdateCoordinator(DataUpdateCoordinator):
     """The Sensi data update coordinator."""
+
+    _last_event_time_stamp: datetime | None = None
 
     def __init__(
         self,
@@ -309,16 +341,16 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         self._login_retry = 0
         self._last_update_failed = False
 
-        self._setup(config)
+        self._save_auth_config(config)
 
         super().__init__(
             hass,
-            _LOGGER,
+            LOGGER,
             name="SensiUpdateCoordinator",
             update_interval=timedelta(seconds=30),
         )
 
-    def _setup(self, config: AuthenticationConfig):
+    def _save_auth_config(self, config: AuthenticationConfig):
         self._auth_config = config
         self._access_token = config.access_token
         self._headers = {"Authorization": "bearer " + config.access_token}
@@ -337,80 +369,120 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         if not msg or not msg.startswith("42"):
             return False
 
-        found_data = False
+        found_state = False
+
         parsed_json = json.loads(msg[2:])
         if parsed_json[0] == "state":
             for device_data in parsed_json[1]:
                 icd_id = device_data.get("icd_id")
 
-                # Assuimg that data will be present for all devices in consistent manner.
-                found_data = SensiDevice.data_has_state(device_data)
+                # Assumes that data will be present for all devices in consistent manner.
+                found_state = "state" in device_data
 
                 if icd_id in devices:
                     devices[icd_id].update(device_data)
                 else:
-                    _LOGGER.info("Creating device %s", icd_id)
+                    LOGGER.info("Creating device %s", icd_id)
                     devices[icd_id] = SensiDevice(self, device_data)
 
-        return found_data
+                if "capabilities" in device_data:
+                    devices[icd_id].update_capabilities(device_data["capabilities"])
+
+        return found_state
 
     async def _async_update_data(self) -> dict[str, SensiDevice]:
         """Update device data. This is invoked by DataUpdateCoordinator."""
-        if datetime.now().timestamp() >= self._expires_at:
-            _LOGGER.info("Token expired, getting new token")
 
-            self._login_retry = self._login_retry + 1
-            if self._login_retry > MAX_LOGIN_RETRY:
-                _LOGGER.info(
-                    "Login failed %d times. Suspending data update.", self._login_retry
-                )
-                self.update_interval = None
-                return
+        # Testing showed that update after a event request failed to bring new data.
+        # The next update would bring in correct data, skipping update conditionally.
+        if self._last_event_time_stamp is not None:
+            if (datetime.now() - self._last_event_time_stamp) < timedelta(
+                seconds=COORDINATOR_DELAY_REFRESH_AFTER_UPDATE
+            ):
+                return self._devices
 
-            try:
-                await login(self.hass, self._auth_config, True)
-                self._login_retry = 0
-            except AuthenticationError:
-                _LOGGER.warning("Unable to authenticate", exc_info=True)
-                return
-            except SensiConnectionError:
-                _LOGGER.warning("Failed to connect", exc_info=True)
-                return
+        if not await self._verify_authentication():
+            return self._devices
 
-            self._setup(self._auth_config)
+        url = WS_URL if self._devices else f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
-        async with websockets.connect(WS_URL, extra_headers=self._headers) as websocket:
-            done = False
-            while not done:
+        fetch_count = 0
+        done = False
+
+        async with websockets.client.connect(
+            url, extra_headers=self._headers
+        ) as websocket:
+            while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
                 try:
                     msg = await asyncio.wait_for(websocket.recv(), timeout=10)
                     done = self._parse_socket_response(msg, self._devices)
+                    fetch_count = fetch_count + 1
+
                     if self._last_update_failed:
-                        _LOGGER.debug("Data updated, it failed last time")
+                        LOGGER.debug("Data updated, it failed last time")
                         self._last_update_failed = False
 
                 except asyncio.TimeoutError:
-                    _LOGGER.warning("Timed out waiting for data")
+                    LOGGER.warning("Timed out waiting for data")
                     done = True
                     self._last_update_failed = True
                 except websockets.exceptions.WebSocketException as socket_exception:
-                    _LOGGER.warning(str(socket_exception))
+                    LOGGER.warning(str(socket_exception))
                     self._last_update_failed = True
                     done = True
                 except Exception as err:  # pylint: disable=broad-except
-                    _LOGGER.warning(str(err))
+                    LOGGER.warning(str(err))
                     self._last_update_failed = True
                     done = True
 
         return self._devices
 
-    async def async_send_event(self, data: str):
+    async def async_send_event(self, data: str) -> None:
         """Send a JSON request."""
-        async with websockets.connect(WS_URL, extra_headers=self._headers) as websocket:
+
+        await self.async_send_event_priv(data)
+        await self.async_send_event_priv(data)  # Repeat
+
+    async def async_send_event_priv(self, data: str) -> None:
+        """Send a JSON request."""
+
+        self._last_event_time_stamp = None
+
+        async with websockets.client.connect(
+            WS_URL, extra_headers=self._headers
+        ) as websocket:
             try:
                 await websocket.send("421" + data)
                 msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-                _LOGGER.debug("async_send_event response=%s", msg)
+                # self._last_event_time_stamp = datetime.now()
+                LOGGER.debug("async_send_event response=%s", msg)
             except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.warning("Sending event with %s failed", data)
-                _LOGGER.warning(str(err))
+                LOGGER.warning("Sending event with %s failed", data)
+                LOGGER.warning(str(err))
+
+    async def _verify_authentication(self) -> bool:
+        """Verify that authentication is not expired. Login again if necessary."""
+        if datetime.now().timestamp() >= self._expires_at:
+            LOGGER.info("Token expired, getting new token")
+
+            self._login_retry = self._login_retry + 1
+            if self._login_retry > MAX_LOGIN_RETRY:
+                LOGGER.info(
+                    "Login failed %d times. Suspending data update.", self._login_retry
+                )
+                self.update_interval = None
+                return False
+
+            try:
+                await login(self.hass, self._auth_config, True)
+                self._login_retry = 0
+            except AuthenticationError:
+                LOGGER.warning("Unable to authenticate", exc_info=True)
+                return False
+            except SensiConnectionError:
+                LOGGER.warning("Failed to connect", exc_info=True)
+                return False
+
+            self._save_auth_config(self._auth_config)
+
+        return True

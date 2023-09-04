@@ -2,25 +2,27 @@
 
 from __future__ import annotations
 
-import logging
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.entity import DeviceInfo, EntityDescription
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.sensi.auth import (
     AuthenticationConfig,
     AuthenticationError,
     login,
 )
-from custom_components.sensi.coordinator import SensiUpdateCoordinator
+from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
 
-from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
+from .const import DOMAIN_DATA_COORDINATOR_KEY, LOGGER, SENSI_ATTRIBUTION, SENSI_DOMAIN
 
-SUPPORTED_PLATFORMS = [Platform.CLIMATE, Platform.SENSOR]
-
-_LOGGER = logging.getLogger(__name__)
+SUPPORTED_PLATFORMS = [
+    Platform.CLIMATE,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 
 def send_notification(
@@ -60,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         raise ConfigEntryAuthFailed from err
 
     except Exception as err:
-        _LOGGER.warning("Unable to authenticate", exc_info=True)
+        LOGGER.warning("Unable to authenticate", exc_info=True)
         raise ConfigEntryNotReady(
             "Unable to authenticate. Sensi integration is not ready."
         ) from err
@@ -77,6 +79,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    # pylint: disable=unused-argument
     """Unload a config entry."""
-    hass.data.pop(SENSI_DOMAIN)
+    if unload_ok := await hass.config_entries.async_unload_platforms(
+        entry, SUPPORTED_PLATFORMS
+    ):
+        hass.data[SENSI_DOMAIN].pop(entry.entry_id)
+    return unload_ok
+
+
+class SensiEntity(CoordinatorEntity):
+    """Representation of a Sensi entity."""
+
+    _attr_has_entity_name = True
+    _attr_attribution = SENSI_ATTRIBUTION
+
+    def __init__(self, device: SensiDevice) -> None:
+        """Initialize the entity."""
+
+        super().__init__(device.coordinator)
+        self._device = device
+        self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}"
+
+        self._attr_device_info = DeviceInfo(
+            identifiers={(SENSI_DOMAIN, device.identifier)},
+            name=device.name,
+            manufacturer="Sensi",
+            model=device.model,
+        )
+
+    @property
+    def available(self) -> bool:
+        """
+        Return if the entity is available.
+        The entity is not available if there is no data or if the device is offline.
+        """
+        return (
+            self._device
+            and not self._device.offline
+            and self.coordinator.data
+            and self.coordinator.data.get(self._device.identifier)
+        )
+
+
+class SensiDescriptionEntity(SensiEntity):
+    """Representation of a Sensi description entity."""
+
+    def __init__(self, device: SensiDevice, description: EntityDescription) -> None:
+        """Initialize the entity."""
+
+        super().__init__(device)
+        self.entity_description = description
+        self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}_{description.key}"

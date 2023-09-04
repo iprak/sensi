@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-import logging
 from typing import Any
 
 from homeassistant import config_entries
@@ -17,9 +16,7 @@ from custom_components.sensi.auth import (
     login,
 )
 
-from .const import SENSI_DOMAIN, SENSI_NAME
-
-_LOGGER = logging.getLogger(__name__)
+from .const import LOGGER, SENSI_DOMAIN, SENSI_NAME
 
 REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
 
@@ -49,7 +46,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         except AuthenticationError:
             return {"base": "invalid_auth"}
         except Exception as err:  # pylint: disable=broad-except
-            _LOGGER.exception(str(err))
+            LOGGER.exception(str(err))
             return {"base": "unknown"}
 
         return None
