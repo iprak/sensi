@@ -115,7 +115,6 @@ class SensiEntity(CoordinatorEntity):
         """
         return (
             self._device
-            and not self._device.offline
             and self.coordinator.data
             and self.coordinator.data.get(self._device.identifier)
         )

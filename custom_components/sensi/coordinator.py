@@ -138,6 +138,8 @@ class SensiDevice:
             LOGGER.debug(state)
 
             self.offline = state.get("status") == "offline"
+            self.attributes["offline"] = self.offline
+
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
 

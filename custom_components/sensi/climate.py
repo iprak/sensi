@@ -45,7 +45,6 @@ async def async_setup_entry(
     coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
     entities = [SensiThermostat(device) for device in coordinator.get_devices()]
     async_add_entities(entities)
-    LOGGER.info("Added %d thermostats", len(entities))
 
 
 class SensiThermostat(SensiEntity, ClimateEntity):
@@ -143,6 +142,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
 
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temp = kwargs.get(ATTR_TEMPERATURE)
@@ -152,15 +155,25 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new operating mode."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         if hvac_mode not in HA_TO_SENSI_HVACMode:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
         await self._device.async_set_operating_mode(HA_TO_SENSI_HVACMode[hvac_mode])
         self.async_write_ha_state()
-        LOGGER.info("Set hvac_mode to %s", hvac_mode)
+        LOGGER.info("%s: set hvac_mode to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
@@ -174,9 +187,14 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             await self._device.async_set_fan_mode(fan_mode)  # on or auto
 
         self.async_write_ha_state()
-        LOGGER.info("Set fan_mode to %s", fan_mode)
+        LOGGER.info("%s: set fan_mode to %s", self._device.name, fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
         await self._device.async_set_fan_mode(HVACMode.AUTO)
         self.async_write_ha_state()
