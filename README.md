@@ -6,7 +6,7 @@ It was developed by reverse engineering the mobile app and work done by https://
 
 On adding the Sensi integration, you should see one device and 3 entities. You will need credentials used in the Sensi mobile app.
 
-![Sample thermostat](image.png)
+![image](https://github.com/iprak/sensi/assets/6459774/381fa847-42f6-4ca2-b8b6-09ecd5298146)
 
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
