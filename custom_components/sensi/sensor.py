@@ -14,7 +14,11 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, TEMP_CELSIUS, UnitOfElectricPotential
+from homeassistant.const import (
+    PERCENTAGE,
+    TEMP_CELSIUS,
+    EntityCategory,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -60,10 +64,11 @@ SENSOR_TYPES: Final = (
     SensiSensorEntityDescription(
         key="battery",
         name="Battery",
-        device_class=SensorDeviceClass.VOLTAGE,
+        device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        value_fn=lambda device: device.battery_voltage,
+        native_unit_of_measurement=PERCENTAGE,
+        value_fn=lambda device: device.battery_level,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 
