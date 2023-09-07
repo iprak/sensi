@@ -6,7 +6,8 @@ It was developed by reverse engineering the mobile app and work done by https://
 
 On adding the Sensi integration, you should see one device and 3 entities. You will need credentials used in the Sensi mobile app.
 
-![image](https://github.com/iprak/sensi/assets/6459774/381fa847-42f6-4ca2-b8b6-09ecd5298146)
+![image](https://github.com/iprak/sensi/assets/6459774/68044f83-222a-469c-9738-cf2d365e79ec)
+
 
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
@@ -48,6 +49,9 @@ So far, simultaneous logins from mobile app and integration have not been probem
 None
 
 # Breaking Changes
+
+## Revision 1.1.1
+The battery level is now computed based on a formula. It is not perfect but should give some idea of the battery state. The battery voltage itself is now available as an attribute. You will see a warning like The unit of `sensor.sensi_36_6f_92_ff_fe_02_24_b7_battery (%) cannot be converted to the unit of previously compiled statistics (V).`
 
 ## Revision 1.1.0
 
