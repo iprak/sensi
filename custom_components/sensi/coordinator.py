@@ -15,6 +15,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import websockets.client
 
+
 from custom_components.sensi.auth import (
     AuthenticationConfig,
     SensiConnectionError,
@@ -70,6 +71,28 @@ def parse_bool(state: dict[str, Any], key: str) -> bool | None:
         return None
 
 
+def calculate_battery_level(voltage: float) -> int | None:
+    """Calculate the battery level."""
+    # https://devzone.nordicsemi.com/f/nordic-q-a/28101/how-to-calculate-battery-voltage-into-percentage-for-aa-2-batteries-without-fluctuations
+    # https://forum.arduino.cc/t/calculate-battery-percentage-of-alkaline-batteries-using-the-voltage/669958/17
+    if voltage is None:
+        return None
+    mvolts = voltage * 1000
+    # return "low" if (((voltage * 1000) - 900) * 100) / (600) <= 30 else "good"
+    if mvolts >= 3000:
+        return 100
+    elif mvolts > 2900:
+        return 100 - int(((3000 - mvolts) * 58) / 100)
+    elif mvolts > 2740:
+        return 42 - int(((2900 - mvolts) * 24) / 160)
+    elif mvolts > 2440:
+        return 18 - int(((2740 - mvolts) * 12) / 300)
+    elif mvolts > 2100:
+        return 6 - int(((2440 - mvolts) * 6) / 340)
+    else:
+        return 0
+
+
 class SensiDevice:
     """Class representing a Sensi thermostat device."""
 
@@ -100,6 +123,7 @@ class SensiDevice:
     heat_target: float | None = None
     display_properties: dict[DisplayProperties, StateType] = {}
     battery_voltage: float | None = None
+    battery_level: float | None = None
     offline: bool = True
 
     def __init__(self, coordinator, data_json: dict):
@@ -160,6 +184,8 @@ class SensiDevice:
                 "wifi_connection_quality"
             )
             self.battery_voltage = state.get("battery_voltage")
+            self.attributes["battery_voltage"] = self.battery_voltage
+            self.battery_level = calculate_battery_level(self.battery_voltage)
 
             self.min_temp = state.get("cool_min_temp", 45)
             self.max_temp = state.get("heat_max_temp", 99)
