@@ -123,7 +123,7 @@ class SensiDevice:
     heat_target: float | None = None
     display_properties: dict[DisplayProperties, StateType] = {}
     battery_voltage: float | None = None
-    battery_level: float | None = None
+    battery_level: int | None = None
     offline: bool = True
 
     def __init__(self, coordinator, data_json: dict):
