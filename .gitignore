@@ -29,9 +29,6 @@ share/*
 
 # Visual Studio Code
 .vscode/*
-!.vscode/cSpell.json
-!.vscode/extensions.json
-!.vscode/tasks.json
 .env
 
 # mypy
