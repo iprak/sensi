@@ -2,8 +2,6 @@ __pycache__
 *.py.b*
 secrets.yaml
 
-pylint/
-
 # Logs
 *.log
 pip-log.txt
@@ -34,3 +32,8 @@ share/*
 # mypy
 /.mypy_cache/*
 /.dmypy.json
+
+# These come from the image
+setup.cfg
+pyproject.toml
+pylint/
