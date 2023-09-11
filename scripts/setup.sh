@@ -14,3 +14,5 @@ FILE=".devcontainer/secrets.yaml"
 echo "Linking custom_components"
 rm -rf /config/custom_components
 ln -sfr custom_components /config/custom_components
+
+rsync -a -v --remove-source-files /tmp/container_content/ ./
