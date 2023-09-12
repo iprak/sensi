@@ -1,7 +1,5 @@
 """Sensi Thermostat authentication helpers."""
 
-from __future__ import annotations
-
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -11,10 +9,10 @@ import uuid
 
 import aiohttp
 import async_timeout
+
+from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, storage
-
-from custom_components.sensi.const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 
 # Defined in CreateRefreshParams.java
 OAUTH_URL: Final = "https://oauth.sensiapi.io/token?device={}"
@@ -108,7 +106,7 @@ async def login(
 class AuthenticationError(Exception):
     """API exception occurred when fail to authenticate."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         """Create instance of AuthenticationError."""
         self.message = message
         super().__init__(self.message)
@@ -117,7 +115,7 @@ class AuthenticationError(Exception):
 class SensiConnectionError(Exception):
     """API exception occurred when fail to connect."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         """Create instance of SensiConnectionError."""
         self.message = message
         super().__init__(self.message)

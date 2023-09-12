@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 from typing import Any, Final
 
-from custom_components.sensi import (
+from . import (
     SensiDescriptionEntity,
     get_fan_support,
     set_fan_support,
 )
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
     SwitchEntity,
@@ -158,11 +158,15 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         set_fan_support(self.hass, self._device, self._entry, True)
         self._status = True
         self.async_write_ha_state()
-        await self._device.coordinator.async_update()
+
+        # Force coordinator refresh to get climate entity to use new fan status
+        await self._device.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         set_fan_support(self.hass, self._device, self._entry, False)
         self._status = False
         self.async_write_ha_state()
-        await self._device.coordinator.async_update()
+
+        # Force coordinator refresh to get climate entity to use new fan status
+        await self._device.coordinator.async_request_refresh()

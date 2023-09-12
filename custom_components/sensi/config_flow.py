@@ -1,20 +1,19 @@
 """Config flow for Sensi thermostat."""
-from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
 
-from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.data_entry_flow import FlowResult
 import voluptuous as vol
 
-from custom_components.sensi.auth import (
+from .auth import (
     AuthenticationConfig,
     AuthenticationError,
     SensiConnectionError,
     login,
 )
+from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.data_entry_flow import FlowResult
 
 from .const import LOGGER, SENSI_DOMAIN, SENSI_NAME
 
@@ -33,7 +32,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
 
     VERSION = 1
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Start a config flow."""
         self._reauth_unique_id = None
 

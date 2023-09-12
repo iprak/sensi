@@ -3,8 +3,8 @@
 from collections.abc import Mapping
 from typing import Any, Union
 
-from custom_components.sensi import SensiEntity, get_fan_support
-from custom_components.sensi.const import (
+from . import SensiEntity, get_fan_support
+from .const import (
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     LOGGER,
@@ -14,12 +14,12 @@ from custom_components.sensi.const import (
     SENSI_FAN_ON,
     Capabilities,
 )
-from custom_components.sensi.coordinator import (
+from .coordinator import (
     HA_TO_SENSI_HVACMode,
     SensiDevice,
     SensiUpdateCoordinator,
 )
-from homeassistant.components.climate import (  # ClimateEntityDescription,
+from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
     ClimateEntity,
     ClimateEntityFeature,

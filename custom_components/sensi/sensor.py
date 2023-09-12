@@ -4,8 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
-from custom_components.sensi import SensiDescriptionEntity
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
+from . import SensiDescriptionEntity
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
     SensorDeviceClass,
@@ -14,7 +14,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, TEMP_CELSIUS, EntityCategory
+from homeassistant.const import EntityCategory, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -43,7 +43,7 @@ SENSOR_TYPES: Final = (
         name="Temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         value_fn=lambda device: device.temperature,
     ),
     SensiSensorEntityDescription(

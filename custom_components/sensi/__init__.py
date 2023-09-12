@@ -1,11 +1,11 @@
 """The Sensi thermostat component."""
 
-from custom_components.sensi.auth import (
+from .auth import (
     AuthenticationConfig,
     AuthenticationError,
     login,
 )
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -134,7 +134,6 @@ class SensiDescriptionEntity(SensiEntity):
         super().__init__(device)
         self.entity_description = description
         self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}_{description.key}"
-
 
 
 def get_fan_support(device: SensiDevice, entry: ConfigEntry) -> bool:

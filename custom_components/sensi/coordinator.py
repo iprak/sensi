@@ -8,12 +8,12 @@ from typing import Any, Final
 
 import websockets.client
 
-from custom_components.sensi.auth import (
+from .auth import (
     AuthenticationConfig,
     SensiConnectionError,
     login,
 )
-from custom_components.sensi.const import (
+from .const import (
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     LOGGER,
@@ -22,7 +22,7 @@ from custom_components.sensi.const import (
     Settings,
 )
 from homeassistant.components.climate import HVACMode
-from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -103,7 +103,7 @@ class SensiDevice:
     model: str | None = None
 
     temperature: float | None = None
-    temperature_unit = TEMP_FAHRENHEIT
+    temperature_unit = UnitOfTemperature.FAHRENHEIT
     humidity: int | None = None
     hvac_mode: HVACMode = HVACMode.AUTO
 
@@ -123,7 +123,7 @@ class SensiDevice:
     battery_level: int | None = None
     offline: bool = True
 
-    def __init__(self, coordinator, data_json: dict):
+    def __init__(self, coordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
         self.coordinator = coordinator
         self.update(data_json)
@@ -178,7 +178,9 @@ class SensiDevice:
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
                 self.temperature_unit = (
-                    TEMP_CELSIUS if self._display_scale == "c" else TEMP_FAHRENHEIT
+                    UnitOfTemperature.CELSIUS
+                    if self._display_scale == "c"
+                    else UnitOfTemperature.FAHRENHEIT
                 )
 
             self.attributes["wifi_connection_quality"] = state.get(
@@ -220,9 +222,9 @@ class SensiDevice:
                 if self.attributes["circulating_fan"] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
-            self._properties[
-                Settings.CONTINUOUS_BACKLIGHT
-            ] = parse_bool(state, Settings.CONTINUOUS_BACKLIGHT)
+            self._properties[Settings.CONTINUOUS_BACKLIGHT] = parse_bool(
+                state, Settings.CONTINUOUS_BACKLIGHT
+            )
             self._properties[Settings.DISPLAY_HUMIDITY] = parse_bool(
                 state, Settings.DISPLAY_HUMIDITY
             )
@@ -328,14 +330,11 @@ class SensiDevice:
         """Get a display configuration."""
         return self._properties.get(key)
 
-    async def async_set_setting(
-        self, key: Settings, value: bool
-    ) -> None:
+    async def async_set_setting(self, key: Settings, value: bool) -> None:
         """Set a display configuration."""
 
         if key not in Settings:
             raise ValueError(f"Unsupported setting: {key}")
-            return
 
         if value == self.get_setting(key):
             return
@@ -497,7 +496,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             self._login_retry = self._login_retry + 1
             if self._login_retry > MAX_LOGIN_RETRY:
                 LOGGER.info(
-                    "Login failed %d times. Suspending data update.", self._login_retry
+                    "Login failed %d times. Suspending data update", self._login_retry
                 )
                 self.update_interval = None
                 return False
