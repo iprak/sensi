@@ -1,23 +1,9 @@
 """Sensi Thermostat."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any, Union
 
-from homeassistant.components.climate import (  # ClimateEntityDescription,
-    ENTITY_ID_FORMAT,
-    ClimateEntity,
-    ClimateEntityFeature,
-    HVACMode,
-)
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_TEMPERATURE
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import async_generate_entity_id
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
-from custom_components.sensi import SensiEntity
+from custom_components.sensi import SensiEntity, get_fan_support
 from custom_components.sensi.const import (
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
@@ -33,6 +19,17 @@ from custom_components.sensi.coordinator import (
     SensiDevice,
     SensiUpdateCoordinator,
 )
+from homeassistant.components.climate import (  # ClimateEntityDescription,
+    ENTITY_ID_FORMAT,
+    ClimateEntity,
+    ClimateEntityFeature,
+    HVACMode,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import async_generate_entity_id
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 
 async def async_setup_entry(
@@ -43,28 +40,19 @@ async def async_setup_entry(
     """Set up Sensi thermostat."""
     data = hass.data[SENSI_DOMAIN][entry.entry_id]
     coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
-    entities = [SensiThermostat(device) for device in coordinator.get_devices()]
+    entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
     async_add_entities(entities)
 
 
 class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
 
-    _attr_hvac_modes = [
-        HVACMode.AUTO,
-        HVACMode.COOL,
-        HVACMode.HEAT,
-        HVACMode.OFF,
-    ]
-    _attr_supported_features = (
-        ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-    )
-
-    def __init__(self, device: SensiDevice) -> None:
+    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
         """Initialize the device."""
 
         super().__init__(device)
 
+        self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.identifier}",
@@ -87,8 +75,40 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return None
 
     @property
+    def supported_features(self) -> ClimateEntityFeature:
+        """Return the list of supported features."""
+
+        if get_fan_support(self._device, self._entry):
+            return (
+                ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+            )
+        else:
+            return ClimateEntityFeature.TARGET_TEMPERATURE
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return the list of available hvac operation modes."""
+
+        modes = []
+
+        if self._device.supports(Capabilities.OPERATING_MODE_OFF):
+            modes.append(HVACMode.OFF)
+        if self._device.supports(Capabilities.OPERATING_MODE_HEAT):
+            modes.append(HVACMode.HEAT)
+        if self._device.supports(Capabilities.OPERATING_MODE_COOL):
+            modes.append(HVACMode.COOL)
+        if self._device.supports(Capabilities.OPERATING_MODE_AUTO):
+            modes.append(HVACMode.AUTO)
+
+        return modes
+
+    @property
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
+
+        if not get_fan_support(self._device, self._entry):
+            return []
+
         return (
             [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
             if self._device.supports(Capabilities.CIRCULATING_FAN)

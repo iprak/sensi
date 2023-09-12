@@ -1,7 +1,11 @@
 """The Sensi thermostat component."""
 
-from __future__ import annotations
-
+from custom_components.sensi.auth import (
+    AuthenticationConfig,
+    AuthenticationError,
+    login,
+)
+from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -9,14 +13,14 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.sensi.auth import (
-    AuthenticationConfig,
-    AuthenticationError,
-    login,
+from .const import (
+    CONFIG_FAN_SUPPORT,
+    DEFAULT_FAN_SUPPORT,
+    DOMAIN_DATA_COORDINATOR_KEY,
+    LOGGER,
+    SENSI_ATTRIBUTION,
+    SENSI_DOMAIN,
 )
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
-
-from .const import DOMAIN_DATA_COORDINATOR_KEY, LOGGER, SENSI_ATTRIBUTION, SENSI_DOMAIN
 
 SUPPORTED_PLATFORMS = [
     Platform.CLIMATE,
@@ -70,6 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     coordinator = SensiUpdateCoordinator(hass, auth_config)
     await coordinator.async_config_entry_first_refresh()
 
+    hass.data.setdefault(SENSI_DOMAIN, {})
     hass.data[SENSI_DOMAIN][entry.entry_id] = {
         DOMAIN_DATA_COORDINATOR_KEY: coordinator,
     }
@@ -109,8 +114,8 @@ class SensiEntity(CoordinatorEntity):
 
     @property
     def available(self) -> bool:
-        """
-        Return if the entity is available.
+        """Return if the entity is available.
+
         The entity is not available if there is no data or if the device is offline.
         """
         return (
@@ -129,3 +134,25 @@ class SensiDescriptionEntity(SensiEntity):
         super().__init__(device)
         self.entity_description = description
         self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}_{description.key}"
+
+
+
+def get_fan_support(device: SensiDevice, entry: ConfigEntry) -> bool:
+    """Determine if fan is supported."""
+
+    options = entry.options.get(CONFIG_FAN_SUPPORT, {})
+    return options.get(device.identifier, DEFAULT_FAN_SUPPORT)
+
+
+def set_fan_support(
+    hass: HomeAssistant, device: SensiDevice, entry: ConfigEntry, value: bool
+) -> None:
+    """Update the fan support status in ConfigEntry."""
+
+    new_data = entry.data.copy()
+    new_options = entry.options.copy()
+    fan_options = new_options.get(CONFIG_FAN_SUPPORT, {})
+    fan_options[device.identifier] = value
+    new_options[CONFIG_FAN_SUPPORT] = fan_options
+
+    hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
