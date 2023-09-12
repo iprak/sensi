@@ -1,20 +1,12 @@
 """The Sensi data coordinator."""
 
-from __future__ import annotations
-
 import asyncio
 from datetime import datetime, timedelta
 import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
-from homeassistant.components.climate import HVACMode
-from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import websockets.client
-
 
 from custom_components.sensi.auth import (
     AuthenticationConfig,
@@ -27,15 +19,20 @@ from custom_components.sensi.const import (
     LOGGER,
     SENSI_FAN_CIRCULATE,
     Capabilities,
-    DisplayProperties,
+    Settings,
 )
+from homeassistant.components.climate import HVACMode
+from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 # This is based on IOWrapper.java
 # pylint: disable=line-too-long
 WS_URL: Final = "wss://rt.sensiapi.io/thermostat/?transport=websocket"
-CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan"
+CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan,operating_mode_settings"
 
-# # All possible capabilities:
+# All possible capabilities:
 # display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,
 # continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,compressor_lockout,boost,heat_cycle_rate,
 # heat_cycle_rate_steps,cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,early_start,min_heat_setpoint,
@@ -99,7 +96,7 @@ class SensiDevice:
     # pylint: disable=too-many-instance-attributes
     # These attributes are meant to be here.
 
-    coordinator: SensiUpdateCoordinator = None
+    coordinator = None
 
     identifier: str | None = None
     name: str | None = None
@@ -114,6 +111,7 @@ class SensiDevice:
     """Raw display_scale"""
 
     _capabilities: dict[Capabilities, bool] = {}
+    _properties: dict[Settings, StateType] = {}
 
     fan_mode: str | None = None
     attributes: dict[str, str | float] = {}
@@ -121,7 +119,6 @@ class SensiDevice:
     max_temp = 99
     cool_target: float | None = None
     heat_target: float | None = None
-    display_properties: dict[DisplayProperties, StateType] = {}
     battery_voltage: float | None = None
     battery_level: int | None = None
     offline: bool = True
@@ -135,13 +132,17 @@ class SensiDevice:
         """Update device capabilities."""
 
         for key in Capabilities:
+            # key can be property.sub_property
+            prop_name = key.split(".")[0]
             getter = CAPABILITIES_VALUE_GETTER.get(key)
             if getter:
-                value = getter(data.get(key))
+                value = getter(data.get(prop_name))
             else:
-                value = data.get(key, "no")
+                value = data.get(prop_name, "no")
 
             self._capabilities[key] = value == "yes"
+
+        LOGGER.debug("%s Capabilities=%s", self.name, self._capabilities)
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
@@ -219,14 +220,14 @@ class SensiDevice:
                 if self.attributes["circulating_fan"] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
-            self.display_properties[
-                DisplayProperties.CONTINUOUS_BACKLIGHT
-            ] = parse_bool(state, DisplayProperties.CONTINUOUS_BACKLIGHT)
-            self.display_properties[DisplayProperties.DISPLAY_HUMIDITY] = parse_bool(
-                state, DisplayProperties.DISPLAY_HUMIDITY
+            self._properties[
+                Settings.CONTINUOUS_BACKLIGHT
+            ] = parse_bool(state, Settings.CONTINUOUS_BACKLIGHT)
+            self._properties[Settings.DISPLAY_HUMIDITY] = parse_bool(
+                state, Settings.DISPLAY_HUMIDITY
             )
-            self.display_properties[DisplayProperties.DISPLAY_TIME] = parse_bool(
-                state, DisplayProperties.DISPLAY_TIME
+            self._properties[Settings.DISPLAY_TIME] = parse_bool(
+                state, Settings.DISPLAY_TIME
             )
 
             # pylint: disable=line-too-long
@@ -249,9 +250,8 @@ class SensiDevice:
         if self.hvac_mode == HVACMode.HEAT:
             if self.heat_target == value:
                 return
-        else:
-            if self.cool_target == value:
-                return
+        elif self.cool_target == value:
+            return
 
         # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature
         data = self.build_set_request_str(
@@ -311,9 +311,9 @@ class SensiDevice:
         self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
 
     async def async_set_operating_mode(self, mode: str) -> None:
-        """
-        Set the fan mode.
-        com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode"
+        """Set the fan mode.
+
+        com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
         new_hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
@@ -324,24 +324,25 @@ class SensiDevice:
         await self.coordinator.async_send_event(data)
         self.hvac_mode = new_hvac_mode
 
-    def get_display_setting(self, key: DisplayProperties) -> bool | None:
+    def get_setting(self, key: Settings) -> bool | None:
         """Get a display configuration."""
-        return self.display_properties.get(key)
+        return self._properties.get(key)
 
-    async def async_set_display_setting(
-        self, key: DisplayProperties, value: bool
+    async def async_set_setting(
+        self, key: Settings, value: bool
     ) -> None:
         """Set a display configuration."""
 
-        if key not in DisplayProperties:
+        if key not in Settings:
+            raise ValueError(f"Unsupported setting: {key}")
             return
 
-        if value == self.get_display_setting(key):
+        if value == self.get_setting(key):
             return
 
         data = self.build_set_request_str(key, {"value": "on" if value else "off"})
         await self.coordinator.async_send_event(data)
-        self.display_properties[key] = value
+        self._properties[key] = value
 
     def build_set_request_str(self, key: str, payload: dict[str, str]) -> str:
         """Prepare the request string for setting data."""
