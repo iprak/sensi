@@ -107,7 +107,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Return the list of available fan modes."""
 
         if not get_fan_support(self._device, self._entry):
-            return []
+            return None
 
         return (
             [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
