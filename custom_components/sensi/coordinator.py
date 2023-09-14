@@ -432,7 +432,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         if not await self._verify_authentication():
             return self._devices
 
-        url = WS_URL if self._devices else f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
+        url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
         fetch_count = 0
         done = False
