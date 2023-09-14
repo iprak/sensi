@@ -15,4 +15,5 @@ echo "Linking custom_components"
 rm -rf /config/custom_components
 ln -sfr custom_components /config/custom_components
 
+# Extract .vscode, pylint, pyproject.toml, setup.cfg
 rsync -a -v --remove-source-files /tmp/container_content/ ./

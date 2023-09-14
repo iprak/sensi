@@ -1,11 +1,11 @@
 """Sensi thermostat sensors."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
+from . import SensiDescriptionEntity
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
     SensorDeviceClass,
@@ -14,18 +14,11 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    PERCENTAGE,
-    TEMP_CELSIUS,
-    EntityCategory,
-)
+from homeassistant.const import EntityCategory, UnitOfTemperature, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
-
-from custom_components.sensi import SensiDescriptionEntity
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
 
 from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
 
@@ -50,7 +43,7 @@ SENSOR_TYPES: Final = (
         name="Temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         value_fn=lambda device: device.temperature,
     ),
     SensiSensorEntityDescription(
@@ -111,8 +104,13 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
             hass=device.coordinator.hass,
         )
 
-        if description.device_class == SensorDeviceClass.TEMPERATURE:
-            self._attr_native_unit_of_measurement = device.temperature_unit
+    @property
+    def suggested_unit_of_measurement(self) -> str | None:
+        """Return the temperature unit which should be used for the thermostat's state."""
+        if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE:
+            self._attr_suggested_unit_of_measurement = self._device.temperature_unit
+
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def native_value(self) -> StateType:

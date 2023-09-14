@@ -1,10 +1,14 @@
 """Sensi thermostat setting switches."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any, Final
 
+from . import (
+    SensiDescriptionEntity,
+    get_fan_support,
+    set_fan_support,
+)
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
     SwitchEntity,
@@ -16,19 +20,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from custom_components.sensi import SensiDescriptionEntity
-from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
-
 from .const import (
+    CONFIG_FAN_SUPPORT,
     DOMAIN_DATA_COORDINATOR_KEY,
     SENSI_DOMAIN,
     Capabilities,
-    DisplayProperties,
+    Settings,
 )
 
 
 @dataclass
-class SensiSwitchEntityDescriptionMixin:
+class SensiCapabilityEntityDescriptionMixin:
     """Mixin for Sensi thermostat setting."""
 
     capability: Capabilities
@@ -36,29 +38,29 @@ class SensiSwitchEntityDescriptionMixin:
 
 
 @dataclass
-class SensiSwitchEntityDescription(
-    SwitchEntityDescription, SensiSwitchEntityDescriptionMixin
+class SensiCapabilityEntityDescription(
+    SwitchEntityDescription, SensiCapabilityEntityDescriptionMixin
 ):
     """Representation of a Sensi thermostat setting."""
 
 
 SWITCH_TYPES: Final = (
-    SensiSwitchEntityDescription(
-        key=DisplayProperties.DISPLAY_HUMIDITY,
+    SensiCapabilityEntityDescription(
+        key=Settings.DISPLAY_HUMIDITY,
         name="Display Humidity",
         icon="mdi:water-percent",
         entity_category=EntityCategory.CONFIG,
         capability=Capabilities.DISPLAY_HUMIDITY,
     ),
-    SensiSwitchEntityDescription(
-        key=DisplayProperties.CONTINUOUS_BACKLIGHT,
+    SensiCapabilityEntityDescription(
+        key=Settings.CONTINUOUS_BACKLIGHT,
         name="Continuous Backlight",
         icon="mdi:wall-sconce-flat",
         entity_category=EntityCategory.CONFIG,
         capability=Capabilities.CONTINUOUS_BACKLIGHT,
     ),
-    SensiSwitchEntityDescription(
-        key=DisplayProperties.DISPLAY_TIME,
+    SensiCapabilityEntityDescription(
+        key=Settings.DISPLAY_TIME,
         name="Display Time",
         icon="mdi:clock",
         entity_category=EntityCategory.CONFIG,
@@ -81,18 +83,20 @@ async def async_setup_entry(
         for description in SWITCH_TYPES:
             # A device might not support a setting e.g. Continuous Backlight
             if device.supports(description.capability):
-                entities.append(SensiDisplaySettingSwitch(device, description))
+                entities.append(SensiCapabilitySettingSwitch(device, description))
+
+        entities.append(SensiFanSupportSwitch(device, entry))
 
     async_add_entities(entities)
 
 
-class SensiDisplaySettingSwitch(SensiDescriptionEntity, SwitchEntity):
-    """Representation of a Sensi thermostat display setting."""
+class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
+    """Representation of a Sensi thermostat capability setting."""
 
     def __init__(
         self, device: SensiDevice, description: SwitchEntityDescription
     ) -> None:
-        """Initialize the configuration."""
+        """Initialize the setting."""
         super().__init__(device, description)
 
         self.entity_id = async_generate_entity_id(
@@ -103,12 +107,66 @@ class SensiDisplaySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        return self._device.get_display_setting(self.entity_description.key)
+        """Return True if entity is on."""
+        return self._device.get_setting(self.entity_description.key)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._device.async_set_display_setting(self.entity_description.key, True)
+        """Turn the entity on."""
+        await self._device.async_set_setting(self.entity_description.key, True)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._device.async_set_display_setting(self.entity_description.key, False)
+        """Turn the entity off."""
+        await self._device.async_set_setting(self.entity_description.key, False)
         self.async_write_ha_state()
+
+
+class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
+    """Representation of Sensi thermostat fan support setting."""
+
+    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
+        """Initialize the setting."""
+
+        description = SwitchEntityDescription(
+            key=CONFIG_FAN_SUPPORT,
+            name="Fan support",
+            icon="mdi:fan-off",
+            entity_category=EntityCategory.CONFIG,
+        )
+
+        super().__init__(device, description)
+
+        # Cache status to avoid querying ConfigEntry
+        self._status: bool | None = None
+
+        self._entry = entry
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.identifier}_{description.key}",
+            hass=device.coordinator.hass,
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if entity is on."""
+        if self._status is None:
+            self._status = get_fan_support(self._device, self._entry)
+        return self._status
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        set_fan_support(self.hass, self._device, self._entry, True)
+        self._status = True
+        self.async_write_ha_state()
+
+        # Force coordinator refresh to get climate entity to use new fan status
+        await self._device.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        set_fan_support(self.hass, self._device, self._entry, False)
+        self._status = False
+        self.async_write_ha_state()
+
+        # Force coordinator refresh to get climate entity to use new fan status
+        await self._device.coordinator.async_request_refresh()

@@ -1,41 +1,38 @@
 """The Sensi data coordinator."""
 
-from __future__ import annotations
-
 import asyncio
 from datetime import datetime, timedelta
 import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
-from homeassistant.components.climate import HVACMode
-from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import websockets.client
 
-
-from custom_components.sensi.auth import (
+from .auth import (
     AuthenticationConfig,
     SensiConnectionError,
     login,
 )
-from custom_components.sensi.const import (
+from .const import (
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     LOGGER,
     SENSI_FAN_CIRCULATE,
     Capabilities,
-    DisplayProperties,
+    Settings,
 )
+from homeassistant.components.climate import HVACMode
+from homeassistant.const import UnitOfTemperature
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 # This is based on IOWrapper.java
 # pylint: disable=line-too-long
 WS_URL: Final = "wss://rt.sensiapi.io/thermostat/?transport=websocket"
-CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan"
+CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan,operating_mode_settings"
 
-# # All possible capabilities:
+# All possible capabilities:
 # display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,
 # continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,compressor_lockout,boost,heat_cycle_rate,
 # heat_cycle_rate_steps,cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,early_start,min_heat_setpoint,
@@ -99,14 +96,14 @@ class SensiDevice:
     # pylint: disable=too-many-instance-attributes
     # These attributes are meant to be here.
 
-    coordinator: SensiUpdateCoordinator = None
+    coordinator = None
 
     identifier: str | None = None
     name: str | None = None
     model: str | None = None
 
     temperature: float | None = None
-    temperature_unit = TEMP_FAHRENHEIT
+    temperature_unit = UnitOfTemperature.FAHRENHEIT
     humidity: int | None = None
     hvac_mode: HVACMode = HVACMode.AUTO
 
@@ -114,6 +111,7 @@ class SensiDevice:
     """Raw display_scale"""
 
     _capabilities: dict[Capabilities, bool] = {}
+    _properties: dict[Settings, StateType] = {}
 
     fan_mode: str | None = None
     attributes: dict[str, str | float] = {}
@@ -121,12 +119,11 @@ class SensiDevice:
     max_temp = 99
     cool_target: float | None = None
     heat_target: float | None = None
-    display_properties: dict[DisplayProperties, StateType] = {}
     battery_voltage: float | None = None
     battery_level: int | None = None
     offline: bool = True
 
-    def __init__(self, coordinator, data_json: dict):
+    def __init__(self, coordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
         self.coordinator = coordinator
         self.update(data_json)
@@ -135,13 +132,17 @@ class SensiDevice:
         """Update device capabilities."""
 
         for key in Capabilities:
+            # key can be property.sub_property
+            prop_name = key.split(".")[0]
             getter = CAPABILITIES_VALUE_GETTER.get(key)
             if getter:
-                value = getter(data.get(key))
+                value = getter(data.get(prop_name))
             else:
-                value = data.get(key, "no")
+                value = data.get(prop_name, "no")
 
             self._capabilities[key] = value == "yes"
+
+        LOGGER.debug("%s Capabilities=%s", self.name, self._capabilities)
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
@@ -177,7 +178,9 @@ class SensiDevice:
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
                 self.temperature_unit = (
-                    TEMP_CELSIUS if self._display_scale == "c" else TEMP_FAHRENHEIT
+                    UnitOfTemperature.CELSIUS
+                    if self._display_scale == "c"
+                    else UnitOfTemperature.FAHRENHEIT
                 )
 
             self.attributes["wifi_connection_quality"] = state.get(
@@ -219,14 +222,14 @@ class SensiDevice:
                 if self.attributes["circulating_fan"] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
-            self.display_properties[
-                DisplayProperties.CONTINUOUS_BACKLIGHT
-            ] = parse_bool(state, DisplayProperties.CONTINUOUS_BACKLIGHT)
-            self.display_properties[DisplayProperties.DISPLAY_HUMIDITY] = parse_bool(
-                state, DisplayProperties.DISPLAY_HUMIDITY
+            self._properties[Settings.CONTINUOUS_BACKLIGHT] = parse_bool(
+                state, Settings.CONTINUOUS_BACKLIGHT
             )
-            self.display_properties[DisplayProperties.DISPLAY_TIME] = parse_bool(
-                state, DisplayProperties.DISPLAY_TIME
+            self._properties[Settings.DISPLAY_HUMIDITY] = parse_bool(
+                state, Settings.DISPLAY_HUMIDITY
+            )
+            self._properties[Settings.DISPLAY_TIME] = parse_bool(
+                state, Settings.DISPLAY_TIME
             )
 
             # pylint: disable=line-too-long
@@ -249,9 +252,8 @@ class SensiDevice:
         if self.hvac_mode == HVACMode.HEAT:
             if self.heat_target == value:
                 return
-        else:
-            if self.cool_target == value:
-                return
+        elif self.cool_target == value:
+            return
 
         # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature
         data = self.build_set_request_str(
@@ -311,9 +313,9 @@ class SensiDevice:
         self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
 
     async def async_set_operating_mode(self, mode: str) -> None:
-        """
-        Set the fan mode.
-        com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode"
+        """Set the fan mode.
+
+        com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
         new_hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
@@ -324,24 +326,22 @@ class SensiDevice:
         await self.coordinator.async_send_event(data)
         self.hvac_mode = new_hvac_mode
 
-    def get_display_setting(self, key: DisplayProperties) -> bool | None:
+    def get_setting(self, key: Settings) -> bool | None:
         """Get a display configuration."""
-        return self.display_properties.get(key)
+        return self._properties.get(key)
 
-    async def async_set_display_setting(
-        self, key: DisplayProperties, value: bool
-    ) -> None:
+    async def async_set_setting(self, key: Settings, value: bool) -> None:
         """Set a display configuration."""
 
-        if key not in DisplayProperties:
-            return
+        if key not in Settings:
+            raise ValueError(f"Unsupported setting: {key}")
 
-        if value == self.get_display_setting(key):
+        if value == self.get_setting(key):
             return
 
         data = self.build_set_request_str(key, {"value": "on" if value else "off"})
         await self.coordinator.async_send_event(data)
-        self.display_properties[key] = value
+        self._properties[key] = value
 
     def build_set_request_str(self, key: str, payload: dict[str, str]) -> str:
         """Prepare the request string for setting data."""
@@ -432,7 +432,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         if not await self._verify_authentication():
             return self._devices
 
-        url = WS_URL if self._devices else f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
+        url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
         fetch_count = 0
         done = False
@@ -496,7 +496,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             self._login_retry = self._login_retry + 1
             if self._login_retry > MAX_LOGIN_RETRY:
                 LOGGER.info(
-                    "Login failed %d times. Suspending data update.", self._login_retry
+                    "Login failed %d times. Suspending data update", self._login_retry
                 )
                 self.update_interval = None
                 return False

@@ -6,14 +6,17 @@ It was developed by reverse engineering the mobile app and work done by https://
 
 On adding the Sensi integration, you should see one device and 3 entities. You will need credentials used in the Sensi mobile app.
 
-![image](https://github.com/iprak/sensi/assets/6459774/68044f83-222a-469c-9738-cf2d365e79ec)
+![image](https://github.com/iprak/sensi/assets/6459774/2222ea8e-c6bf-482d-b551-89464f81cdcd)
 
 
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
+- The available operating modes `Auto/Heat/Cool/Off` are based on thermostat setup.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
+  - Fan support can be disabled, in which case `fan modes` will not be available.
 - Data is refreshed every 30 seconds.
+- The `Temperature` sensor will have unit based on the thermostat setup but the `Climate` entity will show temperature based on HomeAssistant locale setting.
 - Some Thermostat display properties such as Display Humidity, Display Time and Continuous Backlight can also be controlled. Not all thermostats support Continuous Backlight feature and the option will be unavailable in that case.
-- If the thermostat is Offline, the operations will have no effect.
+- If the thermostat is `Offline`, the entities will appear unavailabhle.
 
 Sample attributes on the climate entity:
 

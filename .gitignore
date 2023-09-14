@@ -23,7 +23,6 @@ venv
 .venv
 Pipfile*
 share/*
-/Scripts/
 
 # Visual Studio Code
 .vscode/*
