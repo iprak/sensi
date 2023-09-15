@@ -87,7 +87,7 @@ async def async_setup_entry(
 class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     """Representation of a Sensi thermostat sensor."""
 
-    entity_description: SensiSensorEntityDescription
+    entity_description: SensiSensorEntityDescription = None
 
     def __init__(
         self,

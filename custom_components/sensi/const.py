@@ -27,6 +27,7 @@ CONFIG_FAN_SUPPORT: Final = "fan_support"
 DEFAULT_FAN_SUPPORT: Final = True
 
 COORDINATOR_DELAY_REFRESH_AFTER_UPDATE: Final = 10
+COORDINATOR_UPDATE_INTERVAL: Final = 30
 
 
 class Settings(StrEnum):
