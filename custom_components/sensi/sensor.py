@@ -100,7 +100,7 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.identifier}_{description.key}",
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
             hass=device.coordinator.hass,
         )
 

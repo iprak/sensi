@@ -101,7 +101,7 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.identifier}_{description.key}",
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
             hass=device.coordinator.hass,
         )
 
@@ -142,7 +142,7 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.identifier}_{description.key}",
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
             hass=device.coordinator.hass,
         )
 
