@@ -148,7 +148,7 @@ class SensiDevice:
 
             self._capabilities[key] = value == "yes"
 
-        LOGGER.debug("%s Capabilities=%s", self.name, self._capabilities)
+        LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
