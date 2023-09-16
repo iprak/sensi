@@ -54,7 +54,7 @@ None
 
 ## Revision 1.2.0
 
-The entity/unique ids have been correct. Unfortunaterly, this will cause the previous entities to appear duplicate/disabled. You would want to remove the previous entities and reference the new ones. The new entity_id is based on the name given to the thermostat and not the device_id which it more accessible.
+The entity/unique ids have been correct. Unfortunately, this will cause the previous entities to appear duplicate/disabled. You would want to remove the previous entities and reference the new ones. The new entity_id is based on the name given to the thermostat and not the device_id which it more accessible.
 
 ## Revision 1.1.1
 
