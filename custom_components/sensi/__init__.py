@@ -1,4 +1,5 @@
 """The Sensi thermostat component."""
+from __future__ import annotations
 
 from .auth import (
     AuthenticationConfig,
