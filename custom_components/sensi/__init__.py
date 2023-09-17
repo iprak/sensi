@@ -1,4 +1,5 @@
 """The Sensi thermostat component."""
+from __future__ import annotations
 
 from .auth import (
     AuthenticationConfig,
@@ -103,7 +104,7 @@ class SensiEntity(CoordinatorEntity):
 
         super().__init__(device.coordinator)
         self._device = device
-        self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}"
+        self._attr_unique_id = device.identifier
 
         self._attr_device_info = DeviceInfo(
             identifiers={(SENSI_DOMAIN, device.identifier)},
@@ -134,7 +135,11 @@ class SensiDescriptionEntity(SensiEntity):
 
         super().__init__(device)
         self.entity_description = description
-        self._attr_unique_id = f"{SENSI_DOMAIN}_{device.identifier}_{description.key}"
+
+        # Override the _attr_unique_id to include description.key
+        # description would be passed for sensor and switch domains.
+        # https://developers.home-assistant.io/docs/entity_registry_index/
+        self._attr_unique_id = f"{device.identifier}_{description.key}"
 
 
 def get_fan_support(device: SensiDevice, entry: ConfigEntry) -> bool:

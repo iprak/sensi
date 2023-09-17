@@ -8,7 +8,6 @@ On adding the Sensi integration, you should see one device and 3 entities. You w
 
 ![image](https://github.com/iprak/sensi/assets/6459774/2222ea8e-c6bf-482d-b551-89464f81cdcd)
 
-
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
 - The available operating modes `Auto/Heat/Cool/Off` are based on thermostat setup.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
@@ -53,7 +52,12 @@ None
 
 # Breaking Changes
 
+## Revision 1.2.0
+
+The entity/unique ids have been correct. Unfortunately, this will cause the previous entities to appear duplicate/disabled. You would want to remove the previous entities and reference the new ones. The new entity_id is based on the name given to the thermostat and not the device_id which it more accessible.
+
 ## Revision 1.1.1
+
 The battery level is now computed based on a formula. It is not perfect but should give some idea of the battery state. The battery voltage itself is now available as an attribute. You will see a warning like The unit of `sensor.sensi_36_6f_92_ff_fe_02_24_b7_battery (%) cannot be converted to the unit of previously compiled statistics (V).`
 
 ## Revision 1.1.0

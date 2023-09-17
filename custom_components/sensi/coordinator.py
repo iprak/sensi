@@ -1,4 +1,5 @@
 """The Sensi data coordinator."""
+from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ from .auth import (
 from .const import (
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
+    COORDINATOR_UPDATE_INTERVAL,
     LOGGER,
     SENSI_FAN_CIRCULATE,
     Capabilities,
@@ -110,11 +112,11 @@ class SensiDevice:
     _display_scale = "f"
     """Raw display_scale"""
 
-    _capabilities: dict[Capabilities, bool] = {}
-    _properties: dict[Settings, StateType] = {}
+    _capabilities: dict[Capabilities, bool] = None
+    _properties: dict[Settings, StateType] = None
 
     fan_mode: str | None = None
-    attributes: dict[str, str | float] = {}
+    attributes: dict[str, str | float] = None
     min_temp = 45
     max_temp = 99
     cool_target: float | None = None
@@ -125,6 +127,11 @@ class SensiDevice:
 
     def __init__(self, coordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
+
+        self._capabilities = {}
+        self._properties = {}
+        self.attributes = {}
+
         self.coordinator = coordinator
         self.update(data_json)
 
@@ -142,7 +149,7 @@ class SensiDevice:
 
             self._capabilities[key] = value == "yes"
 
-        LOGGER.debug("%s Capabilities=%s", self.name, self._capabilities)
+        LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
@@ -375,7 +382,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             hass,
             LOGGER,
             name="SensiUpdateCoordinator",
-            update_interval=timedelta(seconds=30),
+            update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )
 
     def _save_auth_config(self, config: AuthenticationConfig):

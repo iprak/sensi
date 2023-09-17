@@ -1,4 +1,5 @@
 """Sensi thermostat sensors."""
+from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -87,7 +88,7 @@ async def async_setup_entry(
 class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     """Representation of a Sensi thermostat sensor."""
 
-    entity_description: SensiSensorEntityDescription
+    entity_description: SensiSensorEntityDescription = None
 
     def __init__(
         self,
@@ -100,7 +101,7 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.identifier}_{description.key}",
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
             hass=device.coordinator.hass,
         )
 

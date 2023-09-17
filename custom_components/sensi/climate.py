@@ -1,4 +1,5 @@
 """Sensi Thermostat."""
+from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any, Union
@@ -55,7 +56,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.identifier}",
+            f"{SENSI_DOMAIN}_{device.name}",
             hass=device.coordinator.hass,
         )
 
