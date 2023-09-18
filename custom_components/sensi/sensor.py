@@ -106,14 +106,14 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
         )
 
     @property
-    def suggested_unit_of_measurement(self) -> str | None:
-        """Return the temperature unit which should be used for the thermostat's state."""
-        if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE:
-            self._attr_suggested_unit_of_measurement = self._device.temperature_unit
-
-        return self.entity_description.native_unit_of_measurement
-
-    @property
     def native_value(self) -> StateType:
         """Return the value reported by the sensor."""
         return self.entity_description.value_fn(self._device)
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the unit of measurement of the sensor, if any."""
+        if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE:
+            return self._device.temperature_unit
+
+        return self.entity_description.native_unit_of_measurement
