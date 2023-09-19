@@ -14,7 +14,6 @@ On adding the Sensi integration, you should see one device and up to 8 entities.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
   - Fan support can be disabled, in which case `fan modes` will not be available.
 - Data is refreshed every 30 seconds.
-- The `Temperature` sensor will have unit based on the thermostat setup but the `Climate` entity will show temperature based on HomeAssistant locale setting.
 - Some Thermostat display properties such as Display Humidity, Display Time and Continuous Backlight can also be controlled. Not all thermostats support Continuous Backlight feature and the option will be unavailable in that case.
 - The `Fan Support` configuration can be used to disable fan.
 - If the thermostat is `Offline`, the entities will appear unavailable.
