@@ -1,12 +1,6 @@
 """The Sensi thermostat component."""
 from __future__ import annotations
 
-from .auth import (
-    AuthenticationConfig,
-    AuthenticationError,
-    login,
-)
-from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -14,6 +8,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .auth import AuthenticationConfig, AuthenticationError, login
 from .const import (
     CONFIG_FAN_SUPPORT,
     DEFAULT_FAN_SUPPORT,
@@ -22,6 +17,7 @@ from .const import (
     SENSI_ATTRIBUTION,
     SENSI_DOMAIN,
 )
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 SUPPORTED_PLATFORMS = [
     Platform.CLIMATE,

@@ -11,9 +11,10 @@ import uuid
 import aiohttp
 import async_timeout
 
-from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, storage
+
+from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 
 # Defined in CreateRefreshParams.java
 OAUTH_URL: Final = "https://oauth.sensiapi.io/token?device={}"

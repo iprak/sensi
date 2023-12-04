@@ -6,16 +6,11 @@ from typing import Any
 
 import voluptuous as vol
 
-from .auth import (
-    AuthenticationConfig,
-    AuthenticationError,
-    SensiConnectionError,
-    login,
-)
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 
+from .auth import AuthenticationConfig, AuthenticationError, SensiConnectionError, login
 from .const import LOGGER, SENSI_DOMAIN, SENSI_NAME
 
 REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
