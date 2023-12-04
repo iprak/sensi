@@ -11,7 +11,7 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_TEMPERATURE
+from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -44,6 +44,8 @@ async def async_setup_entry(
 
 class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
+
+    _attr_target_temperature_step = PRECISION_WHOLE
 
     def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
         """Initialize the device."""
