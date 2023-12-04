@@ -4,12 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Final
 
-from . import (
-    SensiDescriptionEntity,
-    get_fan_support,
-    set_fan_support,
-)
-from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
     SwitchEntity,
@@ -21,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import SensiDescriptionEntity, get_fan_support, set_fan_support
 from .const import (
     CONFIG_FAN_SUPPORT,
     DOMAIN_DATA_COORDINATOR_KEY,
@@ -28,6 +23,7 @@ from .const import (
     Capabilities,
     Settings,
 )
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
 @dataclass

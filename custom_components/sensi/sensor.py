@@ -5,8 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
-from . import SensiDescriptionEntity
-from .coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
     SensorDeviceClass,
@@ -15,13 +13,15 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, UnitOfTemperature, PERCENTAGE
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
+from . import SensiDescriptionEntity
 from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
 @dataclass

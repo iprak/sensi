@@ -9,11 +9,13 @@ from typing import Any, Final
 
 import websockets.client
 
-from .auth import (
-    AuthenticationConfig,
-    SensiConnectionError,
-    login,
-)
+from homeassistant.components.climate import HVACMode
+from homeassistant.const import UnitOfTemperature
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+from .auth import AuthenticationConfig, SensiConnectionError, login
 from .const import (
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
@@ -23,11 +25,6 @@ from .const import (
     Capabilities,
     Settings,
 )
-from homeassistant.components.climate import HVACMode
-from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 # This is based on IOWrapper.java
 # pylint: disable=line-too-long
@@ -52,6 +49,7 @@ SENSI_TO_HVACMode = {
     "cool": HVACMode.COOL,
     "auto": HVACMode.AUTO,
     "off": HVACMode.OFF,
+    "aux": HVACMode.HEAT,
 }
 
 HA_TO_SENSI_HVACMode = {
@@ -149,7 +147,7 @@ class SensiDevice:
 
             self._capabilities[key] = value == "yes"
 
-        LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
+        #LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
@@ -476,7 +474,6 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         """Send a JSON request."""
 
         await self.async_send_event_priv(data)
-        await self.async_send_event_priv(data)  # Repeat
 
     async def async_send_event_priv(self, data: str) -> None:
         """Send a JSON request."""
@@ -489,7 +486,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             try:
                 await websocket.send("421" + data)
                 msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-                # self._last_event_time_stamp = datetime.now()
+                self._last_event_time_stamp = datetime.now()
                 LOGGER.debug("async_send_event response=%s", msg)
             except Exception as err:  # pylint: disable=broad-except
                 LOGGER.warning("Sending event with %s failed", data)

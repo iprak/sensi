@@ -53,6 +53,7 @@ class Capabilities(StrEnum):
     OPERATING_MODE_HEAT = "operating_mode_settings.heat"
     OPERATING_MODE_COOL = "operating_mode_settings.cool"
     OPERATING_MODE_AUTO = "operating_mode_settings.auto"
+    OPERATING_MODE_AUX = "operating_mode_settings.aux"
 
 
 CAPABILITIES_VALUE_GETTER: Final = {
@@ -66,4 +67,5 @@ CAPABILITIES_VALUE_GETTER: Final = {
     Capabilities.OPERATING_MODE_HEAT: lambda item: item and item.get("heat", "no"),
     Capabilities.OPERATING_MODE_COOL: lambda item: item and item.get("cool", "no"),
     Capabilities.OPERATING_MODE_AUTO: lambda item: item and item.get("auto", "no"),
+    Capabilities.OPERATING_MODE_AUX: lambda item: item and item.get("aux", "no"),
 }

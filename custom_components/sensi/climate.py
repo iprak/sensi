@@ -4,22 +4,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Union
 
-from . import SensiEntity, get_fan_support
-from .const import (
-    DOMAIN_DATA_COORDINATOR_KEY,
-    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
-    LOGGER,
-    SENSI_DOMAIN,
-    SENSI_FAN_AUTO,
-    SENSI_FAN_CIRCULATE,
-    SENSI_FAN_ON,
-    Capabilities,
-)
-from .coordinator import (
-    HA_TO_SENSI_HVACMode,
-    SensiDevice,
-    SensiUpdateCoordinator,
-)
 from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
     ClimateEntity,
@@ -31,6 +15,19 @@ from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from . import SensiEntity, get_fan_support
+from .const import (
+    DOMAIN_DATA_COORDINATOR_KEY,
+    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    LOGGER,
+    SENSI_DOMAIN,
+    SENSI_FAN_AUTO,
+    SENSI_FAN_CIRCULATE,
+    SENSI_FAN_ON,
+    Capabilities,
+)
+from .coordinator import HA_TO_SENSI_HVACMode, SensiDevice, SensiUpdateCoordinator
 
 
 async def async_setup_entry(
@@ -79,12 +76,20 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def supported_features(self) -> ClimateEntityFeature:
         """Return the list of supported features."""
 
+        supported = ClimateEntityFeature.TARGET_TEMPERATURE
+
         if get_fan_support(self._device, self._entry):
-            return (
-                ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-            )
-        else:
-            return ClimateEntityFeature.TARGET_TEMPERATURE
+            supported = supported | ClimateEntityFeature.FAN_MODE
+
+        if self._device.supports(Capabilities.OPERATING_MODE_AUX):
+            supported = supported | ClimateEntityFeature.AUX_HEAT
+
+        return supported
+
+    @property
+    def is_aux_heat(self) -> bool:
+        """Return true if aux heater."""
+        return self._device._operating_mode == "aux"
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
