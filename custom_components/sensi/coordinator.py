@@ -9,7 +9,7 @@ from typing import Any, Final
 
 import websockets.client
 
-from homeassistant.components.climate import HVACMode
+from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import StateType
@@ -99,6 +99,7 @@ class SensiDevice:
     temperature_unit = UnitOfTemperature.FAHRENHEIT
     humidity: int | None = None
     hvac_mode: HVACMode | None = None
+    hvac_action: HVACAction | None = None
 
     _display_scale = "f"
     """Raw display_scale"""
@@ -194,12 +195,11 @@ class SensiDevice:
             self.heat_target = state.get("current_heat_temp")
 
             demand_status = state.get("demand_status", {"heat": 0, "cool": 0})
-            hvac_action = None
+            self.hvac_action = None
             if demand_status["heat"] > 0:
-                hvac_action = "heating"
+                self.hvac_action = "heating"
             if demand_status["cool"] > 0:
-                hvac_action = "cooling"
-            self.attributes["hvac_action"] = hvac_action
+                self.hvac_action = "cooling"
 
             # Fan mode is on or auto. We will create a third mode circulate which is based on auto.
             if "fan_mode" in state:
@@ -237,7 +237,7 @@ class SensiDevice:
                 self.humidity,
                 self.hvac_mode,
                 self.fan_mode,
-                hvac_action,
+                self.hvac_action,
                 self.cool_target,
                 self.heat_target,
             )

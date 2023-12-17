@@ -8,6 +8,7 @@ from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
     ClimateEntity,
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -91,7 +92,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def is_aux_heat(self) -> bool:
-        """Return true if aux heater."""
+        """Return true if aux heater is enabled."""
         return self._device._operating_mode == "aux"
 
     @property
@@ -112,6 +113,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return modes
 
     @property
+    def hvac_action(self) -> HVACAction | None:
+        """Return the current running hvac operation if supported."""
+        return self._device.hvac_action
+
+    @property
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
 
@@ -125,7 +131,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         )
 
     @property
-    def current_temperature(self):
+    def current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self._device.temperature
 
@@ -194,7 +200,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         await self._device.async_set_operating_mode(HVAC_MODE_TO_OPERATING_MODE[hvac_mode])
         self.async_write_ha_state()
-        LOGGER.info("%s: set hvac_mode to %s", self._device.name, hvac_mode)
+        LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
