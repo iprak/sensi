@@ -20,6 +20,7 @@ from . import SensiEntity, get_fan_support
 from .const import (
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
@@ -27,7 +28,7 @@ from .const import (
     SENSI_FAN_ON,
     Capabilities,
 )
-from .coordinator import HA_TO_SENSI_HVACMode, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
 async def async_setup_entry(
@@ -188,10 +189,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             LOGGER.info("%s: device is offline", self._device.name)
             return
 
-        if hvac_mode not in HA_TO_SENSI_HVACMode:
+        if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
-        await self._device.async_set_operating_mode(HA_TO_SENSI_HVACMode[hvac_mode])
+        await self._device.async_set_operating_mode(HVAC_MODE_TO_OPERATING_MODE[hvac_mode])
         self.async_write_ha_state()
         LOGGER.info("%s: set hvac_mode to %s", self._device.name, hvac_mode)
 

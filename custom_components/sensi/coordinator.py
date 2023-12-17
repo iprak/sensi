@@ -27,6 +27,7 @@ from .const import (
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
     LOGGER,
+    OPERATING_MODE_TO_HVAC_MODE,
     SENSI_FAN_CIRCULATE,
     Capabilities,
     Settings,
@@ -50,20 +51,6 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
 
-SENSI_TO_HVACMode = {
-    "heat": HVACMode.HEAT,
-    "cool": HVACMode.COOL,
-    "auto": HVACMode.AUTO,
-    "off": HVACMode.OFF,
-    "aux": HVACMode.HEAT,
-}
-
-HA_TO_SENSI_HVACMode = {
-    HVACMode.HEAT: "heat",
-    HVACMode.COOL: "cool",
-    HVACMode.AUTO: "auto",
-    HVACMode.OFF: "off",
-}
 
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
@@ -111,7 +98,7 @@ class SensiDevice:
     temperature: float | None = None
     temperature_unit = UnitOfTemperature.FAHRENHEIT
     humidity: int | None = None
-    hvac_mode: HVACMode = HVACMode.AUTO
+    hvac_mode: HVACMode | None = None
 
     _display_scale = "f"
     """Raw display_scale"""
@@ -127,6 +114,8 @@ class SensiDevice:
     heat_target: float | None = None
     battery_level: int | None = None
     offline: bool = True
+
+    # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
     def __init__(self, coordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
@@ -181,9 +170,7 @@ class SensiDevice:
             # current_operating_mode can be auto_heat but operating_mode remains auto
             if "operating_mode" in state:
                 self._operating_mode = state.get("operating_mode")
-                self.hvac_mode = SENSI_TO_HVACMode.get(
-                    self._operating_mode, HVACMode.AUTO
-                )
+                self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self._operating_mode)
 
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
@@ -288,7 +275,7 @@ class SensiDevice:
         if self.fan_mode == mode:
             return
 
-        # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode
+        # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode, toJson
         data = self.build_set_request_str("fan_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
         self.fan_mode = mode
@@ -328,7 +315,7 @@ class SensiDevice:
         com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
-        new_hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
+        new_hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
         if new_hvac_mode == self.hvac_mode:
             return
 

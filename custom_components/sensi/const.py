@@ -5,6 +5,8 @@ from enum import StrEnum
 import logging
 from typing import Final
 
+from homeassistant.components.climate import HVACMode
+
 SENSI_DOMAIN: Final = "sensi"
 SENSI_NAME: Final = "Sensi Thermostat"
 SENSI_ATTRIBUTION: Final = "Data provided by Sensi"
@@ -84,4 +86,19 @@ CAPABILITIES_VALUE_GETTER: Final = {
     Capabilities.OPERATING_MODE_COOL: lambda item: item and item.get("cool", "no"),
     Capabilities.OPERATING_MODE_AUTO: lambda item: item and item.get("auto", "no"),
     Capabilities.OPERATING_MODE_AUX: lambda item: item and item.get("aux", "no"),
+}
+
+OPERATING_MODE_TO_HVAC_MODE = {
+    OperatingModes.AUX: HVACMode.HEAT,
+    OperatingModes.HEAT: HVACMode.HEAT,
+    OperatingModes.COOL: HVACMode.COOL,
+    OperatingModes.AUTO: HVACMode.AUTO,
+    OperatingModes.OFF: HVACMode.OFF,
+}
+
+HVAC_MODE_TO_OPERATING_MODE = {
+    HVACMode.HEAT: OperatingModes.HEAT,
+    HVACMode.COOL: OperatingModes.COOL,
+    HVACMode.AUTO: OperatingModes.AUTO,
+    HVACMode.OFF: OperatingModes.OFF,
 }
