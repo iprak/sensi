@@ -30,6 +30,7 @@ from .const import (
     OPERATING_MODE_TO_HVAC_MODE,
     SENSI_FAN_CIRCULATE,
     Capabilities,
+    OperatingModes,
     Settings,
 )
 
@@ -50,7 +51,6 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
-
 
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
@@ -100,6 +100,8 @@ class SensiDevice:
     humidity: int | None = None
     hvac_mode: HVACMode | None = None
     hvac_action: HVACAction | None = None
+    operating_mode: OperatingModes | None = None
+    effective_operating_mode: OperatingModes | None = None
 
     _display_scale = "f"
     """Raw display_scale"""
@@ -168,10 +170,7 @@ class SensiDevice:
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
 
-            # current_operating_mode can be auto_heat but operating_mode remains auto
-            if "operating_mode" in state:
-                self._operating_mode = state.get("operating_mode")
-                self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self._operating_mode)
+            self.parse_thermostat_modes(state)
 
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
@@ -180,6 +179,8 @@ class SensiDevice:
                     if self._display_scale == "c"
                     else UnitOfTemperature.FAHRENHEIT
                 )
+            else:
+                LOGGER.info("display_scale not found in data")
 
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
             self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
@@ -193,13 +194,6 @@ class SensiDevice:
 
             self.cool_target = state.get("current_cool_temp")
             self.heat_target = state.get("current_heat_temp")
-
-            demand_status = state.get("demand_status", {"heat": 0, "cool": 0})
-            self.hvac_action = None
-            if demand_status["heat"] > 0:
-                self.hvac_action = "heating"
-            if demand_status["cool"] > 0:
-                self.hvac_action = "cooling"
 
             # Fan mode is on or auto. We will create a third mode circulate which is based on auto.
             if "fan_mode" in state:
@@ -242,6 +236,44 @@ class SensiDevice:
                 self.heat_target,
             )
             # pylint: enable=line-too-long
+
+    def parse_thermostat_modes(self, state) -> None:
+        """Parse thermostat modes from the state."""
+
+        # When thermostat is set to heat mode, operating_mode and current_operating_mode are both heat.
+        # Heating Auxilliary
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702844902}
+        # Normal "Heating"
+        #   {'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1702845317}
+        # No "Heating"
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # When thermostat is set to Aux mode, operating_mode and current_operating_mode are both aux.
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702840837}
+
+        if "operating_mode" in state:
+            self.operating_mode = state["operating_mode"]
+            self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self.operating_mode)
+        else:
+            LOGGER.debug("operating_mode not found in data")
+
+        if "demand_status" in state:
+            demand_status = state["demand_status"]
+
+            if demand_status.get("aux", 0) > 0:
+                self.effective_operating_mode = OperatingModes.AUX
+                self.hvac_action = HVACAction.HEATING
+            elif demand_status.get("heat", 0) > 0:
+                self.effective_operating_mode = OperatingModes.HEAT
+                self.hvac_action = HVACAction.HEATING
+            elif demand_status.get("cool",0) > 0:
+                self.effective_operating_mode = OperatingModes.COOL
+                self.hvac_action = HVACAction.COOLING
+            else:
+                self.effective_operating_mode = OperatingModes.OFF
+                self.hvac_action = HVACAction.OFF
+        else:
+            LOGGER.debug("demand_status not found in data")
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
@@ -309,19 +341,35 @@ class SensiDevice:
         self.attributes[ATTR_CIRCULATING_FAN] = status
         self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
 
-    async def async_set_operating_mode(self, mode: str) -> None:
-        """Set the fan mode.
+    async def async_set_operating_mode(self, mode: OperatingModes) -> bool:
+        """Update the operating and hvac mode.
 
         com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
-        new_hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
-        if new_hvac_mode == self.hvac_mode:
-            return
+        if mode == self.operating_mode:
+            return False
 
         data = self.build_set_request_str("operating_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
-        self.hvac_mode = new_hvac_mode
+        self.operating_mode = mode
+        self.effective_operating_mode = mode
+
+        self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
+        return True
+
+    async def async_enable_aux_mode(self) -> bool:
+        """Set auxiliary heating mode."""
+        if self.effective_operating_mode == OperatingModes.AUX:
+            return False
+
+        mode = OperatingModes.AUX
+        data = self.build_set_request_str("operating_mode", {"value": mode})
+        await self.coordinator.async_send_event(data)
+        self.operating_mode = OperatingModes.HEAT
+        self.effective_operating_mode = OperatingModes.AUX
+        self.hvac_mode = HVACMode.HEAT
+        return True
 
     def get_setting(self, key: Settings) -> bool | None:
         """Get a display configuration."""
