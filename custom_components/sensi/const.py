@@ -30,6 +30,12 @@ DEFAULT_FAN_SUPPORT: Final = True
 COORDINATOR_DELAY_REFRESH_AFTER_UPDATE: Final = 10
 COORDINATOR_UPDATE_INTERVAL: Final = 30
 
+ATTR_CIRCULATING_FAN: Final = "circulating_fan"
+ATTR_CIRCULATING_FAN_DUTY_CYCLE: Final = "circulating_fan_duty_cycle"
+ATTR_OFFLINE: Final = "offline"
+ATTR_POWER_STATUS: Final = "power_status"
+ATTR_WIFI_QUALITY: Final = "wifi_connection_quality"
+ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
 
 class Settings(StrEnum):
     """Thermostat Display properties."""
@@ -37,6 +43,16 @@ class Settings(StrEnum):
     CONTINUOUS_BACKLIGHT = "continuous_backlight"
     DISPLAY_HUMIDITY = "display_humidity"
     DISPLAY_TIME = "display_time"
+
+
+class OperatingModes(StrEnum):
+    """Thermostat operating mode values. This is based on OperatingMode (OperatingMode.java)."""
+
+    OFF = "off"
+    AUX = "aux"
+    HEAT = "heat"
+    COOL = "cool"
+    AUTO = "auto"
 
 
 class Capabilities(StrEnum):

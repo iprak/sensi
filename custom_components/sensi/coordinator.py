@@ -17,6 +17,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .auth import AuthenticationConfig, SensiConnectionError, login
 from .const import (
+    ATTR_BATTERY_VOLTAGE,
+    ATTR_CIRCULATING_FAN,
+    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    ATTR_OFFLINE,
+    ATTR_POWER_STATUS,
+    ATTR_WIFI_QUALITY,
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
@@ -96,7 +102,7 @@ class SensiDevice:
     # pylint: disable=too-many-instance-attributes
     # These attributes are meant to be here.
 
-    coordinator = None
+    coordinator: SensiUpdateCoordinator | None = None
 
     identifier: str | None = None
     name: str | None = None
@@ -119,7 +125,6 @@ class SensiDevice:
     max_temp = 99
     cool_target: float | None = None
     heat_target: float | None = None
-    battery_voltage: float | None = None
     battery_level: int | None = None
     offline: bool = True
 
@@ -168,7 +173,7 @@ class SensiDevice:
             LOGGER.debug(state)
 
             self.offline = state.get("status") == "offline"
-            self.attributes["offline"] = self.offline
+            self.attributes[ATTR_OFFLINE] = self.offline
 
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
@@ -188,12 +193,12 @@ class SensiDevice:
                     else UnitOfTemperature.FAHRENHEIT
                 )
 
-            self.attributes["wifi_connection_quality"] = state.get(
-                "wifi_connection_quality"
-            )
-            self.battery_voltage = state.get("battery_voltage")
-            self.attributes["battery_voltage"] = self.battery_voltage
-            self.battery_level = calculate_battery_level(self.battery_voltage)
+            self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
+            self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
+
+            battery_voltage = state.get("battery_voltage")
+            self.attributes[ATTR_BATTERY_VOLTAGE] = battery_voltage
+            self.battery_level = calculate_battery_level(battery_voltage)
 
             self.min_temp = state.get("cool_min_temp", 45)
             self.max_temp = state.get("heat_max_temp", 99)
@@ -219,12 +224,12 @@ class SensiDevice:
                 circulating_fan = state.get(
                     "circulating_fan", {"enabled": "off", "duty_cycle": 0}
                 )
-                self.attributes["circulating_fan"] = circulating_fan["enabled"]
-                self.attributes["circulating_fan_cuty_cycle"] = circulating_fan[
+                self.attributes[ATTR_CIRCULATING_FAN] = circulating_fan["enabled"]
+                self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = circulating_fan[
                     "duty_cycle"
                 ]
 
-                if self.attributes["circulating_fan"] == "on":
+                if self.attributes[ATTR_CIRCULATING_FAN] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
             self._properties[Settings.CONTINUOUS_BACKLIGHT] = parse_bool(
@@ -302,8 +307,8 @@ class SensiDevice:
 
         status = "on" if enabled else "off"
 
-        if (self.attributes["circulating_fan"] == status) and (
-            self.attributes["circulating_fan_cuty_cycle"] == duty_cycle
+        if (self.attributes[ATTR_CIRCULATING_FAN] == status) and (
+            self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == duty_cycle
         ):
             return
 
@@ -314,8 +319,8 @@ class SensiDevice:
         )
         await self.coordinator.async_send_event(data)
 
-        self.attributes["circulating_fan"] = status
-        self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
+        self.attributes[ATTR_CIRCULATING_FAN] = status
+        self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
 
     async def async_set_operating_mode(self, mode: str) -> None:
         """Set the fan mode.
