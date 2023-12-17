@@ -281,15 +281,16 @@ class SensiDevice:
         if self.hvac_mode == HVACMode.HEAT:
             if self.heat_target == value:
                 return
-        elif self.cool_target == value:
-            return
+        elif self.hvac_mode == HVACMode.COOL:
+            if self.cool_target == value:
+                return
 
-        # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature
+        # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature, toJson
         data = self.build_set_request_str(
             "temperature",
             {
                 "target_temp": value,
-                "mode": self._operating_mode.lower(),
+                "mode": self.operating_mode.lower(),
                 "scale": self._display_scale,
             },
         )
@@ -297,7 +298,7 @@ class SensiDevice:
 
         if self.hvac_mode == HVACMode.HEAT:
             self.heat_target = value
-        else:
+        elif self.hvac_mode == HVACMode.COOL:
             self.cool_target = value
 
     async def async_set_fan_mode(self, mode: str) -> None:
