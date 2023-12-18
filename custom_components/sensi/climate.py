@@ -8,6 +8,7 @@ from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
     ClimateEntity,
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -20,14 +21,16 @@ from . import SensiEntity, get_fan_support
 from .const import (
     DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
     Capabilities,
+    OperatingModes,
 )
-from .coordinator import HA_TO_SENSI_HVACMode, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
 async def async_setup_entry(
@@ -90,8 +93,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def is_aux_heat(self) -> bool:
-        """Return true if aux heater."""
-        return self._device._operating_mode == "aux"
+        """Return true if aux heater is enabled."""
+        return self._device.effective_operating_mode ==  OperatingModes.AUX
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -111,6 +114,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return modes
 
     @property
+    def hvac_action(self) -> HVACAction | None:
+        """Return the current running hvac operation if supported."""
+        return self._device.hvac_action
+
+    @property
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
 
@@ -124,7 +132,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         )
 
     @property
-    def current_temperature(self):
+    def current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self._device.temperature
 
@@ -188,12 +196,12 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             LOGGER.info("%s: device is offline", self._device.name)
             return
 
-        if hvac_mode not in HA_TO_SENSI_HVACMode:
+        if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
-        await self._device.async_set_operating_mode(HA_TO_SENSI_HVACMode[hvac_mode])
-        self.async_write_ha_state()
-        LOGGER.info("%s: set hvac_mode to %s", self._device.name, hvac_mode)
+        if await self._device.async_set_operating_mode(HVAC_MODE_TO_OPERATING_MODE[hvac_mode]):
+            self.async_write_ha_state()
+            LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
@@ -226,3 +234,19 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         await self._device.async_set_fan_mode(HVACMode.AUTO)
         self.async_write_ha_state()
+
+    async def async_turn_aux_heat_on(self) -> None:
+        """Turn auxiliary heater on."""
+
+        if self._device.offline:
+            LOGGER.info("%s: device is offline", self._device.name)
+            return
+
+        self._last_hvac_mode_before_aux_heat = self.hvac_mode
+
+        if await self._device.async_enable_aux_mode():
+            self.async_write_ha_state()
+
+    async def async_turn_aux_heat_off(self) -> None:
+        """Turn auxiliary heater off."""
+        await self.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat)

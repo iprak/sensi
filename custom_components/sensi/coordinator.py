@@ -9,7 +9,7 @@ from typing import Any, Final
 
 import websockets.client
 
-from homeassistant.components.climate import HVACMode
+from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import StateType
@@ -17,12 +17,20 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .auth import AuthenticationConfig, SensiConnectionError, login
 from .const import (
+    ATTR_BATTERY_VOLTAGE,
+    ATTR_CIRCULATING_FAN,
+    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    ATTR_OFFLINE,
+    ATTR_POWER_STATUS,
+    ATTR_WIFI_QUALITY,
     CAPABILITIES_VALUE_GETTER,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
     LOGGER,
+    OPERATING_MODE_TO_HVAC_MODE,
     SENSI_FAN_CIRCULATE,
     Capabilities,
+    OperatingModes,
     Settings,
 )
 
@@ -43,21 +51,6 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
-
-SENSI_TO_HVACMode = {
-    "heat": HVACMode.HEAT,
-    "cool": HVACMode.COOL,
-    "auto": HVACMode.AUTO,
-    "off": HVACMode.OFF,
-    "aux": HVACMode.HEAT,
-}
-
-HA_TO_SENSI_HVACMode = {
-    HVACMode.HEAT: "heat",
-    HVACMode.COOL: "cool",
-    HVACMode.AUTO: "auto",
-    HVACMode.OFF: "off",
-}
 
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
@@ -96,7 +89,7 @@ class SensiDevice:
     # pylint: disable=too-many-instance-attributes
     # These attributes are meant to be here.
 
-    coordinator = None
+    coordinator: SensiUpdateCoordinator | None = None
 
     identifier: str | None = None
     name: str | None = None
@@ -105,7 +98,10 @@ class SensiDevice:
     temperature: float | None = None
     temperature_unit = UnitOfTemperature.FAHRENHEIT
     humidity: int | None = None
-    hvac_mode: HVACMode = HVACMode.AUTO
+    hvac_mode: HVACMode | None = None
+    hvac_action: HVACAction | None = None
+    operating_mode: OperatingModes | None = None
+    effective_operating_mode: OperatingModes | None = None
 
     _display_scale = "f"
     """Raw display_scale"""
@@ -119,9 +115,10 @@ class SensiDevice:
     max_temp = 99
     cool_target: float | None = None
     heat_target: float | None = None
-    battery_voltage: float | None = None
     battery_level: int | None = None
     offline: bool = True
+
+    # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
     def __init__(self, coordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
@@ -168,17 +165,12 @@ class SensiDevice:
             LOGGER.debug(state)
 
             self.offline = state.get("status") == "offline"
-            self.attributes["offline"] = self.offline
+            self.attributes[ATTR_OFFLINE] = self.offline
 
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
 
-            # current_operating_mode can be auto_heat but operating_mode remains auto
-            if "operating_mode" in state:
-                self._operating_mode = state.get("operating_mode")
-                self.hvac_mode = SENSI_TO_HVACMode.get(
-                    self._operating_mode, HVACMode.AUTO
-                )
+            self.parse_thermostat_modes(state)
 
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
@@ -187,27 +179,21 @@ class SensiDevice:
                     if self._display_scale == "c"
                     else UnitOfTemperature.FAHRENHEIT
                 )
+            else:
+                LOGGER.info("display_scale not found in data")
 
-            self.attributes["wifi_connection_quality"] = state.get(
-                "wifi_connection_quality"
-            )
-            self.battery_voltage = state.get("battery_voltage")
-            self.attributes["battery_voltage"] = self.battery_voltage
-            self.battery_level = calculate_battery_level(self.battery_voltage)
+            self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
+            self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
+
+            battery_voltage = state.get("battery_voltage")
+            self.attributes[ATTR_BATTERY_VOLTAGE] = battery_voltage
+            self.battery_level = calculate_battery_level(battery_voltage)
 
             self.min_temp = state.get("cool_min_temp", 45)
             self.max_temp = state.get("heat_max_temp", 99)
 
             self.cool_target = state.get("current_cool_temp")
             self.heat_target = state.get("current_heat_temp")
-
-            demand_status = state.get("demand_status", {"heat": 0, "cool": 0})
-            hvac_action = None
-            if demand_status["heat"] > 0:
-                hvac_action = "heating"
-            if demand_status["cool"] > 0:
-                hvac_action = "cooling"
-            self.attributes["hvac_action"] = hvac_action
 
             # Fan mode is on or auto. We will create a third mode circulate which is based on auto.
             if "fan_mode" in state:
@@ -219,12 +205,12 @@ class SensiDevice:
                 circulating_fan = state.get(
                     "circulating_fan", {"enabled": "off", "duty_cycle": 0}
                 )
-                self.attributes["circulating_fan"] = circulating_fan["enabled"]
-                self.attributes["circulating_fan_cuty_cycle"] = circulating_fan[
+                self.attributes[ATTR_CIRCULATING_FAN] = circulating_fan["enabled"]
+                self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = circulating_fan[
                     "duty_cycle"
                 ]
 
-                if self.attributes["circulating_fan"] == "on":
+                if self.attributes[ATTR_CIRCULATING_FAN] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
             self._properties[Settings.CONTINUOUS_BACKLIGHT] = parse_bool(
@@ -245,11 +231,49 @@ class SensiDevice:
                 self.humidity,
                 self.hvac_mode,
                 self.fan_mode,
-                hvac_action,
+                self.hvac_action,
                 self.cool_target,
                 self.heat_target,
             )
             # pylint: enable=line-too-long
+
+    def parse_thermostat_modes(self, state) -> None:
+        """Parse thermostat modes from the state."""
+
+        # When thermostat is set to heat mode, operating_mode and current_operating_mode are both heat.
+        # Heating Auxilliary
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702844902}
+        # Normal "Heating"
+        #   {'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1702845317}
+        # No "Heating"
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # When thermostat is set to Aux mode, operating_mode and current_operating_mode are both aux.
+        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702840837}
+
+        if "operating_mode" in state:
+            self.operating_mode = state["operating_mode"]
+            self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self.operating_mode)
+        else:
+            LOGGER.debug("operating_mode not found in data")
+
+        if "demand_status" in state:
+            demand_status = state["demand_status"]
+
+            if demand_status.get("aux", 0) > 0:
+                self.effective_operating_mode = OperatingModes.AUX
+                self.hvac_action = HVACAction.HEATING
+            elif demand_status.get("heat", 0) > 0:
+                self.effective_operating_mode = OperatingModes.HEAT
+                self.hvac_action = HVACAction.HEATING
+            elif demand_status.get("cool",0) > 0:
+                self.effective_operating_mode = OperatingModes.COOL
+                self.hvac_action = HVACAction.COOLING
+            else:
+                self.effective_operating_mode = OperatingModes.OFF
+                self.hvac_action = HVACAction.OFF
+        else:
+            LOGGER.debug("demand_status not found in data")
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
@@ -257,15 +281,16 @@ class SensiDevice:
         if self.hvac_mode == HVACMode.HEAT:
             if self.heat_target == value:
                 return
-        elif self.cool_target == value:
-            return
+        elif self.hvac_mode == HVACMode.COOL:
+            if self.cool_target == value:
+                return
 
-        # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature
+        # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature, toJson
         data = self.build_set_request_str(
             "temperature",
             {
                 "target_temp": value,
-                "mode": self._operating_mode.lower(),
+                "mode": self.operating_mode.lower(),
                 "scale": self._display_scale,
             },
         )
@@ -273,7 +298,7 @@ class SensiDevice:
 
         if self.hvac_mode == HVACMode.HEAT:
             self.heat_target = value
-        else:
+        elif self.hvac_mode == HVACMode.COOL:
             self.cool_target = value
 
     async def async_set_fan_mode(self, mode: str) -> None:
@@ -283,7 +308,7 @@ class SensiDevice:
         if self.fan_mode == mode:
             return
 
-        # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode
+        # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode, toJson
         data = self.build_set_request_str("fan_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
         self.fan_mode = mode
@@ -302,8 +327,8 @@ class SensiDevice:
 
         status = "on" if enabled else "off"
 
-        if (self.attributes["circulating_fan"] == status) and (
-            self.attributes["circulating_fan_cuty_cycle"] == duty_cycle
+        if (self.attributes[ATTR_CIRCULATING_FAN] == status) and (
+            self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == duty_cycle
         ):
             return
 
@@ -314,22 +339,38 @@ class SensiDevice:
         )
         await self.coordinator.async_send_event(data)
 
-        self.attributes["circulating_fan"] = status
-        self.attributes["circulating_fan_cuty_cycle"] = duty_cycle
+        self.attributes[ATTR_CIRCULATING_FAN] = status
+        self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
 
-    async def async_set_operating_mode(self, mode: str) -> None:
-        """Set the fan mode.
+    async def async_set_operating_mode(self, mode: OperatingModes) -> bool:
+        """Update the operating and hvac mode.
 
         com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
-        new_hvac_mode = SENSI_TO_HVACMode.get(mode, HVACMode.AUTO)
-        if new_hvac_mode == self.hvac_mode:
-            return
+        if mode == self.operating_mode:
+            return False
 
         data = self.build_set_request_str("operating_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
-        self.hvac_mode = new_hvac_mode
+        self.operating_mode = mode
+        self.effective_operating_mode = mode
+
+        self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
+        return True
+
+    async def async_enable_aux_mode(self) -> bool:
+        """Set auxiliary heating mode."""
+        if self.effective_operating_mode == OperatingModes.AUX:
+            return False
+
+        mode = OperatingModes.AUX
+        data = self.build_set_request_str("operating_mode", {"value": mode})
+        await self.coordinator.async_send_event(data)
+        self.operating_mode = OperatingModes.HEAT
+        self.effective_operating_mode = OperatingModes.AUX
+        self.hvac_mode = HVACMode.HEAT
+        return True
 
     def get_setting(self, key: Settings) -> bool | None:
         """Get a display configuration."""
