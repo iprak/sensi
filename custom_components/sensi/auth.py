@@ -16,6 +16,8 @@ from homeassistant.helpers import aiohttp_client, storage
 
 from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 
+DEFAULT_TIMEOUT = 10
+
 # Defined in CreateRefreshParams.java
 OAUTH_URL: Final = "https://oauth.sensiapi.io/token?device={}"
 CLIENT_SECRET: Final = "XBF?Z9U6;x3bUwe^FugbL=4ksvGjLnCQ"
@@ -72,10 +74,16 @@ async def login(
         "grant_type": "password",
     }
 
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "x-platform":"android",
+        "accept": "*/*"
+        }
+
     try:
         session = aiohttp_client.async_get_clientsession(hass)
-        async with async_timeout.timeout(10):
-            response = await session.post(OAUTH_URL.format(device_id), data=post_data)
+        async with async_timeout.timeout(DEFAULT_TIMEOUT):
+            response = await session.post(OAUTH_URL.format(device_id), data=post_data, headers=headers, allow_redirects=True,)
     except (asyncio.TimeoutError, aiohttp.ClientError) as err:
         LOGGER.warning("Timed out getting access token", exc_info=True)
         raise SensiConnectionError from err
