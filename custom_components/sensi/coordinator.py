@@ -24,8 +24,10 @@ from .const import (
     ATTR_POWER_STATUS,
     ATTR_WIFI_QUALITY,
     CAPABILITIES_VALUE_GETTER,
+    COOL_MIN_TEMPERATURE,
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
+    HEAT_MAX_TEMPERATURE,
     LOGGER,
     OPERATING_MODE_TO_HVAC_MODE,
     SENSI_FAN_CIRCULATE,
@@ -100,7 +102,13 @@ class SensiDevice:
     humidity: int | None = None
     hvac_mode: HVACMode | None = None
     hvac_action: HVACAction | None = None
+
+    last_action_heat: bool
+    """Was the last action heating?"""
+
     operating_mode: OperatingModes | None = None
+    """Operating mode reported by Sensi"""
+
     effective_operating_mode: OperatingModes | None = None
 
     _display_scale = "f"
@@ -111,8 +119,8 @@ class SensiDevice:
 
     fan_mode: str | None = None
     attributes: dict[str, str | float] = None
-    min_temp = 45
-    max_temp = 99
+    min_temp = COOL_MIN_TEMPERATURE
+    max_temp = HEAT_MAX_TEMPERATURE
     cool_target: float | None = None
     heat_target: float | None = None
     battery_level: int | None = None
@@ -170,7 +178,7 @@ class SensiDevice:
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
 
-            self.parse_thermostat_modes(state)
+            self.parse_thermostat_mode_action(state)
 
             if "display_scale" in state:
                 self._display_scale = state.get("display_scale")
@@ -189,8 +197,8 @@ class SensiDevice:
             self.attributes[ATTR_BATTERY_VOLTAGE] = battery_voltage
             self.battery_level = calculate_battery_level(battery_voltage)
 
-            self.min_temp = state.get("cool_min_temp", 45)
-            self.max_temp = state.get("heat_max_temp", 99)
+            self.min_temp = state.get("cool_min_temp", COOL_MIN_TEMPERATURE)
+            self.max_temp = state.get("heat_max_temp", HEAT_MAX_TEMPERATURE)
 
             self.cool_target = state.get("current_cool_temp")
             self.heat_target = state.get("current_heat_temp")
@@ -225,7 +233,7 @@ class SensiDevice:
 
             # pylint: disable=line-too-long
             LOGGER.info(
-                "%d%s humidity=%d hvac_mode=%s fan_mode=%s hvac_action=%s cool_target=%d heat_target=%d",
+                "%d%s humidity=%d, hvac_mode=%s, fan_mode=%s, hvac_action=%s, cool_target=%d, heat_target=%d",
                 self.temperature,
                 self.temperature_unit,
                 self.humidity,
@@ -237,19 +245,66 @@ class SensiDevice:
             )
             # pylint: enable=line-too-long
 
-    def parse_thermostat_modes(self, state) -> None:
-        """Parse thermostat modes from the state."""
+    def parse_thermostat_mode_action(self, state) -> None:
+        """Parse thermostat mode and action from the state."""
 
-        # When thermostat is set to heat mode, operating_mode and current_operating_mode are both heat.
-        # Heating Auxilliary
-        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702844902}
-        # Normal "Heating"
-        #   {'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1702845317}
-        # No "Heating"
-        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+        # [Aux mode]
+        #     Off
+        #     operating_mode=current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
 
-        # When thermostat is set to Aux mode, operating_mode and current_operating_mode are both aux.
-        #   {'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1702840837}
+        #     Heat
+        #     operating_mode=current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706456258}
+
+        #     Cool
+        #     operating_mode=current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706456358}
+
+        #     Aux
+        #     operating_mode=current_operating_mode=aux
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1706456438}
+
+        # [Off]
+        #     Off
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Heat]
+        #     Heating:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706461614}
+
+        #     idle:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Cool]
+        #     Idle:
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'cool', 'last_start': None}
+
+        #     Cooling:
+        #     operating_mode=cool, current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706461689}
+
+        # [Auto]
+        #     cooling:
+        #     operating_mode=auto, current_operating_mode=auto_cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706462094}
+
+        #     idle:
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #     heating
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706462635}
+
+
+        # When thermostat is set to Off, operating_mode and current_operating_mode are both Off. Themostat should not be be demanding heating or cooling
+
+        LOGGER.debug("operating_mode=%s, demand_status=%s", state["operating_mode"], state["demand_status"])
 
         if "operating_mode" in state:
             self.operating_mode = state["operating_mode"]
@@ -257,12 +312,16 @@ class SensiDevice:
         else:
             LOGGER.debug("operating_mode not found in data")
 
-        if "demand_status" in state:
+        if self.operating_mode == OperatingModes.OFF:
+            self.effective_operating_mode = OperatingModes.OFF
+            self.hvac_action = HVACAction.OFF
+        elif "demand_status" in state:
             demand_status = state["demand_status"]
+            self.last_action_heat = demand_status.get("last") == "heat"
 
             if demand_status.get("aux", 0) > 0:
                 self.effective_operating_mode = OperatingModes.AUX
-                self.hvac_action = HVACAction.HEATING
+                self.hvac_action = HVACAction.HEATING   #Treat Aux as Heating
             elif demand_status.get("heat", 0) > 0:
                 self.effective_operating_mode = OperatingModes.HEAT
                 self.hvac_action = HVACAction.HEATING
@@ -270,10 +329,23 @@ class SensiDevice:
                 self.effective_operating_mode = OperatingModes.COOL
                 self.hvac_action = HVACAction.COOLING
             else:
-                self.effective_operating_mode = OperatingModes.OFF
-                self.hvac_action = HVACAction.OFF
+                self.effective_operating_mode = None
+                self.hvac_action = HVACAction.IDLE
         else:
             LOGGER.debug("demand_status not found in data")
+
+    @property
+    def target_temperature(self)-> float | None:
+        """Return the temperature we try to reach."""
+        if self.hvac_action == HVACAction.OFF:
+            return None
+        elif self.hvac_action == HVACAction.HEATING:
+            return self.heat_target
+        elif self.hvac_action == HVACAction.COOLING:
+            return self.cool_target
+        else:
+            #HVACAction.IDLE
+            return self.heat_target if self.last_action_heat else self.cool_target
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
