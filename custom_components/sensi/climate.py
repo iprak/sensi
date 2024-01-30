@@ -142,13 +142,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return self._device.temperature_unit
 
     @property
-    def target_temperature(self):
+    def target_temperature(self)-> float | None:
         """Return the temperature we try to reach."""
-        return (
-            self._device.heat_target
-            if self.hvac_mode == HVACMode.HEAT
-            else self._device.cool_target
-        )
+        return self._device.target_temperature
 
     @property
     def current_humidity(self) -> int | None:

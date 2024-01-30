@@ -8,7 +8,6 @@ On adding the Sensi integration, you should see one device and up to 8 entities.
 
 ![image](https://github.com/iprak/sensi/assets/6459774/c02ee32d-e987-496f-b435-d9eda032df0e)
 
-
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
 - The available operating modes `Auto/Heat/Cool/Off` are based on thermostat setup.
 - Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
@@ -17,8 +16,15 @@ On adding the Sensi integration, you should see one device and up to 8 entities.
 - Some Thermostat display properties such as Display Humidity, Display Time and Continuous Backlight can also be controlled. Not all thermostats support Continuous Backlight feature and the option will be unavailable in that case.
 - The `Fan Support` configuration can be used to disable fan.
 - If the thermostat is `Offline`, the entities will appear unavailable.
+- Idle state
+  - The target temperature from the previous action will be displayed.
+- Auxiliary heating
+  - Homeassistant currently doesn't handle aux heat case well. One will "Heating" as the action for aux heating.
+- Min/Max setpoints
+  - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action.
 
 Sample attributes on the climate entity:
+
 ```
 hvac_modes: off, heat, cool, auto
 min_temp: 45
