@@ -45,6 +45,7 @@ class Settings(StrEnum):
     CONTINUOUS_BACKLIGHT = "continuous_backlight"
     DISPLAY_HUMIDITY = "display_humidity"
     DISPLAY_TIME = "display_time"
+    KEYPAD_LOCKOUT = "keypad_lockout"
 
 
 class OperatingModes(StrEnum):
@@ -64,6 +65,7 @@ class Capabilities(StrEnum):
     DEGREES_FC = "degrees_fc"
     DISPLAY_HUMIDITY = "display_humidity"
     DISPLAY_TIME = "display_time"
+    KEYPAD_LOCKOUT = "keypad_lockout"
     CIRCULATING_FAN = "circulating_fan"
     FAN_MODE_AUTO = "fan_mode_settings.auto"
     FAN_MODE_ON = "fan_mode_settings.on"

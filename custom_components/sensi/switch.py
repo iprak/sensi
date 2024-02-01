@@ -63,6 +63,13 @@ SWITCH_TYPES: Final = (
         entity_category=EntityCategory.CONFIG,
         capability=Capabilities.DISPLAY_TIME,
     ),
+    SensiCapabilityEntityDescription(
+        key=Settings.KEYPAD_LOCKOUT,
+        name="Keypad lockout",
+        icon="mdi:lock",
+        entity_category=EntityCategory.CONFIG,
+        capability=Capabilities.KEYPAD_LOCKOUT,
+    ),
 )
 
 

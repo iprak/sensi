@@ -39,7 +39,7 @@ from .const import (
 # This is based on IOWrapper.java
 # pylint: disable=line-too-long
 WS_URL: Final = "wss://rt.sensiapi.io/thermostat/?transport=websocket"
-CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan,operating_mode_settings"
+CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,degrees_fc,display_time,circulating_fan,operating_mode_settings,keypad_lockout"
 
 # All possible capabilities:
 # display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,
