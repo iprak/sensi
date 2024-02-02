@@ -67,14 +67,14 @@ SENSOR_TYPES: Final = (
 
     SensiSensorEntityDescription(
         key=Settings.COOL_MIN_TEMP,
-        name="Min temperature",
+        name="Min setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
         value_fn=lambda device: device.min_temp,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensiSensorEntityDescription(
         key=Settings.HEAT_MAX_TEMP,
-        name="Max temperature",
+        name="Max setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda device: device.max_temp,
