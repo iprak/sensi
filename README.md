@@ -6,7 +6,8 @@ It was developed by reverse engineering the mobile app and work done by https://
 
 On adding the Sensi integration, you should see one device and up to 8 entities. You will need credentials used in the Sensi mobile app.
 
-![image](https://github.com/iprak/sensi/assets/6459774/c02ee32d-e987-496f-b435-d9eda032df0e)
+![image](https://github.com/iprak/sensi/assets/6459774/222a21ac-8d5f-4530-b3d6-ec87ae668b6d)
+
 
 - Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
 - The available operating modes `Auto/Heat/Cool/Off` are based on thermostat setup.
