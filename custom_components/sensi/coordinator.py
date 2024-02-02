@@ -438,11 +438,11 @@ class SensiDevice:
         return True
 
     def get_setting(self, key: Settings) -> bool | None:
-        """Get a display configuration."""
+        """Get value for a setting."""
         return self._properties.get(key)
 
-    async def async_set_setting(self, key: Settings, value: bool) -> None:
-        """Set a display configuration."""
+    async def async_set_setting(self, key: Settings, value: bool|int) -> None:
+        """Set value for a setting ."""
 
         if key not in Settings:
             raise ValueError(f"Unsupported setting: {key}")
@@ -450,9 +450,29 @@ class SensiDevice:
         if value == self.get_setting(key):
             return
 
-        data = self.build_set_request_str(key, {"value": "on" if value else "off"})
+        if isinstance(value, bool):
+            data = self.build_set_request_str(key, {"value": "on" if value else "off"})
+        else:
+            data = self.build_set_request_str(key, {"value": value})
+
         await self.coordinator.async_send_event(data)
         self._properties[key] = value
+
+    async def async_set_min_temp(self, value: int) -> None:
+        """Set the minimum thermostat temperature."""
+        if self.min_temp == value:
+            return
+
+        await self.async_set_setting(Settings.COOL_MIN_TEMP, value)
+        self.min_temp = value
+
+    async def async_set_max_temp(self, value: int) -> None:
+        """Set the maximum thermostat temperature."""
+        if self.max_temp == value:
+            return
+
+        await self.async_set_setting(Settings.HEAT_MAX_TEMP, value)
+        self.max_temp = value
 
     def build_set_request_str(self, key: str, payload: dict[str, str]) -> str:
         """Prepare the request string for setting data."""

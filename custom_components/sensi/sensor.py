@@ -20,7 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import SensiDescriptionEntity
-from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN
+from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN, Settings
 from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
@@ -62,6 +62,22 @@ SENSOR_TYPES: Final = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda device: device.battery_level,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+
+    SensiSensorEntityDescription(
+        key=Settings.COOL_MIN_TEMP,
+        name="Min temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        value_fn=lambda device: device.min_temp,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensiSensorEntityDescription(
+        key=Settings.HEAT_MAX_TEMP,
+        name="Max temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=PERCENTAGE,
+        value_fn=lambda device: device.max_temp,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
