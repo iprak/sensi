@@ -45,7 +45,9 @@ class Settings(StrEnum):
     CONTINUOUS_BACKLIGHT = "continuous_backlight"
     DISPLAY_HUMIDITY = "display_humidity"
     DISPLAY_TIME = "display_time"
-
+    KEYPAD_LOCKOUT = "keypad_lockout"
+    HEAT_MAX_TEMP = "heat_max_temp"
+    COOL_MIN_TEMP = "cool_min_temp"
 
 class OperatingModes(StrEnum):
     """Thermostat operating mode values. This is based on OperatingMode (OperatingMode.java)."""
@@ -58,12 +60,13 @@ class OperatingModes(StrEnum):
 
 
 class Capabilities(StrEnum):
-    """Thermostat simple capabilites."""
+    """Thermostat capabilites."""
 
     CONTINUOUS_BACKLIGHT = "continuous_backlight"
     DEGREES_FC = "degrees_fc"
     DISPLAY_HUMIDITY = "display_humidity"
     DISPLAY_TIME = "display_time"
+    KEYPAD_LOCKOUT = "keypad_lockout"
     CIRCULATING_FAN = "circulating_fan"
     FAN_MODE_AUTO = "fan_mode_settings.auto"
     FAN_MODE_ON = "fan_mode_settings.on"
@@ -76,16 +79,16 @@ class Capabilities(StrEnum):
 
 CAPABILITIES_VALUE_GETTER: Final = {
     # circulating_fan
-    Capabilities.CIRCULATING_FAN: lambda item: item and item.get("capable", "no"),
+    Capabilities.CIRCULATING_FAN: lambda item: yes_no_capability_getter(item,"capable"),
     # fan_mode_settings
-    Capabilities.FAN_MODE_AUTO: lambda item: item and item.get("auto", "no"),
-    Capabilities.FAN_MODE_ON: lambda item: item and item.get("on", "no"),
+    Capabilities.FAN_MODE_AUTO: lambda item: yes_no_capability_getter(item, "auto"),
+    Capabilities.FAN_MODE_ON: lambda item: yes_no_capability_getter(item, "on"),
     # operating_mode_settings
-    Capabilities.OPERATING_MODE_OFF: lambda item: item and item.get("off", "no"),
-    Capabilities.OPERATING_MODE_HEAT: lambda item: item and item.get("heat", "no"),
-    Capabilities.OPERATING_MODE_COOL: lambda item: item and item.get("cool", "no"),
-    Capabilities.OPERATING_MODE_AUTO: lambda item: item and item.get("auto", "no"),
-    Capabilities.OPERATING_MODE_AUX: lambda item: item and item.get("aux", "no"),
+    Capabilities.OPERATING_MODE_OFF: lambda item: yes_no_capability_getter(item, "off"),
+    Capabilities.OPERATING_MODE_HEAT: lambda item: yes_no_capability_getter(item, "heat"),
+    Capabilities.OPERATING_MODE_COOL: lambda item: yes_no_capability_getter(item, "cool"),
+    Capabilities.OPERATING_MODE_AUTO: lambda item: yes_no_capability_getter(item, "auto"),
+    Capabilities.OPERATING_MODE_AUX: lambda item: yes_no_capability_getter(item, "aux")
 }
 
 OPERATING_MODE_TO_HVAC_MODE = {
@@ -102,3 +105,7 @@ HVAC_MODE_TO_OPERATING_MODE = {
     HVACMode.AUTO: OperatingModes.AUTO,
     HVACMode.OFF: OperatingModes.OFF,
 }
+
+def yes_no_capability_getter(data:dict, key:str)-> bool:
+    """Boolean type capability getter."""
+    return data and data.get(key, "no") == "yes"

@@ -21,7 +21,7 @@ On adding the Sensi integration, you should see one device and up to 8 entities.
 - Auxiliary heating
   - Homeassistant currently doesn't handle aux heat case well. One will "Heating" as the action for aux heating.
 - Min/Max setpoints
-  - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action.
+  - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action. You can see the setpoint values under Diagnostic section of the device.
 
 Sample attributes on the climate entity:
 
