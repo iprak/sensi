@@ -221,15 +221,8 @@ class SensiDevice:
                 if self.attributes[ATTR_CIRCULATING_FAN] == "on":
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
-            self._properties[Settings.CONTINUOUS_BACKLIGHT] = parse_bool(
-                state, Settings.CONTINUOUS_BACKLIGHT
-            )
-            self._properties[Settings.DISPLAY_HUMIDITY] = parse_bool(
-                state, Settings.DISPLAY_HUMIDITY
-            )
-            self._properties[Settings.DISPLAY_TIME] = parse_bool(
-                state, Settings.DISPLAY_TIME
-            )
+            for key in Settings:
+                self._properties[key] = parse_bool(state, key)
 
             # pylint: disable=line-too-long
             LOGGER.info(
