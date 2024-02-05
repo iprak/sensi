@@ -79,16 +79,16 @@ class Capabilities(StrEnum):
 
 CAPABILITIES_VALUE_GETTER: Final = {
     # circulating_fan
-    Capabilities.CIRCULATING_FAN: lambda item: yes_no_capability_getter(item,"capable"),
+    Capabilities.CIRCULATING_FAN: lambda item: item and item.get("capable", "no"),
     # fan_mode_settings
-    Capabilities.FAN_MODE_AUTO: lambda item: yes_no_capability_getter(item, "auto"),
-    Capabilities.FAN_MODE_ON: lambda item: yes_no_capability_getter(item, "on"),
+    Capabilities.FAN_MODE_AUTO: lambda item: item and item.get("auto", "no"),
+    Capabilities.FAN_MODE_ON: lambda item: item and item.get("on", "no"),
     # operating_mode_settings
-    Capabilities.OPERATING_MODE_OFF: lambda item: yes_no_capability_getter(item, "off"),
-    Capabilities.OPERATING_MODE_HEAT: lambda item: yes_no_capability_getter(item, "heat"),
-    Capabilities.OPERATING_MODE_COOL: lambda item: yes_no_capability_getter(item, "cool"),
-    Capabilities.OPERATING_MODE_AUTO: lambda item: yes_no_capability_getter(item, "auto"),
-    Capabilities.OPERATING_MODE_AUX: lambda item: yes_no_capability_getter(item, "aux")
+    Capabilities.OPERATING_MODE_OFF: lambda item: item and item.get("off", "no"),
+    Capabilities.OPERATING_MODE_HEAT: lambda item: item and item.get("heat", "no"),
+    Capabilities.OPERATING_MODE_COOL: lambda item: item and item.get("cool", "no"),
+    Capabilities.OPERATING_MODE_AUTO: lambda item: item and item.get("auto", "no"),
+    Capabilities.OPERATING_MODE_AUX: lambda item: item and item.get("aux", "no"),
 }
 
 OPERATING_MODE_TO_HVAC_MODE = {
@@ -105,7 +105,3 @@ HVAC_MODE_TO_OPERATING_MODE = {
     HVACMode.AUTO: OperatingModes.AUTO,
     HVACMode.OFF: OperatingModes.OFF,
 }
-
-def yes_no_capability_getter(data:dict, key:str)-> bool:
-    """Boolean type capability getter."""
-    return data and data.get(key, "no") == "yes"
