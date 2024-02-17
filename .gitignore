@@ -25,7 +25,6 @@ Pipfile*
 share/*
 
 # Visual Studio Code
-.vscode/*
 .env
 
 # mypy
@@ -33,6 +32,5 @@ share/*
 /.dmypy.json
 
 # These come from the image
-setup.cfg
 pyproject.toml
 pylint/

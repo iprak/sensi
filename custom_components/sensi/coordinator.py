@@ -59,8 +59,8 @@ def parse_bool(state: dict[str, Any], key: str) -> bool | None:
     """Parse on/off into bool value."""
     if key in state:
         return state.get(key) == "on"
-    else:
-        return None
+
+    return None
 
 
 def calculate_battery_level(voltage: float) -> int | None:
@@ -73,16 +73,16 @@ def calculate_battery_level(voltage: float) -> int | None:
     # return "low" if (((voltage * 1000) - 900) * 100) / (600) <= 30 else "good"
     if mvolts >= 3000:
         return 100
-    elif mvolts > 2900:
+    if mvolts > 2900:
         return 100 - int(((3000 - mvolts) * 58) / 100)
-    elif mvolts > 2740:
+    if mvolts > 2740:
         return 42 - int(((2900 - mvolts) * 24) / 160)
-    elif mvolts > 2440:
+    if mvolts > 2440:
         return 18 - int(((2740 - mvolts) * 12) / 300)
-    elif mvolts > 2100:
+    if mvolts > 2100:
         return 6 - int(((2440 - mvolts) * 6) / 340)
-    else:
-        return 0
+
+    return 0
 
 
 class SensiDevice:
@@ -152,7 +152,7 @@ class SensiDevice:
 
             self._capabilities[key] = value == "yes"
 
-        #LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
+        # LOGGER.debug("%s Capabilities=%s", self.name, json.dumps(self._capabilities))
 
     def supports(self, value: Capabilities) -> bool:
         """Check if the device has the capability."""
@@ -188,7 +188,7 @@ class SensiDevice:
                     else UnitOfTemperature.FAHRENHEIT
                 )
             else:
-                LOGGER.info("display_scale not found in data")
+                LOGGER.info("Property 'display_scale' not found in data")
 
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
             self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
@@ -294,10 +294,13 @@ class SensiDevice:
         #     operating_mode=auto, current_operating_mode=auto_heat
         #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706462635}
 
-
         # When thermostat is set to Off, operating_mode and current_operating_mode are both Off. Themostat should not be be demanding heating or cooling
 
-        LOGGER.debug("operating_mode=%s, demand_status=%s", state["operating_mode"], state["demand_status"])
+        LOGGER.debug(
+            "operating_mode=%s, demand_status=%s",
+            state["operating_mode"],
+            state["demand_status"],
+        )
 
         if "operating_mode" in state:
             self.operating_mode = state["operating_mode"]
@@ -314,11 +317,11 @@ class SensiDevice:
 
             if demand_status.get("aux", 0) > 0:
                 self.effective_operating_mode = OperatingModes.AUX
-                self.hvac_action = HVACAction.HEATING   #Treat Aux as Heating
+                self.hvac_action = HVACAction.HEATING  # Treat Aux as Heating
             elif demand_status.get("heat", 0) > 0:
                 self.effective_operating_mode = OperatingModes.HEAT
                 self.hvac_action = HVACAction.HEATING
-            elif demand_status.get("cool",0) > 0:
+            elif demand_status.get("cool", 0) > 0:
                 self.effective_operating_mode = OperatingModes.COOL
                 self.hvac_action = HVACAction.COOLING
             else:
@@ -328,17 +331,17 @@ class SensiDevice:
             LOGGER.debug("demand_status not found in data")
 
     @property
-    def target_temperature(self)-> float | None:
+    def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
         if self.hvac_action == HVACAction.OFF:
             return None
-        elif self.hvac_action == HVACAction.HEATING:
+        if self.hvac_action == HVACAction.HEATING:
             return self.heat_target
-        elif self.hvac_action == HVACAction.COOLING:
+        if self.hvac_action == HVACAction.COOLING:
             return self.cool_target
-        else:
-            #HVACAction.IDLE
-            return self.heat_target if self.last_action_heat else self.cool_target
+
+        # HVACAction.IDLE
+        return self.heat_target if self.last_action_heat else self.cool_target
 
     async def async_set_temp(self, value: int) -> None:
         """Set the target temperature."""
@@ -441,7 +444,7 @@ class SensiDevice:
         """Get value for a setting."""
         return self._properties.get(key)
 
-    async def async_set_setting(self, key: Settings, value: bool|int) -> None:
+    async def async_set_setting(self, key: Settings, value: bool | int) -> None:
         """Set value for a setting ."""
 
         if key not in Settings:

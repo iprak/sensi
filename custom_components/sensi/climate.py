@@ -49,6 +49,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
 
     _attr_target_temperature_step = PRECISION_WHOLE
+    _last_hvac_mode_before_aux_heat: HVACMode | str | None
+
+    # This is to suppress 'therefore implicitly supports the turn_on/turn_off methods
+    # without setting the proper ClimateEntityFeature' warning
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
         """Initialize the device."""
@@ -81,7 +86,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def supported_features(self) -> ClimateEntityFeature:
         """Return the list of supported features."""
 
-        supported = ClimateEntityFeature.TARGET_TEMPERATURE
+        supported = (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.TURN_ON
+            | ClimateEntityFeature.TURN_OFF
+        )
 
         if get_fan_support(self._device, self._entry):
             supported = supported | ClimateEntityFeature.FAN_MODE
@@ -94,7 +103,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def is_aux_heat(self) -> bool:
         """Return true if aux heater is enabled."""
-        return self._device.effective_operating_mode ==  OperatingModes.AUX
+        return self._device.effective_operating_mode == OperatingModes.AUX
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -142,7 +151,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return self._device.temperature_unit
 
     @property
-    def target_temperature(self)-> float | None:
+    def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
         return self._device.target_temperature
 
@@ -195,7 +204,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
-        if await self._device.async_set_operating_mode(HVAC_MODE_TO_OPERATING_MODE[hvac_mode]):
+        if await self._device.async_set_operating_mode(
+            HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
+        ):
             self.async_write_ha_state()
             LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
 

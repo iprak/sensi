@@ -9,7 +9,6 @@ from typing import Any, Final
 import uuid
 
 import aiohttp
-import async_timeout
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, storage
@@ -76,14 +75,19 @@ async def login(
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-        "x-platform":"android",
-        "accept": "*/*"
-        }
+        "x-platform": "android",
+        "accept": "*/*",
+    }
 
     try:
         session = aiohttp_client.async_get_clientsession(hass)
-        async with async_timeout.timeout(DEFAULT_TIMEOUT):
-            response = await session.post(OAUTH_URL.format(device_id), data=post_data, headers=headers, allow_redirects=True,)
+        async with asyncio.timeout(DEFAULT_TIMEOUT):
+            response = await session.post(
+                OAUTH_URL.format(device_id),
+                data=post_data,
+                headers=headers,
+                allow_redirects=True,
+            )
     except (asyncio.TimeoutError, aiohttp.ClientError) as err:
         LOGGER.warning("Timed out getting access token", exc_info=True)
         raise SensiConnectionError from err
