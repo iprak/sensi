@@ -7,6 +7,8 @@ from typing import Final
 
 from homeassistant.components.climate import HVACMode
 
+CONFIG_REFRESH_TOKEN: Final = "refresh_token"
+
 SENSI_DOMAIN: Final = "sensi"
 SENSI_NAME: Final = "Sensi Thermostat"
 SENSI_ATTRIBUTION: Final = "Data provided by Sensi"
@@ -39,6 +41,7 @@ ATTR_POWER_STATUS: Final = "power_status"
 ATTR_WIFI_QUALITY: Final = "wifi_connection_quality"
 ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
 
+
 class Settings(StrEnum):
     """Thermostat Display properties."""
 
@@ -48,6 +51,7 @@ class Settings(StrEnum):
     KEYPAD_LOCKOUT = "keypad_lockout"
     HEAT_MAX_TEMP = "heat_max_temp"
     COOL_MIN_TEMP = "cool_min_temp"
+
 
 class OperatingModes(StrEnum):
     """Thermostat operating mode values. This is based on OperatingMode (OperatingMode.java)."""

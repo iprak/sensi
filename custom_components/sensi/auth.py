@@ -27,17 +27,26 @@ KEY_DEVICE_ID: Final = "device_id"
 KEY_ACCESS_TOKEN: Final = "access_token"
 KEY_REFRESH_TOKEN: Final = "refresh_token"
 KEY_EXPIRES_AT: Final = "expires_at"
+KEY_USER_ID: Final = "user_id"
+
+CLIENT_ID2: Final = "fleet"
+CLIENT_SECRET2: Final = (
+    "JLFjJmketRhj>M9uoDhusYKyi?zUyNqhGB)H2XiwLEF#KcGKrRD2JZsDQ7ufNven"
+)
+OAUTH_URL2: Final = "https://oauth.sensiapi.io/token"
 
 
 @dataclass
 class AuthenticationConfig:
     """Internal Sensi authentication configuration."""
 
-    username: str | None = None
-    password: str | None = None
+    user_id: str | None = None
+    # username: str | None = None
+    # password: str | None = None
     scan_interval: timedelta | None = None
     access_token: str | None = None
     expires_at: float | None = None
+    refresh_token: str | None = None
 
 
 async def login(
@@ -66,16 +75,15 @@ async def login(
         persistent_data[KEY_DEVICE_ID] = device_id
 
     post_data = {
-        "username": config.username,
-        "password": config.password,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "grant_type": "password",
+        "client_id": CLIENT_ID2,
+        "client_secret": CLIENT_SECRET2,
+        "grant_type": "refresh_token",
+        "refresh_token": config.access_token,
     }
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-        "x-platform": "android",
+        "accept-language": "en-US,en;q=0.9",
         "accept": "*/*",
     }
 
@@ -83,7 +91,7 @@ async def login(
         session = aiohttp_client.async_get_clientsession(hass)
         async with asyncio.timeout(DEFAULT_TIMEOUT):
             response = await session.post(
-                OAUTH_URL.format(device_id),
+                OAUTH_URL2,
                 data=post_data,
                 headers=headers,
                 allow_redirects=True,
@@ -103,18 +111,97 @@ async def login(
     response_json = await response.json()
     access_token = response_json.get(KEY_ACCESS_TOKEN)
     refresh_token = response_json.get(KEY_REFRESH_TOKEN)
+    user_id = response_json.get(KEY_USER_ID)  # This is used as unique_id in config flow
+
     expires_in = int(response_json.get("expires_in"))
     expires_at = (datetime.now() + timedelta(seconds=expires_in)).timestamp()
 
     config.access_token = access_token
     config.expires_at = expires_at
+    config.user_id = user_id
 
     persistent_data[KEY_ACCESS_TOKEN] = access_token
     persistent_data[KEY_REFRESH_TOKEN] = refresh_token
     persistent_data[KEY_EXPIRES_AT] = expires_at
 
     await store.async_save(persistent_data)
-    return
+
+
+# async def login(
+#     hass: HomeAssistant, config: AuthenticationConfig, new_token: bool = False
+# ):
+#     """Login."""
+
+#     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
+#     persistent_data = await store.async_load() or {}
+#     device_id = persistent_data.get(KEY_DEVICE_ID)
+
+#     if not new_token:
+#         access_token = persistent_data.get(KEY_ACCESS_TOKEN)
+#         refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
+#         expires_at = persistent_data.get(KEY_EXPIRES_AT)
+
+#         if device_id and access_token and expires_at:
+#             config.access_token = access_token
+#             config.expires_at = expires_at
+
+#             LOGGER.debug("Using saved authentication")
+#             return
+
+#     if not device_id:
+#         device_id = uuid.uuid4()
+#         persistent_data[KEY_DEVICE_ID] = device_id
+
+#     post_data = {
+#         "username": config.username,
+#         "password": config.password,
+#         "client_id": CLIENT_ID,
+#         "client_secret": CLIENT_SECRET,
+#         "grant_type": "password",
+#     }
+
+#     headers = {
+#         "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+#         "x-platform": "android",
+#         "accept": "*/*",
+#     }
+
+#     try:
+#         session = aiohttp_client.async_get_clientsession(hass)
+#         async with asyncio.timeout(DEFAULT_TIMEOUT):
+#             response = await session.post(
+#                 OAUTH_URL.format(device_id),
+#                 data=post_data,
+#                 headers=headers,
+#                 allow_redirects=True,
+#             )
+#     except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+#         LOGGER.warning("Timed out getting access token", exc_info=True)
+#         raise SensiConnectionError from err
+
+#     persistent_data["device_id"] = device_id
+
+#     # Uncomment this to test async_step_reauth
+#     # raise AuthenticationError("Invalid login credentials")
+#     if response.status != HTTPStatus.OK:
+#         await store.async_save(persistent_data)
+#         raise AuthenticationError("Invalid login credentials")
+
+#     response_json = await response.json()
+#     access_token = response_json.get(KEY_ACCESS_TOKEN)
+#     refresh_token = response_json.get(KEY_REFRESH_TOKEN)
+#     expires_in = int(response_json.get("expires_in"))
+#     expires_at = (datetime.now() + timedelta(seconds=expires_in)).timestamp()
+
+#     config.access_token = access_token
+#     config.expires_at = expires_at
+
+#     persistent_data[KEY_ACCESS_TOKEN] = access_token
+#     persistent_data[KEY_REFRESH_TOKEN] = refresh_token
+#     persistent_data[KEY_EXPIRES_AT] = expires_at
+
+#     await store.async_save(persistent_data)
+#     return
 
 
 class AuthenticationError(Exception):

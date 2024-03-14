@@ -3,17 +3,15 @@
     "step": {
       "user": {
         "data": {
-          "username": "UserName",
-          "password": "Password",
-          "name": "Sensi Thermostat"
+          "refresh_token":"Refresh token"
         },
-        "description": "Set up Sensi integration. Login with yout mobile app credentials.",
+        "description": "Set up Sensi integration.\n\nLogin with your credentials from https://manager.sensicomfort.com/ and then paste the refresh_token from the response. Refer to integration home page (?) for details.",
         "title": "Sensi Thermostat"
       }
     },
     "error": {
       "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid credentials",
+      "invalid_auth": "Invalid authentication",
       "unknown": "Unexpected error"
     }
   }

@@ -7,18 +7,18 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 
 from .auth import AuthenticationConfig, AuthenticationError, SensiConnectionError, login
-from .const import LOGGER, SENSI_DOMAIN, SENSI_NAME
+from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
-REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
+# REAUTH_SCHEMA = vol.Schema({vol.Required(CONFIG_REFRESH_TOKEN): str})
 
 AUTH_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
+        # vol.Required(CONF_USERNAME): str,
+        # vol.Required(CONF_PASSWORD): str,
+        vol.Required(CONFIG_REFRESH_TOKEN): str,
     }
 )
 
@@ -32,8 +32,8 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Start a config flow."""
         self._reauth_unique_id = None
 
-    async def _async_validate_input(self, config: AuthenticationConfig):
-        """Validate user input."""
+    async def _try_login(self, config: AuthenticationConfig):
+        """Try login with supplied credentials."""
         try:
             await login(self.hass, config, True)
         except SensiConnectionError:
@@ -54,11 +54,15 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             config = AuthenticationConfig(
-                username=user_input[CONF_USERNAME], password=user_input[CONF_PASSWORD]
+                # username=user_input[CONF_USERNAME],
+                # password=user_input[CONF_PASSWORD],
+                refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
-            errors = await self._async_validate_input(config)
+            errors = await self._try_login(config)
             if not errors:
-                await self.async_set_unique_id(user_input[CONF_USERNAME])
+                await self.async_set_unique_id(
+                    config.user_id
+                )  # Use user_id as unique_id
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=SENSI_NAME, data=user_input)
 
@@ -78,26 +82,29 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Handle reauthentication."""
         errors = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
-        username = existing_entry.data[CONF_USERNAME]
+        # username = existing_entry.data[CONF_USERNAME]
         if user_input is not None:
             config = AuthenticationConfig(
-                username=username,
-                password=user_input[CONF_PASSWORD],
+                # username=username,
+                # password=user_input[CONF_PASSWORD],
+                refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
-            errors = await self._async_validate_input(config)
+            errors = await self._try_login(config)
             if not errors:
                 self.hass.config_entries.async_update_entry(
                     existing_entry,
                     data={
                         **existing_entry.data,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        # CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONFIG_REFRESH_TOKEN: user_input[CONFIG_REFRESH_TOKEN],
                     },
                 )
                 await self.hass.config_entries.async_reload(existing_entry.entry_id)
                 return self.async_abort(reason="reauth_successful")
 
+        # The input for user and re_config is the same
         return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=REAUTH_SCHEMA,
+            step_id="user",
+            data_schema=AUTH_DATA_SCHEMA,
             errors=errors,
         )
