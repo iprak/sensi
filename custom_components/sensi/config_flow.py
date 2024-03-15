@@ -9,7 +9,12 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 
-from .auth import AuthenticationConfig, AuthenticationError, SensiConnectionError, login
+from .auth import (
+    AuthenticationConfig,
+    AuthenticationError,
+    SensiConnectionError,
+    get_access_token,
+)
 from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
 # REAUTH_SCHEMA = vol.Schema({vol.Required(CONFIG_REFRESH_TOKEN): str})
@@ -35,7 +40,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
     async def _try_login(self, config: AuthenticationConfig):
         """Try login with supplied credentials."""
         try:
-            await login(self.hass, config, True)
+            await get_access_token(self.hass, config.refresh_token)
         except SensiConnectionError:
             return {"base": "cannot_connect"}
         except AuthenticationError:
