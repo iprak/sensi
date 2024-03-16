@@ -12,10 +12,11 @@ import websockets.client
 from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .auth import AuthenticationConfig, SensiConnectionError, login
+from .auth import AuthenticationConfig
 from .const import (
     ATTR_BATTERY_VOLTAGE,
     ATTR_CIRCULATING_FAN,
@@ -491,19 +492,14 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
     _last_event_time_stamp: datetime | None = None
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config: AuthenticationConfig,
-    ) -> None:
+    def __init__(self, hass: HomeAssistant, config: AuthenticationConfig) -> None:
         """Initialize Sensi coordinator."""
 
-        self._auth_config: AuthenticationConfig = None
         self._devices: dict[str, SensiDevice] = {}
-        self._login_retry = 0
-        self._last_update_failed = False
+        # self._login_retry = 0
+        self._last_update_failed = False  # Used for debugging
 
-        self._save_auth_config(config)
+        self._setup_headers(config)
 
         super().__init__(
             hass,
@@ -512,11 +508,10 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )
 
-    def _save_auth_config(self, config: AuthenticationConfig):
-        self._auth_config = config
-        self._access_token = config.access_token
+    def _setup_headers(self, config: AuthenticationConfig):
+        # self._access_token = config.access_token
         self._headers = {"Authorization": "bearer " + config.access_token}
-        self._expires_at = config.expires_at
+        # self._expires_at = config.expires_at
 
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""
@@ -528,7 +523,15 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
     def _parse_socket_response(self, msg: str, devices: dict[str, SensiDevice]) -> bool:
         """Parse the websocket device response."""
-        if not msg or not msg.startswith("42"):
+        if not msg:
+            return False
+
+        if msg.startswith("44"):
+            # 44{"message":"jwt expired","code":"invalid_token","type":"UnauthorizedError"}
+            raise AuthenticationError
+
+        if not msg.startswith("42"):
+            # Some other failure
             return False
 
         found_state = False
@@ -563,8 +566,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             ):
                 return self._devices
 
-        if not await self._verify_authentication():
-            return self._devices
+        # Continue to use the current acces_tooken. We need a new refresh_tokken to get an access_token
+        # if not await self._verify_authentication():
+        #    return self._devices
 
         url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
@@ -584,18 +588,15 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         LOGGER.debug("Data updated, it failed last time")
                         self._last_update_failed = False
 
-                except asyncio.TimeoutError:
-                    LOGGER.warning("Timed out waiting for data")
+                except (
+                    asyncio.TimeoutError,
+                    websockets.exceptions.WebSocketException,
+                ) as exception:
                     done = True
                     self._last_update_failed = True
-                except websockets.exceptions.WebSocketException as socket_exception:
-                    LOGGER.warning(str(socket_exception))
-                    self._last_update_failed = True
-                    done = True
-                except Exception as err:  # pylint: disable=broad-except
-                    LOGGER.warning(str(err))
-                    self._last_update_failed = True
-                    done = True
+                    raise UpdateFailed(exception) from exception
+                except AuthenticationError as exception:
+                    raise ConfigEntryAuthFailed from exception
 
         return self._devices
 
@@ -621,29 +622,29 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 LOGGER.warning("Sending event with %s failed", data)
                 LOGGER.warning(str(err))
 
-    async def _verify_authentication(self) -> bool:
-        """Verify that authentication is not expired. Login again if necessary."""
-        if datetime.now().timestamp() >= self._expires_at:
-            LOGGER.info("Token expired, getting new token")
+    # async def _verify_authentication(self) -> bool:
+    #     """Verify that authentication is not expired. Login again if necessary."""
+    #     if datetime.now().timestamp() >= self._expires_at:
+    #         LOGGER.info("Token expired, getting new token")
 
-            self._login_retry = self._login_retry + 1
-            if self._login_retry > MAX_LOGIN_RETRY:
-                LOGGER.info(
-                    "Login failed %d times. Suspending data update", self._login_retry
-                )
-                self.update_interval = None
-                return False
+    #         self._login_retry = self._login_retry + 1
+    #         if self._login_retry > MAX_LOGIN_RETRY:
+    #             LOGGER.info(
+    #                 "Login failed %d times. Suspending data update", self._login_retry
+    #             )
+    #             self.update_interval = None
+    #             return False
 
-            try:
-                await login(self.hass, self._auth_config, True)
-                self._login_retry = 0
-            except AuthenticationError:
-                LOGGER.warning("Unable to authenticate", exc_info=True)
-                return False
-            except SensiConnectionError:
-                LOGGER.warning("Failed to connect", exc_info=True)
-                return False
+    #         try:
+    #             await get_access_token(self.hass, self._auth_config, True)
+    #             self._login_retry = 0
+    #         except AuthenticationError:
+    #             LOGGER.warning("Unable to authenticate", exc_info=True)
+    #             return False
+    #         except SensiConnectionError:
+    #             LOGGER.warning("Failed to connect", exc_info=True)
+    #             return False
 
-            self._save_auth_config(self._auth_config)
+    #         self._save_auth_config(self._auth_config)
 
-        return True
+    #     return True

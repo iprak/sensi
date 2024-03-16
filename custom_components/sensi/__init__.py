@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .auth import AuthenticationConfig, AuthenticationError, login
+from .auth import AuthenticationError, get_stored_config
 from .const import (
     CONFIG_FAN_SUPPORT,
     DEFAULT_FAN_SUPPORT,
@@ -47,15 +47,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the Sensi component."""
 
     hass.data.setdefault(SENSI_DOMAIN, {})
-    user_input = entry.data
-
-    auth_config = AuthenticationConfig(
-        username=user_input[CONF_USERNAME],
-        password=user_input[CONF_PASSWORD],
-    )
 
     try:
-        await login(hass, auth_config, True)  # Obtain new access_token on startup
+        config = await get_stored_config(hass)
+        coordinator = SensiUpdateCoordinator(hass, config)
+        await coordinator.async_config_entry_first_refresh()
+
+        hass.data.setdefault(SENSI_DOMAIN, {})
+        hass.data[SENSI_DOMAIN][entry.entry_id] = {
+            DOMAIN_DATA_COORDINATOR_KEY: coordinator,
+        }
+        await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
+    except ConfigEntryAuthFailed as err:
+        # Pass ConfigEntryAuthFailed, this can be raised from the coordinator
+        raise err
     except AuthenticationError as err:
         # Raising ConfigEntryAuthFailed will automatically put the config entry in a
         # failure state and start a reauth flow.
@@ -67,15 +72,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         raise ConfigEntryNotReady(
             "Unable to authenticate. Sensi integration is not ready."
         ) from err
-
-    coordinator = SensiUpdateCoordinator(hass, auth_config)
-    await coordinator.async_config_entry_first_refresh()
-
-    hass.data.setdefault(SENSI_DOMAIN, {})
-    hass.data[SENSI_DOMAIN][entry.entry_id] = {
-        DOMAIN_DATA_COORDINATOR_KEY: coordinator,
-    }
-    await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
     return True
 

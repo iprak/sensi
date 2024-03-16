@@ -4,7 +4,17 @@ This integration allows displaying and controlling [Sensi](https://sensi.emerson
 
 It was developed by reverse engineering the mobile app and work done by https://github.com/w1ll1am23/pysensi, so the integration could fail at some point.
 
-On adding the Sensi integration, you should see one device and up to 8 entities. You will need credentials used in the Sensi mobile app.
+## Update 3/14/24
+
+Sensi recently updated its apps (8.6.3) and end point to force reCaptcha based authentication. This currently cannot be replicated so instead of username/password, one is required to navigate to https://manager.sensicomfort.com/ in a browser and copy-n-paste the refresh_token.
+
+In Chrome/Edge, navigate to https://manager.sensicomfort.com/, press F12 to launch Dev Tools, switch to Network tab, login with your credentials and grab the value of `refresh_token` without the quotes for `token?device` type request. Similar action can be taken in other browsers.
+
+You will have the repeat the same process for re-authentication on password change.
+
+## Setup
+
+On adding the Sensi integration, you should see one device and up to 8 entities.
 
 ![image](https://github.com/iprak/sensi/assets/6459774/222a21ac-8d5f-4530-b3d6-ec87ae668b6d)
 
@@ -62,6 +72,10 @@ So far, simultaneous logins from mobile app and integration have not been proble
 None
 
 # Breaking Changes
+
+## Revision 1.3.0
+Switched to `refresh_token` instead of userName/password for authentication.
+
 
 ## Revision 1.2.0
 
