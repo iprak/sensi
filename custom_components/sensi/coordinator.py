@@ -16,7 +16,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .auth import AuthenticationConfig
+from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
     ATTR_BATTERY_VOLTAGE,
     ATTR_CIRCULATING_FAN,
@@ -527,11 +527,13 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             return False
 
         if msg.startswith("44"):
+            LOGGER.error("Authentication expired, msg=%s", msg)
             # 44{"message":"jwt expired","code":"invalid_token","type":"UnauthorizedError"}
             raise AuthenticationError
 
         if not msg.startswith("42"):
             # Some other failure
+            LOGGER.error("Skipping, msg=%s", msg)
             return False
 
         found_state = False
@@ -566,9 +568,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             ):
                 return self._devices
 
-        # Continue to use the current acces_tooken. We need a new refresh_tokken to get an access_token
-        # if not await self._verify_authentication():
-        #    return self._devices
+        # Continue to use the current acces_tooken. We will get a new access_token based on response
 
         url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
@@ -595,8 +595,13 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                     done = True
                     self._last_update_failed = True
                     raise UpdateFailed(exception) from exception
-                except AuthenticationError as exception:
-                    raise ConfigEntryAuthFailed from exception
+                except AuthenticationError:
+                    LOGGER.debug("Token expired, getting new token")
+
+                    try:
+                        self._setup_headers(await refresh_access_token(self.hass))
+                    except AuthenticationError as exception_inner:
+                        raise ConfigEntryAuthFailed from exception_inner
 
         return self._devices
 

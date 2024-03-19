@@ -52,6 +52,7 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
     """Obtain new access_token and refresh_token for the given refresh_token."""
 
     result = {}
+    LOGGER.debug("Getting access token using refresh_token=%s", refresh_token)
 
     post_data = {
         "client_id": CLIENT_ID2,
@@ -107,35 +108,53 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
 #     return device_id
 
 
-async def get_stored_config(hass: HomeAssistant) -> AuthenticationConfig:
-    """Retrieve stored configuration. This will throw AuthenticationError for missing data."""
+# async def get_stored_config(hass: HomeAssistant) -> AuthenticationConfig:
+#     """Retrieve stored configuration. This will throw AuthenticationError for missing data."""
+
+#     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
+#     persistent_data = await store.async_load()
+
+#     # Data can be missing in older installations, use get()
+#     if refresh_token is None:
+#         refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
+#         if refresh_token is None:
+#             raise AuthenticationError("Stored config is missing refresh_token")
+
+#     result = await _get_new_tokens(hass, refresh_token)
+
+#     persistent_data[KEY_ACCESS_TOKEN] = result[KEY_ACCESS_TOKEN]
+#     persistent_data[KEY_REFRESH_TOKEN] = result[KEY_REFRESH_TOKEN]
+#     persistent_data[KEY_EXPIRES_AT] = result[KEY_EXPIRES_AT]
+#     persistent_data[KEY_USER_ID] = result[KEY_USER_ID]
+
+#     # Only dict or simple values can be saved into store
+#     await store.async_save(persistent_data)
+
+#     return AuthenticationConfig(
+#         user_id=persistent_data[KEY_USER_ID],
+#         access_token=persistent_data[KEY_ACCESS_TOKEN],
+#         expires_at=persistent_data[KEY_EXPIRES_AT],
+#         refresh_token=persistent_data[KEY_REFRESH_TOKEN],
+#     )
+
+
+async def refresh_access_token(
+    hass: HomeAssistant, refresh_token: str | None = None
+) -> AuthenticationConfig:
+    """Obtain new access_token and refresh_token for the given/stored refresh_token."""
 
     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
     persistent_data = await store.async_load()
 
     # Data can be missing in older installations, use get()
-    access_token = persistent_data.get(KEY_ACCESS_TOKEN)
-    expires_at = persistent_data.get(KEY_EXPIRES_AT)
-    refresh_token = persistent_data.get(KEY_ACCESS_TOKEN)
+    if refresh_token is None:
+        refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
+        LOGGER.debug("Using stored refresh_token %s", refresh_token)
+    else:
+        LOGGER.debug("Using supplied refresh_token %s", refresh_token)
 
-    if access_token is None:
-        raise AuthenticationError("Stored config is missing access_token")
     if refresh_token is None:
         raise AuthenticationError("Stored config is missing refresh_token")
-
-    return AuthenticationConfig(
-        user_id=persistent_data.get(KEY_USER_ID),
-        access_token=access_token,
-        expires_at=expires_at,
-        refresh_token=refresh_token,
-    )
-
-
-async def get_access_token(hass: HomeAssistant, refresh_token: str) -> None:
-    """Obtain new access_token and refresh_token for the given refresh_token."""
-
-    store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
-    persistent_data = await store.async_load() or {}
 
     result = await _get_new_tokens(hass, refresh_token)
 
@@ -146,6 +165,13 @@ async def get_access_token(hass: HomeAssistant, refresh_token: str) -> None:
 
     # Only dict or simple values can be saved into store
     await store.async_save(persistent_data)
+
+    return AuthenticationConfig(
+        user_id=persistent_data[KEY_USER_ID],
+        access_token=persistent_data[KEY_ACCESS_TOKEN],
+        expires_at=persistent_data[KEY_EXPIRES_AT],
+        refresh_token=persistent_data[KEY_REFRESH_TOKEN],
+    )
 
 
 # async def login(

@@ -8,7 +8,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .auth import AuthenticationError, get_stored_config
+from .auth import AuthenticationError, refresh_access_token
 from .const import (
     CONFIG_FAN_SUPPORT,
     DEFAULT_FAN_SUPPORT,
@@ -49,7 +49,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data.setdefault(SENSI_DOMAIN, {})
 
     try:
-        config = await get_stored_config(hass)
+        config = await refresh_access_token(hass)
         coordinator = SensiUpdateCoordinator(hass, config)
         await coordinator.async_config_entry_first_refresh()
 
