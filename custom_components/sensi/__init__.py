@@ -108,11 +108,12 @@ class SensiEntity(CoordinatorEntity):
     def available(self) -> bool:
         """Return if the entity is available.
 
-        The entity is not available if there is no data or if the device is offline.
+        The entity is not available if there is no data or if the device is offline or authentication has succeeded.
         """
         return (
             self._device
             and not self._device.offline
+            and self._device.authenticated
             and self.coordinator.data
             and self.coordinator.data.get(self._device.identifier)
         )
