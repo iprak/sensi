@@ -533,7 +533,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         if not msg.startswith("42"):
             # Some other failure
-            LOGGER.error("Skipping, msg=%s", msg)
+            LOGGER.error("Data marker not found, msg=%s", msg)
             return False
 
         found_state = False
@@ -568,7 +568,23 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             ):
                 return self._devices
 
-        # Continue to use the current acces_tooken. We will get a new access_token based on response
+        try:
+            return await self._fetch_device_data()
+        except AuthenticationError:
+            LOGGER.debug("Token expired, getting new token")
+
+            try:
+                self._setup_headers(await refresh_access_token(self.hass))
+            except AuthenticationError as exception_inner:
+                raise ConfigEntryAuthFailed from exception_inner
+
+            # Try updating data again with new token
+            return self._fetch_device_data()
+
+    async def _fetch_device_data(self) -> dict[str, SensiDevice]:
+        """Fetch device data from url."""
+
+        # Use the current access_tooken. AuthenticationError will thrown if token has expired.
 
         url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
 
@@ -595,13 +611,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                     done = True
                     self._last_update_failed = True
                     raise UpdateFailed(exception) from exception
-                except AuthenticationError:
-                    LOGGER.debug("Token expired, getting new token")
-
-                    try:
-                        self._setup_headers(await refresh_access_token(self.hass))
-                    except AuthenticationError as exception_inner:
-                        raise ConfigEntryAuthFailed from exception_inner
+                # Pass AuthenticationError
 
         return self._devices
 
