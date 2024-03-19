@@ -13,7 +13,7 @@ from .auth import (
     AuthenticationConfig,
     AuthenticationError,
     SensiConnectionError,
-    get_access_token,
+    refresh_access_token,
 )
 from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
@@ -40,7 +40,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
     async def _try_login(self, config: AuthenticationConfig):
         """Try login with supplied credentials."""
         try:
-            await get_access_token(self.hass, config.refresh_token)
+            await refresh_access_token(self.hass, config.refresh_token)
         except SensiConnectionError:
             return {"base": "cannot_connect"}
         except AuthenticationError:
