@@ -532,13 +532,13 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             return False
 
         if msg.startswith("44"):
-            LOGGER.error("Authentication expired, msg=%s", msg)
+            LOGGER.debug("Authentication expired, msg=%s", msg)
             # 44{"message":"jwt expired","code":"invalid_token","type":"UnauthorizedError"}
             raise AuthenticationError
 
         if not msg.startswith("42"):
             # Some other failure
-            LOGGER.error("Data marker not found, msg=%s", msg)
+            LOGGER.debug("Data marker not found, msg=%s", msg)
             return False
 
         found_state = False
