@@ -126,6 +126,7 @@ class SensiDevice:
     heat_target: float | None = None
     battery_level: int | None = None
     offline: bool = True
+    authenticated: bool = False
 
     # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
@@ -135,6 +136,7 @@ class SensiDevice:
         self._capabilities = {}
         self._properties = {}
         self.attributes = {}
+        self.authenticated = True
 
         self.coordinator = coordinator
         self.update(data_json)
@@ -499,6 +501,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         # self._login_retry = 0
         self._last_update_failed = False  # Used for debugging
 
+        # For testing unavailable on token refresh
+        # self.update_counter = 0
+
         self._setup_headers(config)
 
         super().__init__(
@@ -591,6 +596,15 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         fetch_count = 0
         done = False
 
+        # Flag devices as unauthenticated and then authenticated on successful data retreival
+        for device in self.get_devices():
+            device.authenticated = False
+
+        # Uncomment to test failed token refresh
+        # self.update_counter = self.update_counter + 1
+        # if self.update_counter > 5:
+        #    raise AuthenticationError
+
         async with websockets.client.connect(
             url, extra_headers=self._headers
         ) as websocket:
@@ -612,6 +626,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                     self._last_update_failed = True
                     raise UpdateFailed(exception) from exception
                 # Pass AuthenticationError
+
+        for device in self.get_devices():
+            device.authenticated = True
 
         return self._devices
 
