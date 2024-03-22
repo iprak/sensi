@@ -584,7 +584,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 raise ConfigEntryAuthFailed from exception_inner
 
             # Try updating data again with new token
-            return self._fetch_device_data()
+            return await self._fetch_device_data()
 
     async def _fetch_device_data(self) -> dict[str, SensiDevice]:
         """Fetch device data from url."""
