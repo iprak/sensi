@@ -145,6 +145,8 @@ async def refresh_access_token(
 
     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
     persistent_data = await store.async_load()
+    if persistent_data is None:
+        persistent_data = {}
 
     # Data can be missing in older installations, use get()
     if refresh_token is None:
