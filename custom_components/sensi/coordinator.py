@@ -29,6 +29,7 @@ from .const import (
     COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
     HEAT_MAX_TEMPERATURE,
+    HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
     OPERATING_MODE_TO_HVAC_MODE,
     SENSI_FAN_CIRCULATE,
@@ -413,11 +414,20 @@ class SensiDevice:
         self.attributes[ATTR_CIRCULATING_FAN] = status
         self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
 
-    async def async_set_operating_mode(self, mode: OperatingModes) -> bool:
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> bool:
         """Update the operating and hvac mode.
 
         com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
+
+        if self.offline:
+            LOGGER.info("%s: device is offline", self.name)
+            return
+
+        if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
+            raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
+
+        mode = HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
 
         if mode == self.operating_mode:
             return False
