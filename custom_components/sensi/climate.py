@@ -27,7 +27,6 @@ from .const import (
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
     Capabilities,
-    OperatingModes,
 )
 from .coordinator import SensiDevice, SensiUpdateCoordinator
 
@@ -48,7 +47,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
 
     _attr_target_temperature_step = PRECISION_WHOLE
-    _last_hvac_mode_before_aux_heat: HVACMode | str | None
 
     # This is to suppress 'therefore implicitly supports the turn_on/turn_off methods
     # without setting the proper ClimateEntityFeature' warning
@@ -98,11 +96,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             supported = supported | ClimateEntityFeature.AUX_HEAT
 
         return supported
-
-    @property
-    def is_aux_heat(self) -> bool:
-        """Return true if aux heater is enabled."""
-        return self._device.effective_operating_mode == OperatingModes.AUX
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -231,19 +224,3 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         await self._device.async_set_fan_mode(HVACMode.AUTO)
         self.async_write_ha_state()
-
-    async def async_turn_aux_heat_on(self) -> None:
-        """Turn auxiliary heater on."""
-
-        if self._device.offline:
-            LOGGER.info("%s: device is offline", self._device.name)
-            return
-
-        self._last_hvac_mode_before_aux_heat = self.hvac_mode
-
-        if await self._device.async_enable_aux_mode():
-            self.async_write_ha_state()
-
-    async def async_turn_aux_heat_off(self) -> None:
-        """Turn auxiliary heater off."""
-        await self.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat)
