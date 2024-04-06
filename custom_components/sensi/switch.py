@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Final
 
+from homeassistant.components.climate import HVACMode
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
     SwitchEntity,
@@ -17,10 +18,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SensiDescriptionEntity, get_fan_support, set_fan_support
 from .const import (
+    CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
     DOMAIN_DATA_COORDINATOR_KEY,
     SENSI_DOMAIN,
     Capabilities,
+    OperatingModes,
     Settings,
 )
 from .coordinator import SensiDevice, SensiUpdateCoordinator
@@ -90,6 +93,7 @@ async def async_setup_entry(
                 entities.append(SensiCapabilitySettingSwitch(device, description))
 
         entities.append(SensiFanSupportSwitch(device, entry))
+        entities.append(SensiAuxHeatSwitch(device, entry))
 
     async_add_entities(entities)
 
@@ -174,3 +178,55 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
 
         # Force coordinator refresh to get climate entity to use new fan status
         await self._device.coordinator.async_request_refresh()
+
+
+class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
+    """Representation of Sensi thermostat aux heating setting."""
+
+    _last_hvac_mode_before_aux_heat: HVACMode | str | None
+
+    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
+        """Initialize the setting."""
+
+        description = SwitchEntityDescription(
+            key=CONFIG_AUX_HEATING,
+            name="Aux Heating",
+            icon="mdi:heat-pump",
+            entity_category=EntityCategory.CONFIG,
+        )
+
+        super().__init__(device, description)
+
+        self._entry = entry
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
+            hass=device.coordinator.hass,
+        )
+
+        self._last_hvac_mode_before_aux_heat = device.hvac_mode
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._device.supports(Capabilities.OPERATING_MODE_AUX)
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if aux heating is on."""
+        return self._device.operating_mode == OperatingModes.AUX
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn aux heating on."""
+        if self._device.offline:
+            return
+
+        self._last_hvac_mode_before_aux_heat = self._device.hvac_mode
+
+        if await self._device.async_enable_aux_mode():
+            self.async_schedule_update_ha_state(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn aux heating off."""
+        if await self._device.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat):
+            self.async_schedule_update_ha_state(True)

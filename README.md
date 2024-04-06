@@ -14,7 +14,7 @@ You will have the repeat the same process for re-authentication on password chan
 
 ## Setup
 
-On adding the Sensi integration, you should see one device and up to 8 entities.
+On adding the Sensi integration, you should see one device and some related entities.
 
 ![image](https://github.com/iprak/sensi/assets/6459774/222a21ac-8d5f-4530-b3d6-ec87ae668b6d)
 
@@ -30,7 +30,8 @@ On adding the Sensi integration, you should see one device and up to 8 entities.
 - Idle state
   - The target temperature from the previous action will be displayed.
 - Auxiliary heating
-  - Homeassistant currently doesn't handle aux heat case well. One will "Heating" as the action for aux heating.
+  - Homeassistant currently doesn't handle aux heat case well. One will see "Heating" as the action for aux heating.
+  - Homeassistant stopped supporting aux_heat as of 2024.4.0. The aux heating setting now appears as a switch under device configuration, if the thermostat is setup for auxiliary heating.
 - Min/Max setpoints
   - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action. You can see the setpoint values under Diagnostic section of the device.
 
