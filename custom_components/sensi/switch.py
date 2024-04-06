@@ -204,6 +204,8 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
             hass=device.coordinator.hass,
         )
 
+        self._last_hvac_mode_before_aux_heat = device.hvac_mode
+
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
@@ -212,19 +214,19 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if aux heating is on."""
-
-        return self._device.effective_operating_mode == OperatingModes.AUX
+        return self._device.operating_mode == OperatingModes.AUX
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""
         if self._device.offline:
             return
 
-        self._last_hvac_mode_before_aux_heat = self.hvac_mode
+        self._last_hvac_mode_before_aux_heat = self._device.hvac_mode
 
         if await self._device.async_enable_aux_mode():
-            self.async_write_ha_state()
+            self.async_schedule_update_ha_state(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn aux heating off."""
-        await self._device.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat)
+        if await self._device.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat):
+            self.async_schedule_update_ha_state(True)

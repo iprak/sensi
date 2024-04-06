@@ -105,13 +105,11 @@ class SensiDevice:
     hvac_mode: HVACMode | None = None
     hvac_action: HVACAction | None = None
 
-    last_action_heat: bool
+    last_action_heat: bool = False
     """Was the last action heating?"""
 
     operating_mode: OperatingModes | None = None
     """Operating mode reported by Sensi"""
-
-    effective_operating_mode: OperatingModes | None = None
 
     _display_scale = "f"
     """Raw display_scale"""
@@ -174,7 +172,6 @@ class SensiDevice:
         state = data_json.get("state")
         if state:
             LOGGER.info("Updating %s (%s)", self.name, self.identifier)
-            LOGGER.debug(state)
 
             self.offline = state.get("status") == "offline"
             self.attributes[ATTR_OFFLINE] = self.offline
@@ -301,38 +298,94 @@ class SensiDevice:
         # When thermostat is set to Off, operating_mode and current_operating_mode are both Off. Themostat should not be be demanding heating or cooling
 
         LOGGER.debug(
-            "operating_mode=%s, demand_status=%s",
+            "operating_mode=%s, current_operating_mode=%s, demand_status=%s",
             state["operating_mode"],
+            state["current_operating_mode"],
             state["demand_status"],
         )
 
-        if "operating_mode" in state:
-            self.operating_mode = state["operating_mode"]
-            self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self.operating_mode)
-        else:
-            LOGGER.debug("operating_mode not found in data")
+        if "demand_status" not in state:
+            LOGGER.warning(
+                "Property demand_status not found in data, not updating hvac statuses"
+            )
+            return
+
+        if "operating_mode" not in state:
+            LOGGER.warning(
+                "Property operating_mode not found in data, not updating hvac statuses"
+            )
+            return
+
+        # https://sensi.copeland.com/en-us/support/how-do-i-configure-my-thermostat
+        # HP1 = heat pump
+        # AC0 = no cooling
+        # AC1 =  air conditioning uni
+        # HP2/AC2 = more than one stage cooling/heating
+
+        # operating_mode can be off, auto, aux, heat or cool
+        # current_operating_mode can be off, auto_cool/auto_heat, aux, heat or cool
+
+        self.operating_mode = state["operating_mode"]
+        self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(self.operating_mode)
+
+        # AC0/AC1/HP1 state=off
+        # operating_mode=off, current_operating_mode=off, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
 
         if self.operating_mode == OperatingModes.OFF:
-            self.effective_operating_mode = OperatingModes.OFF
             self.hvac_action = HVACAction.OFF
-        elif "demand_status" in state:
-            demand_status = state["demand_status"]
-            self.last_action_heat = demand_status.get("last") == "heat"
+            return
 
-            if demand_status.get("aux", 0) > 0:
-                self.effective_operating_mode = OperatingModes.AUX
-                self.hvac_action = HVACAction.HEATING  # Treat Aux as Heating
-            elif demand_status.get("heat", 0) > 0:
-                self.effective_operating_mode = OperatingModes.HEAT
-                self.hvac_action = HVACAction.HEATING
-            elif demand_status.get("cool", 0) > 0:
-                self.effective_operating_mode = OperatingModes.COOL
-                self.hvac_action = HVACAction.COOLING
-            else:
-                self.effective_operating_mode = None
-                self.hvac_action = HVACAction.IDLE
+        # Treat Aux as Heating
+        if self.operating_mode == OperatingModes.AUX:
+            self.hvac_action = HVACAction.HEATING
+            return
+
+        demand_status = state["demand_status"]
+        self.last_action_heat = demand_status.get("last") == "heat"
+
+        # AC0
+        #   state=heat, target temp higher
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407356}
+
+        #   state=heat, target temp low Thermostat shows "Heat"
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=cool, target temp higher
+        #   operating_mode=cool, current_operating_mode=cool, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'cool', 'last_start': None}
+
+        # AC1
+        #   state=heat, target temp higher
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407536}
+
+        #   state=heat, target temp low Thermostat shows "Heat"
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=heat, target temp lower cooling
+        #   operating_mode=cool, current_operating_mode=cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712407661}
+
+        #   state=auto, current=70 target=68/66
+        #   operating_mode=auto, current_operating_mode=auto_cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712407661}
+
+        #   state=auto, current=70 target=72/70
+        #   operating_mode=auto, current_operating_mode=auto_heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407796}
+
+        # HP1
+        #   state=auto
+        #   operating_mode=auto, current_operating_mode=auto_cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712406686}
+        #   operating_mode=auto, current_operating_mode=auto_heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=aux
+        #   operating_mode=aux, current_operating_mode=aux, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=heat
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407116}
+
+        if demand_status.get("heat", 0) > 0:
+            self.hvac_action = HVACAction.HEATING
+        elif demand_status.get("cool", 0) > 0:
+            self.hvac_action = HVACAction.COOLING
         else:
-            LOGGER.debug("demand_status not found in data")
+            self.hvac_action = HVACAction.IDLE
 
     @property
     def target_temperature(self) -> float | None:
@@ -435,22 +488,20 @@ class SensiDevice:
         data = self.build_set_request_str("operating_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
         self.operating_mode = mode
-        self.effective_operating_mode = mode
 
         self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
         return True
 
     async def async_enable_aux_mode(self) -> bool:
         """Set auxiliary heating mode."""
-        if self.effective_operating_mode == OperatingModes.AUX:
+        if self.operating_mode == OperatingModes.AUX:
             return False
 
         mode = OperatingModes.AUX
         data = self.build_set_request_str("operating_mode", {"value": mode})
         await self.coordinator.async_send_event(data)
-        self.operating_mode = OperatingModes.HEAT
-        self.effective_operating_mode = OperatingModes.AUX
-        self.hvac_mode = HVACMode.HEAT
+        self.operating_mode = OperatingModes.AUX
+        self.hvac_mode = HVACMode.HEAT  # Treating forced aux as Heating
         return True
 
     def get_setting(self, key: Settings) -> bool | None:
