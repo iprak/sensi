@@ -92,9 +92,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if get_fan_support(self._device, self._entry):
             supported = supported | ClimateEntityFeature.FAN_MODE
 
-        if self._device.supports(Capabilities.OPERATING_MODE_AUX):
-            supported = supported | ClimateEntityFeature.AUX_HEAT
-
         return supported
 
     @property
