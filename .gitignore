@@ -25,6 +25,7 @@ Pipfile*
 share/*
 
 # Visual Studio Code
+.vscode/*
 .env
 
 # mypy
