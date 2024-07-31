@@ -2,7 +2,7 @@
   "domain": "sensi",
   "name": "Sensi",
   "documentation": "https://github.com/iprak/sensi",
-  "requirements": [],
+  "requirements": ["websockets=12.0"],
   "dependencies": [],
   "codeowners": ["@iprak"],
   "issue_tracker": "https://github.com/iprak/sensi/issues",

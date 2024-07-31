@@ -1,2 +1,2 @@
 # Custom requirements
-websockets
+  websockets=12.0
