@@ -1,10 +1,16 @@
-# Summary
+
+[![Latest Stable Version](https://img.shields.io/packagist/v/phplicengine/bitly?label=version)](https://packagist.org/packages/phplicengine/bitly)
+[![Total Downloads](https://img.shields.io/packagist/dt/phplicengine/bitly?color=blue)](https://packagist.org/packages/phplicengine/bitly)
+[![License](https://img.shields.io/packagist/l/phplicengine/bitly)](https://packagist.org/packages/phplicengine/bitly)
+<a href="https://buymeacoffee.com/leolite1q" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>
+
+## Summary
 
 This integration allows displaying and controlling [Sensi](https://sensi.emerson.com/en-us) thermostat.
 
 It was developed by reverse engineering the mobile app and work done by https://github.com/w1ll1am23/pysensi, so the integration could fail at some point.
 
-## Update 3/14/24
+### Update 3/14/24
 
 Sensi recently updated its apps (8.6.3) and end point to force reCaptcha based authentication. This currently cannot be replicated so instead of username/password, one is required to navigate to https://manager.sensicomfort.com/ in a browser and copy-n-paste the refresh_token.
 
@@ -60,35 +66,35 @@ friendly_name: Living Room
 supported_features: 9
 ```
 
-# Issues
+## Issues
 
 So far, simultaneous logins from mobile app and integration have not been problematic. But it has been noticed that sometimes changing thermostat properties does not take effect, this could be either due to something going on at Sensi backend or the thermostat temporarily going offline.
 
-# Installation
+## Installation
 
 - Download and copy all the files from `custom_components/sensi/` to `<config directory>/custom_components/sensi/`.
 - Restart HomeAssistant.
 - Create an account on the Sensi mobile app.
 - Add the integration using the `Add Integration` button in Integrations page on your Home Assistant instance.
 
-# Configuration
+## Configuration
 
 None
 
-# Breaking Changes
+## Breaking Changes
 
-## Revision 1.3.0
+### Revision 1.3.0
 Switched to `refresh_token` instead of userName/password for authentication.
 
 
-## Revision 1.2.0
+### Revision 1.2.0
 
 The entity/unique ids have been correct. Unfortunately, this will cause the previous entities to appear duplicate/disabled. You would want to remove the previous entities and reference the new ones. The new entity_id is based on the name given to the thermostat and not the device_id which is more accessible.
 
-## Revision 1.1.1
+### Revision 1.1.1
 
 The battery level is now computed based on a formula. It is not perfect but should give some idea of the battery state. The battery voltage itself is now available as an attribute. You will see a warning like The unit of `sensor.sensi_36_6f_92_ff_fe_02_24_b7_battery (%) cannot be converted to the unit of previously compiled statistics (V).`
 
-## Revision 1.1.0
+### Revision 1.1.0
 
 The entity ids have changed to support multiple thermostats on the same account. Your previous entities would appear duplicate/disabled. You would want to remove the integration and add it back.
