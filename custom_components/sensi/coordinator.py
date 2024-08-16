@@ -1,4 +1,5 @@
 """The Sensi data coordinator."""
+
 from __future__ import annotations
 
 import asyncio
@@ -711,7 +712,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 msg = await asyncio.wait_for(websocket.recv(), timeout=5)
                 self._last_event_time_stamp = datetime.now()
                 LOGGER.debug("async_send_event response=%s", msg)
-            except Exception as err:  # pylint: disable=broad-except
+            except Exception as err:  # pylint: disable=broad-except # noqa: BLE001
                 LOGGER.warning("Sending event with %s failed", data)
                 LOGGER.warning(str(err))
 
