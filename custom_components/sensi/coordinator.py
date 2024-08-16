@@ -670,8 +670,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         async with websockets.client.connect(
             url, extra_headers=self._headers
         ) as websocket:
-            while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
-                try:
+            try:
+                while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
                     msg = await asyncio.wait_for(websocket.recv(), timeout=10)
                     done = self._parse_socket_response(msg, self._devices)
                     fetch_count = fetch_count + 1
@@ -680,14 +680,14 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         LOGGER.debug("Data updated, it failed last time")
                         self._last_update_failed = False
 
-                except (
-                    asyncio.TimeoutError,
-                    websockets.exceptions.WebSocketException,
-                ) as exception:
-                    done = True
-                    self._last_update_failed = True
-                    raise UpdateFailed(exception) from exception
-                # Pass AuthenticationError
+            except (
+                asyncio.TimeoutError,
+                websockets.exceptions.WebSocketException,
+            ) as exception:
+                done = True
+                self._last_update_failed = True
+                raise UpdateFailed(exception) from exception
+            # Pass AuthenticationError
 
         for device in self.get_devices():
             device.authenticated = True
