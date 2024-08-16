@@ -1,8 +1,9 @@
 """Sensi Thermostat."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Union
+from typing import Any
 
 from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
@@ -65,7 +66,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         )
 
     @property
-    def extra_state_attributes(self) -> Union[Mapping[str, Any], None]:
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
         return self._device.attributes
 
