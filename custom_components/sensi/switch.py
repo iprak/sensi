@@ -1,4 +1,5 @@
 """Sensi thermostat setting switches."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -87,10 +88,12 @@ async def async_setup_entry(
 
     entities = []
     for device in coordinator.get_devices():
-        for description in SWITCH_TYPES:
-            # A device might not support a setting e.g. Continuous Backlight
-            if device.supports(description.capability):
-                entities.append(SensiCapabilitySettingSwitch(device, description))
+        # A device might not support a setting e.g. Continuous Backlight
+        entities.extend(
+            SensiCapabilitySettingSwitch(device, description)
+            for description in SWITCH_TYPES
+            if device.supports(description.capability)
+        )
 
         entities.append(SensiFanSupportSwitch(device, entry))
         entities.append(SensiAuxHeatSwitch(device, entry))

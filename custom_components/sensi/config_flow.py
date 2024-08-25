@@ -1,4 +1,5 @@
 """Config flow for Sensi thermostat."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -45,7 +46,7 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
             return {"base": "cannot_connect"}
         except AuthenticationError:
             return {"base": "invalid_auth"}
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:  # pylint: disable=broad-except # noqa: BLE001
             LOGGER.exception(str(err))
             return {"base": "unknown"}
 

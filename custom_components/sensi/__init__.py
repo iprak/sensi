@@ -1,4 +1,5 @@
 """The Sensi thermostat component."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -57,9 +58,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             DOMAIN_DATA_COORDINATOR_KEY: coordinator,
         }
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
-    except ConfigEntryAuthFailed as err:
+    except ConfigEntryAuthFailed:
         # Pass ConfigEntryAuthFailed, this can be raised from the coordinator
-        raise err
+        raise
     except AuthenticationError as err:
         # Raising ConfigEntryAuthFailed will automatically put the config entry in a
         # failure state and start a reauth flow.
