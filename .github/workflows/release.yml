@@ -21,8 +21,8 @@ jobs:
           sed -i "s/\"version\": \".*\"/\"version\": \"${{steps.semantic_release_info.outputs.version}}\"/g" custom_components/sensi/manifest.json
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add -A
-          git commit -m "docs(): bumping release ${{ steps.semantic_release_info.outputs.git_tag }}"
+          git add -A          
+          git commit -m "chore: bumping version to ${{steps.semantic_release_info.outputs.version}}"
           git tag ${{ steps.semantic_release_info.outputs.git_tag }}
 
       - name: Push changes
