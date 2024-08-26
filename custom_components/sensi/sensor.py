@@ -1,4 +1,5 @@
 """Sensi thermostat sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -64,7 +65,6 @@ SENSOR_TYPES: Final = (
         value_fn=lambda device: device.battery_level,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-
     SensiSensorEntityDescription(
         key=Settings.COOL_MIN_TEMP,
         name="Min setpoint",
