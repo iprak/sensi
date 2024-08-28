@@ -174,6 +174,13 @@ class SensiDevice:
         if state:
             LOGGER.info("Updating %s (%s)", self.name, self.identifier)
 
+            new_offline = state.get("status") == "offline"
+
+            if not self.offline and new_offline:
+                LOGGER.warning("%s is now offline", self.name)
+            elif self.offline and not new_offline:
+                LOGGER.warning("%s is now back online", self.name)
+
             self.offline = state.get("status") == "offline"
             self.attributes[ATTR_OFFLINE] = self.offline
 
@@ -190,7 +197,7 @@ class SensiDevice:
                     else UnitOfTemperature.FAHRENHEIT
                 )
             else:
-                LOGGER.info("Property 'display_scale' not found in data")
+                LOGGER.warning("Property 'display_scale' not found in data")
 
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
             self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
