@@ -65,28 +65,6 @@ def parse_bool(state: dict[str, Any], key: str) -> bool | None:
     return None
 
 
-def calculate_battery_level(voltage: float) -> int | None:
-    """Calculate the battery level."""
-    # https://devzone.nordicsemi.com/f/nordic-q-a/28101/how-to-calculate-battery-voltage-into-percentage-for-aa-2-batteries-without-fluctuations
-    # https://forum.arduino.cc/t/calculate-battery-percentage-of-alkaline-batteries-using-the-voltage/669958/17
-    if voltage is None:
-        return None
-    mvolts = voltage * 1000
-    # return "low" if (((voltage * 1000) - 900) * 100) / (600) <= 30 else "good"
-    if mvolts >= 3000:
-        return 100
-    if mvolts > 2900:
-        return 100 - int(((3000 - mvolts) * 58) / 100)
-    if mvolts > 2740:
-        return 42 - int(((2900 - mvolts) * 24) / 160)
-    if mvolts > 2440:
-        return 18 - int(((2740 - mvolts) * 12) / 300)
-    if mvolts > 2100:
-        return 6 - int(((2440 - mvolts) * 6) / 340)
-
-    return 0
-
-
 class SensiDevice:
     """Class representing a Sensi thermostat device."""
 
