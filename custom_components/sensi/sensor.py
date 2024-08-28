@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
@@ -25,18 +25,12 @@ from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN, Settings
 from .coordinator import SensiDevice, SensiUpdateCoordinator
 
 
-@dataclass
-class SensiSensorEntityDescriptionMixin:
-    """Mixin for Sensi thermostat sensor."""
-
-    value_fn: Callable[[SensiDevice], StateType]
-
-
-@dataclass
-class SensiSensorEntityDescription(
-    SensorEntityDescription, SensiSensorEntityDescriptionMixin
-):
+@dataclass(frozen=True)
+class SensiSensorEntityDescription(SensorEntityDescription):
     """Representation of a Sensi thermostat sensor."""
+
+    extra_state_attributes_fn: Callable[[Any], dict[str, str]] | None = None
+    value_fn: Callable[[SensiDevice], StateType] = None
 
 
 SENSOR_TYPES: Final = (
@@ -124,12 +118,26 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     @property
     def native_value(self) -> StateType:
         """Return the value reported by the sensor."""
-        return self.entity_description.value_fn(self._device)
+        return (
+            self.entity_description.value_fn(self._device)
+            if self.entity_description.value_fn
+            else None
+        )
 
     @property
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the sensor, if any."""
-        if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE:
-            return self._device.temperature_unit
+        return (
+            self._device.temperature_unit
+            if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
+            else self.entity_description.native_unit_of_measurement
+        )
 
-        return self.entity_description.native_unit_of_measurement
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Return the state attributes."""
+        return (
+            self.entity_description.extra_state_attributes_fn(self._device)
+            if self.entity_description.extra_state_attributes_fn
+            else None
+        )
