@@ -21,8 +21,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import SensiDescriptionEntity
-from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN, Settings
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .const import (
+    ATTR_BATTERY_VOLTAGE,
+    DOMAIN_DATA_COORDINATOR_KEY,
+    SENSI_DOMAIN,
+    Settings,
+)
+from .coordinator import SensiDevice, SensiUpdateCoordinator, calculate_battery_level
 
 
 @dataclass(frozen=True)
@@ -56,7 +61,10 @@ SENSOR_TYPES: Final = (
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda device: device.battery_level,
+        extra_state_attributes_fn=lambda device: {
+            ATTR_BATTERY_VOLTAGE: device.battery_voltage
+        },
+        value_fn=lambda device: calculate_battery_level(device.battery_voltage),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensiSensorEntityDescription(

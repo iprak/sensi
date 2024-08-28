@@ -19,7 +19,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
-    ATTR_BATTERY_VOLTAGE,
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_OFFLINE,
@@ -124,7 +123,7 @@ class SensiDevice:
     max_temp = HEAT_MAX_TEMPERATURE
     cool_target: float | None = None
     heat_target: float | None = None
-    battery_level: int | None = None
+    battery_voltage: float | None = None
     offline: bool = True
     authenticated: bool = False
 
@@ -202,9 +201,7 @@ class SensiDevice:
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
             self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
 
-            battery_voltage = state.get("battery_voltage")
-            self.attributes[ATTR_BATTERY_VOLTAGE] = battery_voltage
-            self.battery_level = calculate_battery_level(battery_voltage)
+            self.battery_voltage = state.get("battery_voltage")
 
             self.min_temp = state.get("cool_min_temp", COOL_MIN_TEMPERATURE)
             self.max_temp = state.get("heat_max_temp", HEAT_MAX_TEMPERATURE)
