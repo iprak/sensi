@@ -103,7 +103,7 @@ class SensiDevice:
     cool_target: float | None = None
     heat_target: float | None = None
     battery_voltage: float | None = None
-    offline: bool = True
+    offline: bool | None = None
     authenticated: bool = False
 
     # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
@@ -154,10 +154,12 @@ class SensiDevice:
 
             new_offline = state.get("status") == "offline"
 
-            if not self.offline and new_offline:
-                LOGGER.warning("%s is now offline", self.name)
-            elif self.offline and not new_offline:
-                LOGGER.warning("%s is now back online", self.name)
+            # Don't warn the very first time
+            if self.offline is not None:
+                if not self.offline and new_offline:
+                    LOGGER.warning("%s is now offline", self.name)
+                elif self.offline and not new_offline:
+                    LOGGER.warning("%s is now back online", self.name)
 
             self.offline = state.get("status") == "offline"
             self.attributes[ATTR_OFFLINE] = self.offline
