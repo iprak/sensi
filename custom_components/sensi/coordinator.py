@@ -16,10 +16,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util.ssl import get_default_context
 
 from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
-    ATTR_BATTERY_VOLTAGE,
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_OFFLINE,
@@ -66,28 +66,6 @@ def parse_bool(state: dict[str, Any], key: str) -> bool | None:
     return None
 
 
-def calculate_battery_level(voltage: float) -> int | None:
-    """Calculate the battery level."""
-    # https://devzone.nordicsemi.com/f/nordic-q-a/28101/how-to-calculate-battery-voltage-into-percentage-for-aa-2-batteries-without-fluctuations
-    # https://forum.arduino.cc/t/calculate-battery-percentage-of-alkaline-batteries-using-the-voltage/669958/17
-    if voltage is None:
-        return None
-    mvolts = voltage * 1000
-    # return "low" if (((voltage * 1000) - 900) * 100) / (600) <= 30 else "good"
-    if mvolts >= 3000:
-        return 100
-    if mvolts > 2900:
-        return 100 - int(((3000 - mvolts) * 58) / 100)
-    if mvolts > 2740:
-        return 42 - int(((2900 - mvolts) * 24) / 160)
-    if mvolts > 2440:
-        return 18 - int(((2740 - mvolts) * 12) / 300)
-    if mvolts > 2100:
-        return 6 - int(((2440 - mvolts) * 6) / 340)
-
-    return 0
-
-
 class SensiDevice:
     """Class representing a Sensi thermostat device."""
 
@@ -124,7 +102,7 @@ class SensiDevice:
     max_temp = HEAT_MAX_TEMPERATURE
     cool_target: float | None = None
     heat_target: float | None = None
-    battery_level: int | None = None
+    battery_voltage: float | None = None
     offline: bool = True
     authenticated: bool = False
 
@@ -202,9 +180,7 @@ class SensiDevice:
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
             self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
 
-            battery_voltage = state.get("battery_voltage")
-            self.attributes[ATTR_BATTERY_VOLTAGE] = battery_voltage
-            self.battery_level = calculate_battery_level(battery_voltage)
+            self.battery_voltage = state.get("battery_voltage")
 
             self.min_temp = state.get("cool_min_temp", COOL_MIN_TEMPERATURE)
             self.max_temp = state.get("heat_max_temp", HEAT_MAX_TEMPERATURE)
@@ -674,8 +650,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         # if self.update_counter > 5:
         #    raise AuthenticationError
 
+        # https://websockets.readthedocs.io/en/9.1/api/client.html
         async with websockets.client.connect(
-            url, extra_headers=self._headers
+            url, extra_headers=self._headers, ssl=get_default_context()
         ) as websocket:
             try:
                 while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
