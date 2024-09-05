@@ -92,6 +92,7 @@ SENSOR_TYPES: Final = (
     SensiSensorEntityDescription(
         key=Settings.COOL_MIN_TEMP,
         name="Min setpoint",
+        icon="mdi:thermometer-high",
         device_class=SensorDeviceClass.TEMPERATURE,
         value_fn=lambda device: device.min_temp,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -99,6 +100,7 @@ SENSOR_TYPES: Final = (
     SensiSensorEntityDescription(
         key=Settings.HEAT_MAX_TEMP,
         name="Max setpoint",
+        icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda device: device.max_temp,
@@ -171,3 +173,8 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
             if self.entity_description.extra_state_attributes_fn
             else None
         )
+
+    @property
+    def icon(self) -> str | None:
+        """Return icon for sensor."""
+        return self.entity_description.icon
