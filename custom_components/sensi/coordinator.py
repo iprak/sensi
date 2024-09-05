@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util.ssl import get_default_context
 
 from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
@@ -649,8 +650,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         # if self.update_counter > 5:
         #    raise AuthenticationError
 
+        # https://websockets.readthedocs.io/en/9.1/api/client.html
         async with websockets.client.connect(
-            url, extra_headers=self._headers
+            url, extra_headers=self._headers, ssl=get_default_context()
         ) as websocket:
             try:
                 while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
