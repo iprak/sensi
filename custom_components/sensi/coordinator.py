@@ -57,6 +57,8 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
 
+_SSL_CONTEXT = get_default_context()
+
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
     """Parse on/off into bool value."""
@@ -461,7 +463,7 @@ class SensiDevice:
 
         if self.offline:
             LOGGER.info("%s: device is offline", self.name)
-            return
+            return False
 
         if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
@@ -654,7 +656,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         # https://websockets.readthedocs.io/en/9.1/api/client.html
         async with websockets.client.connect(
-            url, extra_headers=self._headers, ssl=get_default_context()
+            url, extra_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
             try:
                 while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
@@ -691,7 +693,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         self._last_event_time_stamp = None
 
         async with websockets.client.connect(
-            WS_URL, extra_headers=self._headers
+            WS_URL, extra_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
             try:
                 await websocket.send("421" + data)
