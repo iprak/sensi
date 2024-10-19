@@ -13,7 +13,11 @@ It was developed by reverse engineering the mobile app and work done by https://
 
 Sensi recently updated its apps (8.6.3) and end point to force reCaptcha based authentication. This currently cannot be replicated so instead of username/password, one is required to navigate to https://manager.sensicomfort.com/ in a browser and copy-n-paste the refresh_token.
 
-In Chrome/Edge, navigate to https://manager.sensicomfort.com/, press F12 to launch Dev Tools, switch to Network tab, login with your credentials and grab the value of `refresh_token` without the quotes for `token?device` type request. You do not have to subscribe to a plan. The token would be on the login request.
+1. Open Chrome or Edge browser
+1. Go to https://manager.sensicomfort.com/
+1. Press F12 to open DevTools and then switch to the `Network` tab
+1. Enter your credentials to log in. You don’t need to go any further or subscribe.
+1. Switch back to DevTools and copy the `refresh_token` value (without quotes) from the `Response` of the `token?device=` request. Note: You might see two requests, and the first one might not have a Response.
 ![how_to_get_refresh_token](https://github.com/iprak/sensi/assets/6459774/3d33a6c1-6c07-4886-b4f0-3289e62d41e4)
 
 Similar action can be taken in other browsers.
