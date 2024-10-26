@@ -1,7 +1,7 @@
 name: Release
 on:
-  workflow_dispatch:  
-  
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,7 +21,7 @@ jobs:
           sed -i "s/\"version\": \".*\"/\"version\": \"${{steps.semantic_release_info.outputs.version}}\"/g" custom_components/sensi/manifest.json
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add -A          
+          git add -A
           git commit -m "chore: bumping version to ${{steps.semantic_release_info.outputs.version}}"
           git tag ${{ steps.semantic_release_info.outputs.git_tag }}
 
@@ -43,4 +43,14 @@ jobs:
           body: ${{ steps.semantic_release_info.outputs.notes }}
           draft: false
           prerelease: false
-          
+
+      - name: "ZIP the integration directory"
+        shell: "bash"
+        run: |
+          cd "${{ github.workspace }}/custom_components/sensi"
+          zip sensi.zip -r ./
+
+      - name: "Upload the ZIP file to the release"
+        uses: "softprops/action-gh-release@v2.0.8"
+        with:
+          files: ${{ github.workspace }}/custom_components/sensi/sensi.zip
