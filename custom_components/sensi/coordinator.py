@@ -33,6 +33,7 @@ from .const import (
     HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
     OPERATING_MODE_TO_HVAC_MODE,
+    SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     Capabilities,
     OperatingModes,
@@ -192,7 +193,7 @@ class SensiDevice:
             self.cool_target = state.get("current_cool_temp")
             self.heat_target = state.get("current_heat_temp")
 
-            # Fan mode is on or auto. We will create a third mode circulate which is based on auto.
+            # Fan mode is reported as 'on' or 'auto'
             if "fan_mode" in state:
                 self.fan_mode = state.get("fan_mode")
 
@@ -207,7 +208,12 @@ class SensiDevice:
                     "duty_cycle"
                 ]
 
-                if self.attributes[ATTR_CIRCULATING_FAN] == "on":
+                # Create a third mode 'circulate' base on 'auto' when 'circulating_fan'
+                # contains 'enabled'='on'.
+                if (
+                    self.fan_mode == SENSI_FAN_AUTO
+                    and self.attributes[ATTR_CIRCULATING_FAN] == "on"
+                ):
                     self.fan_mode = SENSI_FAN_CIRCULATE
 
             for key in Settings:
