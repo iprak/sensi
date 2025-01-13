@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timedelta
 import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
 import websockets.client
+from websockets.exceptions import WebSocketException
 
 from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util.ssl import get_default_context
@@ -413,14 +415,18 @@ class SensiDevice:
                 "scale": self._display_scale,
             },
         )
-        await self.coordinator.async_invoke_command(data)
 
-        if self.hvac_mode == HVACMode.HEAT:
-            self.heat_target = value
-        elif self.hvac_mode == HVACMode.COOL:
-            self.cool_target = value
+        def on_success() -> None:
+            if self.hvac_mode == HVACMode.HEAT:
+                self.heat_target = value
+            elif self.hvac_mode == HVACMode.COOL:
+                self.cool_target = value
 
-    async def async_set_fan_mode(self, mode: str) -> None:
+        return await self.async_try_invoke_command(
+            data, f"Failed to set target temperature to {value}", on_success
+        )
+
+    async def async_set_fan_mode(self, mode: str) -> bool:
         """Set the fan mode."""
 
         mode = mode.lower()
@@ -429,8 +435,13 @@ class SensiDevice:
 
         # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode, toJson
         data = self.build_set_request_str("fan_mode", {"value": mode})
-        await self.coordinator.async_invoke_command(data)
-        self.fan_mode = mode
+
+        def on_success() -> None:
+            self.fan_mode = mode
+
+        return await self.async_try_invoke_command(
+            data, f"Failed to set fan mode to {mode}", on_success
+        )
 
     async def async_set_circulating_fan_mode(
         self, enabled: bool, duty_cycle: int
@@ -456,10 +467,14 @@ class SensiDevice:
             "circulating_fan",
             {"value": {"enabled": status, "duty_cycle": duty_cycle}},
         )
-        await self.coordinator.async_invoke_command(data)
 
-        self.attributes[ATTR_CIRCULATING_FAN] = status
-        self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
+        def on_success() -> None:
+            self.attributes[ATTR_CIRCULATING_FAN] = status
+            self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
+
+        return await self.async_try_invoke_command(
+            data, f"Failed to set fan duty cycle to {duty_cycle}", on_success
+        )
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> bool:
         """Update the operating and hvac mode.
@@ -480,13 +495,14 @@ class SensiDevice:
             return False
 
         data = self.build_set_request_str("operating_mode", {"value": mode})
-        await self.coordinator.async_invoke_command(data)
-        self.operating_mode = mode
 
-        self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
-        return True
+        def on_success() -> None:
+            self.operating_mode = mode
+            self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
 
-        return False
+        return await self.async_try_invoke_command(
+            data, f"Failed to set hvac mode to {mode}", on_success
+        )
 
     async def async_enable_aux_mode(self) -> bool:
         """Set auxiliary heating mode."""
@@ -495,12 +511,14 @@ class SensiDevice:
 
         mode = OperatingModes.AUX
         data = self.build_set_request_str("operating_mode", {"value": mode})
-        await self.coordinator.async_invoke_command(data)
-        self.operating_mode = OperatingModes.AUX
-        self.hvac_mode = HVACMode.HEAT  # Treating forced aux as Heating
-        return True
 
-        return False
+        def on_success() -> None:
+            self.operating_mode = OperatingModes.AUX
+            self.hvac_mode = HVACMode.HEAT  # Treating forced aux as Heating
+
+        return await self.async_try_invoke_command(
+            data, "Failed to enable aux mode", on_success
+        )
 
     def get_setting(self, key: Settings) -> bool | None:
         """Get value for a setting."""
@@ -510,7 +528,7 @@ class SensiDevice:
         """Set value for a setting ."""
 
         if key not in Settings:
-            raise ValueError(f"Unsupported setting: {key}")
+            raise HomeAssistantError(f"Unsupported setting: {key}")
 
         if value == self.get_setting(key):
             return False
@@ -520,10 +538,14 @@ class SensiDevice:
         else:
             data = self.build_set_request_str(key, {"value": value})
 
-        await self.coordinator.async_invoke_command(data)
-        self._properties[key] = value
+        def on_success() -> None:
+            self._properties[key] = value
 
-    async def async_set_min_temp(self, value: int) -> None:
+        return await self.async_try_invoke_command(
+            data, f"Failed to set setting {key} to {value}", on_success
+        )
+
+    async def async_set_min_temp(self, value: int) -> bool:
         """Set the minimum thermostat temperature."""
         if self.min_temp == value:
             return False
@@ -552,6 +574,28 @@ class SensiDevice:
         data["icd_id"] = self.identifier
         json_data = [f"set_{key}", data]
         return json.dumps(json_data)
+
+    async def async_try_invoke_command(
+        self, data: str, failure_message: str, on_success: Callable | None
+    ) -> None:
+        """Invoke command with specified data.
+
+        Raises:
+            HomeAssistantError: for socket exception
+
+        """
+
+        try:
+            await self.coordinator.async_invoke_command(data)
+            if on_success:
+                on_success()
+
+        except WebSocketException as err:
+            raise HomeAssistantError(
+                f"{failure_message}. Command invoked with data {data}.",
+            ) from err
+
+        return True
 
 
 class SensiUpdateCoordinator(DataUpdateCoordinator):
@@ -686,7 +730,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
             except (
                 asyncio.TimeoutError,
-                websockets.exceptions.WebSocketException,
+                WebSocketException,
             ) as exception:
                 done = True
                 self._last_update_failed = True
@@ -699,21 +743,22 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         return self._devices
 
     async def async_invoke_command(self, data: str) -> None:
-        """Send a JSON request."""
+        """Send a JSON request.
+
+        Raises:
+            WebSocketException: exception raised from websockets
+
+        """
 
         self._last_event_time_stamp = None
 
         async with websockets.client.connect(
             WS_URL, extra_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
-            try:
-                await websocket.send("421" + data)
-                msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-                self._last_event_time_stamp = datetime.now()
-                LOGGER.debug("async_invoke_command response=%s", msg)
-            except Exception as err:  # pylint: disable=broad-except # noqa: BLE001
-                LOGGER.warning("Sending event with %s failed", data)
-                LOGGER.warning(str(err))
+            await websocket.send("421" + data)
+            msg = await asyncio.wait_for(websocket.recv(), timeout=5)
+            self._last_event_time_stamp = datetime.now()
+            LOGGER.debug("async_invoke_command response=%s", msg)
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""
