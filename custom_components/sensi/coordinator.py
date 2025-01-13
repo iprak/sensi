@@ -394,15 +394,15 @@ class SensiDevice:
         # HVACAction.IDLE
         return self.heat_target if self.last_action_heat else self.cool_target
 
-    async def async_set_temp(self, value: int) -> None:
+    async def async_set_temp(self, value: int) -> bool:
         """Set the target temperature."""
 
         if self.hvac_mode == HVACMode.HEAT:
             if self.heat_target == value:
-                return
+                return False
         elif self.hvac_mode == HVACMode.COOL:
             if self.cool_target == value:
-                return
+                return False
 
         # com.emerson.sensi.api.events.SetTemperatureEvent > set_temperature, toJson
         data = self.build_set_request_str(
@@ -425,7 +425,7 @@ class SensiDevice:
 
         mode = mode.lower()
         if self.fan_mode == mode:
-            return
+            return False
 
         # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode, toJson
         data = self.build_set_request_str("fan_mode", {"value": mode})
@@ -434,7 +434,7 @@ class SensiDevice:
 
     async def async_set_circulating_fan_mode(
         self, enabled: bool, duty_cycle: int
-    ) -> None:
+    ) -> bool:
         """Set the circulating fan mode."""
 
         if not self.supports(Capabilities.CIRCULATING_FAN):
@@ -442,14 +442,14 @@ class SensiDevice:
                 "%s: circulating fan mode was set but the device does not support it",
                 self.identifier,
             )
-            return
+            return False
 
         status = "on" if enabled else "off"
 
         if (self.attributes[ATTR_CIRCULATING_FAN] == status) and (
             self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == duty_cycle
         ):
-            return
+            return False
 
         # com.emerson.sensi.api.events.SetCirculatingFanEvent > set_fan_mode
         data = self.build_set_request_str(
@@ -486,6 +486,8 @@ class SensiDevice:
         self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
         return True
 
+        return False
+
     async def async_enable_aux_mode(self) -> bool:
         """Set auxiliary heating mode."""
         if self.operating_mode == OperatingModes.AUX:
@@ -498,18 +500,20 @@ class SensiDevice:
         self.hvac_mode = HVACMode.HEAT  # Treating forced aux as Heating
         return True
 
+        return False
+
     def get_setting(self, key: Settings) -> bool | None:
         """Get value for a setting."""
         return self._properties.get(key)
 
-    async def async_set_setting(self, key: Settings, value: bool | int) -> None:
+    async def async_set_setting(self, key: Settings, value: bool | int) -> bool:
         """Set value for a setting ."""
 
         if key not in Settings:
             raise ValueError(f"Unsupported setting: {key}")
 
         if value == self.get_setting(key):
-            return
+            return False
 
         if isinstance(value, bool):
             data = self.build_set_request_str(key, {"value": "on" if value else "off"})
@@ -522,18 +526,24 @@ class SensiDevice:
     async def async_set_min_temp(self, value: int) -> None:
         """Set the minimum thermostat temperature."""
         if self.min_temp == value:
-            return
+            return False
 
-        await self.async_set_setting(Settings.COOL_MIN_TEMP, value)
-        self.min_temp = value
+        if await self.async_set_setting(Settings.COOL_MIN_TEMP, value):
+            self.min_temp = value
+            return True
 
-    async def async_set_max_temp(self, value: int) -> None:
+        return False
+
+    async def async_set_max_temp(self, value: int) -> bool:
         """Set the maximum thermostat temperature."""
         if self.max_temp == value:
-            return
+            return False
 
-        await self.async_set_setting(Settings.HEAT_MAX_TEMP, value)
-        self.max_temp = value
+        if await self.async_set_setting(Settings.HEAT_MAX_TEMP, value):
+            self.max_temp = value
+            return True
+
+        return False
 
     def build_set_request_str(self, key: str, payload: dict[str, str]) -> str:
         """Prepare the request string for setting data."""
