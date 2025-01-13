@@ -413,7 +413,7 @@ class SensiDevice:
                 "scale": self._display_scale,
             },
         )
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
 
         if self.hvac_mode == HVACMode.HEAT:
             self.heat_target = value
@@ -429,7 +429,7 @@ class SensiDevice:
 
         # com.emerson.sensi.api.events.SetFanModeEvent > set_fan_mode, toJson
         data = self.build_set_request_str("fan_mode", {"value": mode})
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
         self.fan_mode = mode
 
     async def async_set_circulating_fan_mode(
@@ -456,7 +456,7 @@ class SensiDevice:
             "circulating_fan",
             {"value": {"enabled": status, "duty_cycle": duty_cycle}},
         )
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
 
         self.attributes[ATTR_CIRCULATING_FAN] = status
         self.attributes[ATTR_CIRCULATING_FAN_DUTY_CYCLE] = duty_cycle
@@ -480,7 +480,7 @@ class SensiDevice:
             return False
 
         data = self.build_set_request_str("operating_mode", {"value": mode})
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
         self.operating_mode = mode
 
         self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
@@ -493,7 +493,7 @@ class SensiDevice:
 
         mode = OperatingModes.AUX
         data = self.build_set_request_str("operating_mode", {"value": mode})
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
         self.operating_mode = OperatingModes.AUX
         self.hvac_mode = HVACMode.HEAT  # Treating forced aux as Heating
         return True
@@ -516,7 +516,7 @@ class SensiDevice:
         else:
             data = self.build_set_request_str(key, {"value": value})
 
-        await self.coordinator.async_send_event(data)
+        await self.coordinator.async_invoke_command(data)
         self._properties[key] = value
 
     async def async_set_min_temp(self, value: int) -> None:
@@ -688,12 +688,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         return self._devices
 
-    async def async_send_event(self, data: str) -> None:
-        """Send a JSON request."""
-
-        await self.async_send_event_priv(data)
-
-    async def async_send_event_priv(self, data: str) -> None:
+    async def async_invoke_command(self, data: str) -> None:
         """Send a JSON request."""
 
         self._last_event_time_stamp = None
@@ -705,7 +700,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 await websocket.send("421" + data)
                 msg = await asyncio.wait_for(websocket.recv(), timeout=5)
                 self._last_event_time_stamp = datetime.now()
-                LOGGER.debug("async_send_event response=%s", msg)
+                LOGGER.debug("async_invoke_command response=%s", msg)
             except Exception as err:  # pylint: disable=broad-except # noqa: BLE001
                 LOGGER.warning("Sending event with %s failed", data)
                 LOGGER.warning(str(err))
