@@ -123,13 +123,13 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
-        await self._device.async_set_setting(self.entity_description.key, True)
-        self.async_write_ha_state()
+        if await self._device.async_set_setting(self.entity_description.key, True):
+            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
-        await self._device.async_set_setting(self.entity_description.key, False)
-        self.async_write_ha_state()
+        if await self._device.async_set_setting(self.entity_description.key, False):
+            self.async_write_ha_state()
 
 
 class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
