@@ -449,11 +449,9 @@ class SensiDevice:
         """Set the circulating fan mode."""
 
         if not self.supports(Capabilities.CIRCULATING_FAN):
-            LOGGER.info(
-                "%s: circulating fan mode was set but the device does not support it",
-                self.identifier,
+            raise HomeAssistantError(
+                f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
-            return False
 
         status = "on" if enabled else "off"
 
@@ -482,12 +480,8 @@ class SensiDevice:
         com.emerson.sensi.api.events.SetSystemModeEvent > "set_operating_mode".
         """
 
-        if self.offline:
-            LOGGER.info("%s: device is offline", self.name)
-            return False
-
         if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
-            raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
+            raise HomeAssistantError(f"Unsupported HVAC mode: {hvac_mode}")
 
         mode = HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
 
