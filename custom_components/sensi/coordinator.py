@@ -111,6 +111,9 @@ class SensiDevice:
     offline: bool | None = None
     authenticated: bool = False
 
+    on_state_updated: Callable | None = None
+    """Callback invoked when device state is updated."""
+
     # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
     def __init__(self, coordinator, data_json: dict) -> None:
@@ -234,6 +237,9 @@ class SensiDevice:
                 self.heat_target,
             )
             # pylint: enable=line-too-long
+
+            if self.on_state_updated:
+                self.on_state_updated()
 
     def parse_thermostat_mode_action(self, state) -> None:
         """Parse thermostat mode and action from the state."""
