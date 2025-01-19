@@ -15,6 +15,7 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -174,51 +175,52 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Set new target temperature."""
 
         if self._device.offline:
-            LOGGER.info("%s: device is offline", self._device.name)
-            return
+            raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temp = kwargs.get(ATTR_TEMPERATURE)
-        await self._device.async_set_temp(round(temp))
-        self.async_write_ha_state()
-        LOGGER.info("Set temperature to %d", temp)
+        if await self._device.async_set_temp(round(temp)):
+            self.schedule_update_ha_state(force_refresh=True)
+            LOGGER.info("Set temperature to %d", temp)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
+        if self._device.offline:
+            raise HomeAssistantError(f"The device {self._device.name} is offline.")
+
         if await self._device.async_set_hvac_mode(hvac_mode):
-            self.async_write_ha_state()
+            self.schedule_update_ha_state(force_refresh=True)
             LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
 
         if self._device.offline:
-            LOGGER.info("%s: device is offline", self._device.name)
-            return
+            raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
+        success = False
         if fan_mode == SENSI_FAN_CIRCULATE:
-            await self._device.async_set_circulating_fan_mode(
+            if await self._device.async_set_circulating_fan_mode(
                 True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
-            )
-            await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
-        else:
-            await self._device.async_set_circulating_fan_mode(False, 0)
-            await self._device.async_set_fan_mode(fan_mode)  # on or auto
+            ):
+                success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
+        elif await self._device.async_set_circulating_fan_mode(False, 0):
+            success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
 
-        self.async_write_ha_state()
-        LOGGER.info("%s: set fan_mode to %s", self._device.name, fan_mode)
+        if success:
+            self.async_write_ha_state()
+            LOGGER.info("%s: set fan_mode to %s", self._device.name, fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
 
         if self._device.offline:
-            LOGGER.info("%s: device is offline", self._device.name)
-            return
+            raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
-        await self._device.async_set_fan_mode(HVACMode.AUTO)
-        self.async_write_ha_state()
+        if await self._device.async_set_fan_mode(HVACMode.AUTO):
+            self.schedule_update_ha_state(force_refresh=True)
