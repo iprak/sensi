@@ -181,7 +181,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temp = kwargs.get(ATTR_TEMPERATURE)
         if await self._device.async_set_temp(round(temp)):
-            self.async_write_ha_state()
+            self.schedule_update_ha_state(force_refresh=True)
             LOGGER.info("Set temperature to %d", temp)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -191,7 +191,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         if await self._device.async_set_hvac_mode(hvac_mode):
-            self.async_write_ha_state()
+            self.schedule_update_ha_state(force_refresh=True)
             LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
@@ -223,4 +223,4 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         if await self._device.async_set_fan_mode(HVACMode.AUTO):
-            self.async_write_ha_state()
+            self.schedule_update_ha_state(force_refresh=True)
