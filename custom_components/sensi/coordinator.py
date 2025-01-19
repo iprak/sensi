@@ -492,7 +492,7 @@ class SensiDevice:
 
         def on_success() -> None:
             self.operating_mode = mode
-            self.hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(mode)
+            self.hvac_mode = hvac_mode
 
         return await self.async_try_invoke_command(
             data, f"Failed to set hvac mode to {mode}", on_success
