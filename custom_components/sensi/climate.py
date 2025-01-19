@@ -179,16 +179,28 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
-        temp = kwargs.get(ATTR_TEMPERATURE)
-        if await self._device.async_set_temp(round(temp)):
+        temperature = kwargs.get(ATTR_TEMPERATURE)
+        await self._async_set_temperature(temperature)
+
+    async def _async_set_temperature(self, temperature: float) -> None:
+        """Set new target temperature."""
+
+        # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
+        # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
+        if await self._device.async_set_temp(round(temperature)):
             self.schedule_update_ha_state(force_refresh=True)
-            LOGGER.info("Set temperature to %d", temp)
+            LOGGER.info("Set temperature to %d", temperature)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
         if self._device.offline:
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
+
+        await self._async_set_hvac_mode(hvac_mode)
+
+    async def _async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Set new hvac mode."""
 
         if await self._device.async_set_hvac_mode(hvac_mode):
             self.schedule_update_ha_state(force_refresh=True)
@@ -202,6 +214,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
+
+        await self._async_set_fan_mode(fan_mode)
+
+    async def _async_set_fan_mode(self, fan_mode: str) -> None:
+        """Set new fan mode."""
 
         success = False
         if fan_mode == SENSI_FAN_CIRCULATE:
