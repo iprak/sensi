@@ -191,6 +191,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temperature = kwargs.get(ATTR_TEMPERATURE)
+
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
         await self._async_set_temperature(temperature)
         self._register_retry(
             "target_temperature", temperature, self._async_set_temperature
@@ -202,7 +205,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         if await self._device.async_set_temp(round(temperature)):
-            LOGGER.info("Set temperature to %d", temperature)
+            LOGGER.info("%s: Seting temperature to %d", self._device.name, temperature)
             self._force_refresh_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -211,6 +214,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if self._device.offline:
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
         await self._async_set_hvac_mode(hvac_mode)
         self._register_retry("hvac_mode", hvac_mode, self._async_set_hvac_mode)
 
@@ -218,7 +223,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Set new hvac mode."""
 
         if await self._device.async_set_hvac_mode(hvac_mode):
-            LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
+            LOGGER.info("%s: Setting hvac_mode to %s", self._device.name, hvac_mode)
             self._force_refresh_state()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
@@ -230,6 +235,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
         await self._async_set_fan_mode(fan_mode)
         self._register_retry("fan_mode", fan_mode, self._async_set_fan_mode)
 
@@ -296,7 +303,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             value = getattr(self, self._retry_property_name)
             if value != self._retry_expected_value:
                 LOGGER.info(
-                    "Current value for %s is %s and does not match the value set %s retrying",
+                    "Current value for '%s' is '%s' and does not match the value set '%s', retrying",
                     self._retry_property_name,
                     value,
                     self._retry_expected_value,
