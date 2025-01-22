@@ -249,8 +249,15 @@ class SensiThermostat(SensiEntity, ClimateEntity):
                 True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             ):
                 success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
-        elif await self._device.async_set_circulating_fan_mode(False, 0):
-            success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
+        else:
+            success = (
+                await self._device.async_set_circulating_fan_mode(False, 0)
+                if self._device.supports_circulating_fan_mode()
+                else True
+            )
+
+            if success:
+                success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
 
         if success:
             self.async_write_ha_state()

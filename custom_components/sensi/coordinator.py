@@ -448,12 +448,17 @@ class SensiDevice:
             data, f"Failed to set fan mode to {mode}", on_success
         )
 
+    def supports_circulating_fan_mode(self) -> bool:
+        """Check if circulating fan mode is supported."""
+
+        return self.supports(Capabilities.CIRCULATING_FAN)
+
     async def async_set_circulating_fan_mode(
         self, enabled: bool, duty_cycle: int
     ) -> bool:
         """Set the circulating fan mode."""
 
-        if not self.supports(Capabilities.CIRCULATING_FAN):
+        if not self.supports_circulating_fan_mode():
             raise HomeAssistantError(
                 f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
