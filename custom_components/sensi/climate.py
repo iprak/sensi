@@ -192,6 +192,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temperature = kwargs.get(ATTR_TEMPERATURE)
 
+        temperature = round(temperature)
+
         # First invoke the setter operation. If it throws due to invalid value,
         # then retry doesn't need to be attempted.
         await self._async_set_temperature(temperature)
@@ -204,7 +206,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
-        if await self._device.async_set_temp(round(temperature)):
+        if await self._device.async_set_temp(temperature):
             LOGGER.info("%s: Seting temperature to %d", self._device.name, temperature)
             self._force_refresh_state()
 
