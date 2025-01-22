@@ -275,8 +275,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def _force_refresh_state(self) -> None:
         """Force refresh after a delay."""
 
+        # Write the current state and then force update
+        self.async_write_ha_state()
+
         # Testing showed that update after a event request failed to bring new data.
-        # Scheduing the next refresh after 3 seconds.
+        # Scheduing the next refresh after a delay.
         async_call_later(
             self.hass, FORCE_REFRESH_DELAY, self._async_force_refresh_state
         )
@@ -284,7 +287,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def _async_force_refresh_state(self, *_: Any) -> None:
         """Refresh the state."""
         await self.async_update()
-        self.async_write_ha_state()
 
     def _register_retry(
         self,
