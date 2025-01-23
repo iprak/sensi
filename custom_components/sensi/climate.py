@@ -243,7 +243,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         self._register_retry("fan_mode", fan_mode, self._async_set_fan_mode)
 
     async def _async_set_fan_mode(self, fan_mode: str) -> None:
-        """Set new fan mode."""
+        """Set new fan mode.
+
+        First set circulating fan mode state if the thermostat supports it
+        and then update the fan mode.
+        """
 
         success = False
         if fan_mode == SENSI_FAN_CIRCULATE:
@@ -252,6 +256,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             ):
                 success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
         else:
+            # Reset circulating fan mode state
             success = (
                 await self._device.async_set_circulating_fan_mode(False, 0)
                 if self._device.supports_circulating_fan_mode()
