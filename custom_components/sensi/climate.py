@@ -201,7 +201,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             "target_temperature", temperature, self._async_set_temperature
         )
 
-    async def _async_set_temperature(self, temperature: float) -> None:
+    async def _async_set_temperature(self, temperature: int) -> None:
         """Set new target temperature."""
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
