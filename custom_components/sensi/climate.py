@@ -207,7 +207,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         if await self._device.async_set_temp(temperature):
-            LOGGER.info("%s: Seting temperature to %d", self._device.name, temperature)
+            LOGGER.info("%s: Setting temperature to %d", self._device.name, temperature)
             self._force_refresh_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -263,7 +263,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         if success:
             self.async_write_ha_state()
-            LOGGER.info("%s: set fan_mode to %s", self._device.name, fan_mode)
+            LOGGER.info("%s: Setting fan_mode to %s", self._device.name, fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
