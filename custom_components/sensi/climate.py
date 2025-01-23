@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -18,6 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 
 from . import SensiEntity, get_fan_support
 from .const import (
@@ -31,6 +33,8 @@ from .const import (
     Capabilities,
 )
 from .coordinator import SensiDevice, SensiUpdateCoordinator
+
+FORCE_REFRESH_DELAY = 3
 
 
 async def async_setup_entry(
@@ -54,10 +58,17 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     # without setting the proper ClimateEntityFeature' warning
     _enable_turn_on_off_backwards_compatibility = False
 
+    _retry_property_name: str
+    _retry_expected_value: float | str | HVACMode
+    _retry_callback: Callable[[float | str | HVACMode]]
+
     def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
         """Initialize the device."""
 
         super().__init__(device)
+
+        device.on_device_updated = self._on_device_updated
+        self._retry_property_name = ""
 
         self._entry = entry
         self.entity_id = async_generate_entity_id(
@@ -179,10 +190,25 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
-        temp = kwargs.get(ATTR_TEMPERATURE)
-        if await self._device.async_set_temp(round(temp)):
-            self.schedule_update_ha_state(force_refresh=True)
-            LOGGER.info("Set temperature to %d", temp)
+        temperature = kwargs.get(ATTR_TEMPERATURE)
+
+        temperature = round(temperature)
+
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
+        await self._async_set_temperature(temperature)
+        self._register_retry(
+            "target_temperature", temperature, self._async_set_temperature
+        )
+
+    async def _async_set_temperature(self, temperature: float) -> None:
+        """Set new target temperature."""
+
+        # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
+        # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
+        if await self._device.async_set_temp(temperature):
+            LOGGER.info("%s: Seting temperature to %d", self._device.name, temperature)
+            self._force_refresh_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
@@ -190,9 +216,17 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if self._device.offline:
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
+        await self._async_set_hvac_mode(hvac_mode)
+        self._register_retry("hvac_mode", hvac_mode, self._async_set_hvac_mode)
+
+    async def _async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Set new hvac mode."""
+
         if await self._device.async_set_hvac_mode(hvac_mode):
-            self.schedule_update_ha_state(force_refresh=True)
-            LOGGER.info("%s: hvac_mode set to %s", self._device.name, hvac_mode)
+            LOGGER.info("%s: Setting hvac_mode to %s", self._device.name, hvac_mode)
+            self._force_refresh_state()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
@@ -203,14 +237,29 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
+        # First invoke the setter operation. If it throws due to invalid value,
+        # then retry doesn't need to be attempted.
+        await self._async_set_fan_mode(fan_mode)
+        self._register_retry("fan_mode", fan_mode, self._async_set_fan_mode)
+
+    async def _async_set_fan_mode(self, fan_mode: str) -> None:
+        """Set new fan mode."""
+
         success = False
         if fan_mode == SENSI_FAN_CIRCULATE:
             if await self._device.async_set_circulating_fan_mode(
                 True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             ):
                 success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
-        elif await self._device.async_set_circulating_fan_mode(False, 0):
-            success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
+        else:
+            success = (
+                await self._device.async_set_circulating_fan_mode(False, 0)
+                if self._device.supports_circulating_fan_mode()
+                else True
+            )
+
+            if success:
+                success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
 
         if success:
             self.async_write_ha_state()
@@ -223,4 +272,54 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         if await self._device.async_set_fan_mode(HVACMode.AUTO):
-            self.schedule_update_ha_state(force_refresh=True)
+            self._force_refresh_state()
+
+    def _force_refresh_state(self) -> None:
+        """Force refresh after a delay."""
+
+        # Write the current state and then force update
+        self.async_write_ha_state()
+
+        # Testing showed that update after a event request failed to bring new data.
+        # Scheduing the next refresh after a delay.
+        async_call_later(
+            self.hass, FORCE_REFRESH_DELAY, self._async_force_refresh_state
+        )
+
+    async def _async_force_refresh_state(self, *_: Any) -> None:
+        """Refresh the state."""
+        await self.async_update()
+
+    def _register_retry(
+        self,
+        property_name: str,
+        expected_value: float | str | HVACMode,
+        callback: Callable[[float | str | HVACMode]],
+    ) -> None:
+        """Save parameters to attempt retry if value did not update as expected."""
+        self._retry_property_name = property_name
+        self._retry_expected_value = expected_value
+        self._retry_callback = callback
+
+    def _on_device_updated(self) -> None:
+        """Device state update callback."""
+        asyncio.run_coroutine_threadsafe(
+            self._async_on_device_updated(), self.hass.loop
+        )
+
+    async def _async_on_device_updated(self) -> None:
+        """Device state update callback."""
+
+        if self._retry_property_name:
+            value = getattr(self, self._retry_property_name)
+            if value != self._retry_expected_value:
+                LOGGER.info(
+                    "Current value for '%s' is '%s' and does not match the value set '%s', retrying",
+                    self._retry_property_name,
+                    value,
+                    self._retry_expected_value,
+                )
+
+                # Reset _retry_property_name to prevent repeated operations
+                self._retry_property_name = ""
+                await self._retry_callback(self._retry_expected_value)

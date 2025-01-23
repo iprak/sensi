@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import timedelta
 import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
@@ -29,7 +29,6 @@ from .const import (
     ATTR_WIFI_QUALITY,
     CAPABILITIES_VALUE_GETTER,
     COOL_MIN_TEMPERATURE,
-    COORDINATOR_DELAY_REFRESH_AFTER_UPDATE,
     COORDINATOR_UPDATE_INTERVAL,
     HEAT_MAX_TEMPERATURE,
     HVAC_MODE_TO_OPERATING_MODE,
@@ -110,6 +109,9 @@ class SensiDevice:
     battery_voltage: float | None = None
     offline: bool | None = None
     authenticated: bool = False
+
+    on_device_updated: Callable | None = None
+    """Callback invoked when device state is updated."""
 
     # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
@@ -234,6 +236,9 @@ class SensiDevice:
                 self.heat_target,
             )
             # pylint: enable=line-too-long
+
+            if self.on_device_updated:
+                self.on_device_updated()
 
     def parse_thermostat_mode_action(self, state) -> None:
         """Parse thermostat mode and action from the state."""
@@ -443,12 +448,17 @@ class SensiDevice:
             data, f"Failed to set fan mode to {mode}", on_success
         )
 
+    def supports_circulating_fan_mode(self) -> bool:
+        """Check if circulating fan mode is supported."""
+
+        return self.supports(Capabilities.CIRCULATING_FAN)
+
     async def async_set_circulating_fan_mode(
         self, enabled: bool, duty_cycle: int
     ) -> bool:
         """Set the circulating fan mode."""
 
-        if not self.supports(Capabilities.CIRCULATING_FAN):
+        if not self.supports_circulating_fan_mode():
             raise HomeAssistantError(
                 f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
@@ -595,8 +605,6 @@ class SensiDevice:
 class SensiUpdateCoordinator(DataUpdateCoordinator):
     """The Sensi data update coordinator."""
 
-    _last_event_time_stamp: datetime | None = None
-
     def __init__(self, hass: HomeAssistant, config: AuthenticationConfig) -> None:
         """Initialize Sensi coordinator."""
 
@@ -668,14 +676,6 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, SensiDevice]:
         """Update device data. This is invoked by DataUpdateCoordinator."""
 
-        # Testing showed that update after a event request failed to bring new data.
-        # The next update would bring in correct data, skipping update conditionally.
-        if self._last_event_time_stamp is not None:
-            if (datetime.now() - self._last_event_time_stamp) < timedelta(
-                seconds=COORDINATOR_DELAY_REFRESH_AFTER_UPDATE
-            ):
-                return self._devices
-
         try:
             return await self._fetch_device_data()
         except AuthenticationError:
@@ -744,15 +744,12 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         """
 
-        self._last_event_time_stamp = None
-
         async with websockets.client.connect(
             WS_URL, extra_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
             await websocket.send("421" + data)
             msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-            self._last_event_time_stamp = datetime.now()
-            LOGGER.debug("async_invoke_command response=%s", msg)
+            LOGGER.debug("invoke_command response=%s", msg)
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""
