@@ -554,7 +554,7 @@ class SensiDevice:
         return json.dumps(json_data)
 
 
-class SensiUpdateCoordinator(DataUpdateCoordinator):
+class SensiUpdateCoordinator(DataUpdateCoordinator[dict[str, SensiDevice]]):
     """The Sensi data update coordinator."""
 
     _last_event_time_stamp: datetime | None = None
