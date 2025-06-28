@@ -13,12 +13,16 @@ from .auth import AuthenticationError, refresh_access_token
 from .const import (
     CONFIG_FAN_SUPPORT,
     DEFAULT_FAN_SUPPORT,
-    DOMAIN_DATA_COORDINATOR_KEY,
     LOGGER,
     SENSI_ATTRIBUTION,
     SENSI_DOMAIN,
 )
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import (
+    SensiConfigEntry,
+    SensiData,
+    SensiDevice,
+    SensiUpdateCoordinator,
+)
 
 SUPPORTED_PLATFORMS = [
     Platform.CLIMATE,
@@ -44,19 +48,17 @@ def send_notification(
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     """Set up the Sensi component."""
 
     hass.data.setdefault(SENSI_DOMAIN, {})
 
     try:
         config = await refresh_access_token(hass)
-        coordinator = SensiUpdateCoordinator(hass, config)
+        coordinator = SensiUpdateCoordinator(hass, config, entry)
         await coordinator.async_config_entry_first_refresh()
 
-        hass.data[SENSI_DOMAIN][entry.entry_id] = {
-            DOMAIN_DATA_COORDINATOR_KEY: coordinator,
-        }
+        entry.runtime_data = SensiData(coordinator=coordinator)
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
     except ConfigEntryAuthFailed:
         # Pass ConfigEntryAuthFailed, this can be raised from the coordinator

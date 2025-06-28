@@ -1,4 +1,5 @@
 """Constants for the Sensi Thermostat component."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -19,7 +20,6 @@ SENSI_FAN_CIRCULATE: Final = "Circulate"
 FAN_CIRCULATE_DEFAULT_DUTY_CYCLE = 10
 
 
-DOMAIN_DATA_COORDINATOR_KEY: Final = "coordinator"
 STORAGE_VERSION: Final = 1
 STORAGE_KEY: Final = SENSI_DOMAIN
 

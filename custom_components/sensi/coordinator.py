@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 from multiprocessing import AuthenticationError
@@ -12,6 +13,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -59,6 +61,16 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
 _SSL_CONTEXT = get_default_context()
+
+
+@dataclass
+class SensiData:
+    """Data for the integration."""
+
+    coordinator: SensiUpdateCoordinator
+
+
+type SensiConfigEntry = ConfigEntry[SensiData]
 
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
@@ -559,7 +571,12 @@ class SensiUpdateCoordinator(DataUpdateCoordinator[dict[str, SensiDevice]]):
 
     _last_event_time_stamp: datetime | None = None
 
-    def __init__(self, hass: HomeAssistant, config: AuthenticationConfig) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config: AuthenticationConfig,
+        config_entry: SensiConfigEntry,
+    ) -> None:
         """Initialize Sensi coordinator."""
 
         self._devices: dict[str, SensiDevice] = {}
@@ -574,6 +591,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator[dict[str, SensiDevice]]):
         super().__init__(
             hass,
             LOGGER,
+            config_entry=config_entry,
             name="SensiUpdateCoordinator",
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )

@@ -21,13 +21,12 @@ from . import SensiDescriptionEntity, get_fan_support, set_fan_support
 from .const import (
     CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
-    DOMAIN_DATA_COORDINATOR_KEY,
     SENSI_DOMAIN,
     Capabilities,
     OperatingModes,
     Settings,
 )
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 
 
 @dataclass
@@ -79,12 +78,11 @@ SWITCH_TYPES: Final = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat setting switches."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
+    coordinator: SensiUpdateCoordinator = entry.runtime_data.coordinator
 
     entities = []
     for device in coordinator.get_devices():

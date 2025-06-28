@@ -20,7 +20,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import SensiEntity, get_fan_support
 from .const import (
-    DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     LOGGER,
     SENSI_DOMAIN,
@@ -29,17 +28,16 @@ from .const import (
     SENSI_FAN_ON,
     Capabilities,
 )
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
+    coordinator: SensiUpdateCoordinator = entry.runtime_data.coordinator
     entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
     async_add_entities(entities)
 

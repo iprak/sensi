@@ -1,4 +1,5 @@
 """Sensi thermostat sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -12,7 +13,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -20,8 +20,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import SensiDescriptionEntity
-from .const import DOMAIN_DATA_COORDINATOR_KEY, SENSI_DOMAIN, Settings
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .const import SENSI_DOMAIN, Settings
+from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 
 
 @dataclass
@@ -64,7 +64,6 @@ SENSOR_TYPES: Final = (
         value_fn=lambda device: device.battery_level,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-
     SensiSensorEntityDescription(
         key=Settings.COOL_MIN_TEMP,
         name="Min setpoint",
@@ -85,12 +84,11 @@ SENSOR_TYPES: Final = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat sensors."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
+    coordinator: SensiUpdateCoordinator = entry.runtime_data.coordinator
 
     entities = [
         SensiSensorEntity(device, description)
