@@ -8,7 +8,8 @@ import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
-import websockets.client
+from websockets.asyncio.client import connect
+from websockets.exceptions import WebSocketException
 
 from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
@@ -16,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util.ssl import get_default_context
 
 from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
@@ -56,6 +58,7 @@ CAPABILITIES_PARAM = "display_humidity,fan_mode_settings,continuous_backlight,de
 
 MAX_LOGIN_RETRY: Final = 4
 MAX_DATA_FETCH_COUNT: Final = 5
+_SSL_CONTEXT = get_default_context()
 
 
 def parse_bool(state: dict[str, Any], key: str) -> bool | None:
@@ -667,8 +670,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         # if self.update_counter > 5:
         #    raise AuthenticationError
 
-        async with websockets.client.connect(
-            url, extra_headers=self._headers
+        async with connect(
+            url, additional_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
             try:
                 while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
@@ -680,10 +683,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         LOGGER.debug("Data updated, it failed last time")
                         self._last_update_failed = False
 
-            except (
-                TimeoutError,
-                websockets.exceptions.WebSocketException,
-            ) as exception:
+            except (TimeoutError, WebSocketException) as exception:
                 done = True
                 self._last_update_failed = True
                 raise UpdateFailed(exception) from exception
@@ -704,8 +704,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         self._last_event_time_stamp = None
 
-        async with websockets.client.connect(
-            WS_URL, extra_headers=self._headers
+        async with connect(
+            WS_URL, additional_headers=self._headers, ssl=_SSL_CONTEXT
         ) as websocket:
             try:
                 await websocket.send("421" + data)
