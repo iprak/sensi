@@ -9,7 +9,7 @@ import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
-import websockets.client
+from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import WebSocketException
 
 from homeassistant.components.climate import HVACAction, HVACMode
@@ -81,6 +81,8 @@ class SensiDevice:
     identifier: str | None = None
     name: str | None = None
     model: str | None = None
+    model_id: str | None = None
+    serial_number: str | None = None
 
     temperature: float | None = None
     temperature_unit = UnitOfTemperature.FAHRENHEIT
@@ -342,6 +344,7 @@ class SensiDevice:
             return
 
         demand_status = state["demand_status"]
+        # return last == null ? LastRunningMode.UNKNOWN : LastRunningMode.INSTANCE.get(last);
         self.last_action_heat = demand_status.get("last") == "heat"
 
         # AC0
@@ -380,6 +383,8 @@ class SensiDevice:
 
         #   state=heat
         #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407116}
+
+        # return getCool() > 0 ? DemandStatus.COOL : getHeat() > 0 ? DemandStatus.HEAT : getAux() > 0 ? DemandStatus.AUX : DemandStatus.NONE;
 
         if demand_status.get("heat", 0) > 0:
             self.hvac_action = HVACAction.HEATING
@@ -579,8 +584,15 @@ class SensiDevice:
         json_data = [f"set_{key}", data]
         return json.dumps(json_data)
 
+    def build_get_request_str(self, key: str) -> str:
+        """Prepare the request string for getting data."""
+
+        data = {"icd_id": self.identifier}
+        json_data = [f"get_{key}", data]
+        return json.dumps(json_data)
+
     async def async_try_invoke_command(
-        self, data: str, failure_message: str, on_success: Callable | None
+        self, data: str, failure_message: str, on_success: Callable | None = None
     ) -> None:
         """Invoke command with specified data.
 
@@ -601,9 +613,61 @@ class SensiDevice:
 
         return True
 
+    async def async_update_capabilities(self) -> bool:
+        """Update device capabilities."""
+        data = self.build_get_request_str("capabilities")
+
+        await self.coordinator.websocket.send("421" + data)
+
+        msg_counter = 1
+        while msg_counter < 10:
+            msg = await asyncio.wait_for(self.coordinator.websocket.recv(), timeout=5)
+            msg_counter = msg_counter + 1
+
+            if msg.startswith("44"):
+                LOGGER.debug("Authentication expired, msg=%s", msg)
+                break
+
+            if msg.startswith("431"):
+                break
+
+            if msg.startswith("42"):
+                parsed_json = json.loads(msg[2:])
+                if (len(parsed_json) == 2) and (parsed_json[0] == "capabilities"):
+                    self.update_capabilities(parsed_json[1])
+
+    async def async_update_info(self) -> bool:
+        """Update device info."""
+        data = self.build_get_request_str("info")
+
+        await self.coordinator.websocket.send("421" + data)
+
+        msg_counter = 1
+        while msg_counter < 10:
+            msg = await asyncio.wait_for(self.coordinator.websocket.recv(), timeout=5)
+            msg_counter = msg_counter + 1
+
+            if msg.startswith("44"):
+                LOGGER.debug("Authentication expired, msg=%s", msg)
+                break
+
+            LOGGER.debug("async_update_info %d=%s", msg_counter, msg)
+
+            if msg.startswith("431"):
+                # 431[{"error":{"description":"Forbidden"}}]
+                break
+
+            if msg.startswith("42"):
+                parsed_json = json.loads(msg[2:])
+                if (len(parsed_json) == 2) and (parsed_json[0] == "info"):
+                    self.serial_number = parsed_json[1].get("serial_number")
+                    self.model_id = parsed_json[1].get("model_number")
+
 
 class SensiUpdateCoordinator(DataUpdateCoordinator):
     """The Sensi data update coordinator."""
+
+    _websocket: ClientConnection | None = None
 
     def __init__(self, hass: HomeAssistant, config: AuthenticationConfig) -> None:
         """Initialize Sensi coordinator."""
@@ -624,10 +688,42 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )
 
+    @staticmethod
+    async def create(
+        hass: HomeAssistant, config: AuthenticationConfig
+    ) -> SensiUpdateCoordinator:
+        """Create a new SensiUpdateCoordinator instance."""
+        coordinator = SensiUpdateCoordinator(hass, config)
+        await coordinator.async_prepare_socket()
+        await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_update_device_info()
+        await coordinator.async_update_capabilities()
+        return coordinator
+
+    async def async_setup(self) -> None:
+        """Set up the coordinator."""
+        await self.async_prepare_socket()
+
+    async def async_prepare_socket(self) -> None:
+        """Prepare the websocket connection."""
+        self._websocket = await connect(
+            WS_URL, additional_headers=self._headers, ssl=_SSL_CONTEXT
+        )
+
+    @property
+    def websocket(self) -> ClientConnection | None:
+        """Return the current websocket."""
+        return self._websocket
+
     def _setup_headers(self, config: AuthenticationConfig):
         # self._access_token = config.access_token
         self._headers = {"Authorization": "bearer " + config.access_token}
         # self._expires_at = config.expires_at
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Return the headers for the websocket connection."""
+        return self._headers
 
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""
@@ -668,8 +764,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                     LOGGER.info("Creating device %s", icd_id)
                     devices[icd_id] = SensiDevice(self, device_data)
 
-                if "capabilities" in device_data:
-                    devices[icd_id].update_capabilities(device_data["capabilities"])
+                # if "capabilities" in device_data:
+                #    devices[icd_id].update_capabilities(device_data["capabilities"])
 
         return found_state
 
@@ -688,6 +784,16 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
             # Try updating data again with new token
             return await self._fetch_device_data()
+
+    async def async_update_device_info(self) -> dict[str, SensiDevice]:
+        """Update device info for all devices."""
+        for device in self.get_devices():
+            await device.async_update_info()
+
+    async def async_update_capabilities(self) -> dict[str, SensiDevice]:
+        """Update device info for all devices."""
+        for device in self.get_devices():
+            await device.async_update_capabilities()
 
     async def _fetch_device_data(self) -> dict[str, SensiDevice]:
         """Fetch device data from url."""
@@ -709,12 +815,12 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         #    raise AuthenticationError
 
         # https://websockets.readthedocs.io/en/9.1/api/client.html
-        async with websockets.client.connect(
-            url, extra_headers=self._headers, ssl=_SSL_CONTEXT
-        ) as websocket:
+        # async with connect(
+        #     url, additional_headers=self._headers, ssl=_SSL_CONTEXT
+        # ) as websocket:
             try:
                 while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
-                    msg = await asyncio.wait_for(websocket.recv(), timeout=10)
+                    msg = await asyncio.wait_for(self.websocket.recv(), timeout=10)
                     done = self._parse_socket_response(msg, self._devices)
                     fetch_count = fetch_count + 1
 
@@ -723,7 +829,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         self._last_update_failed = False
 
             except (
-                asyncio.TimeoutError,
+                TimeoutError,
                 WebSocketException,
             ) as exception:
                 done = True
@@ -744,12 +850,16 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         """
 
-        async with websockets.client.connect(
-            WS_URL, extra_headers=self._headers, ssl=_SSL_CONTEXT
-        ) as websocket:
-            await websocket.send("421" + data)
-            msg = await asyncio.wait_for(websocket.recv(), timeout=5)
-            LOGGER.debug("invoke_command response=%s", msg)
+        await self.websocket.send("421" + data)
+
+        msg_counter = 1
+        while msg_counter < 10:
+            msg = await asyncio.wait_for(self.websocket.recv(), timeout=5)
+            LOGGER.debug("Message %d=%s", msg_counter, msg)
+            msg_counter = msg_counter + 1
+
+            if msg.startswith("431"):
+                break
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""

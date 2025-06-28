@@ -19,4 +19,4 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.sensi: info
+    custom_components.sensi: debug
