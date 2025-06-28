@@ -476,7 +476,7 @@ class SensiDevice:
 
         if self.offline:
             LOGGER.info("%s: device is offline", self.name)
-            return
+            return False
 
         if hvac_mode not in HVAC_MODE_TO_OPERATING_MODE:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
