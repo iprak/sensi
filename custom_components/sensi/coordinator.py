@@ -681,7 +681,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         self._last_update_failed = False
 
             except (
-                asyncio.TimeoutError,
+                TimeoutError,
                 websockets.exceptions.WebSocketException,
             ) as exception:
                 done = True
