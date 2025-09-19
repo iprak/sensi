@@ -91,6 +91,8 @@ class SensiDevice:
     last_action_heat: bool = False
     """Was the last action heating?"""
 
+    fan_speed: int | None = None
+
     operating_mode: OperatingModes | None = None
     """Operating mode reported by Sensi"""
 
@@ -343,6 +345,9 @@ class SensiDevice:
 
         demand_status = state["demand_status"]
         self.last_action_heat = demand_status.get("last") == "heat"
+
+        fan_speed = int(demand_status.get("fan", 0))
+        self.fan_speed = max(0, min(100, fan_speed))
 
         # AC0
         #   state=heat, target temp higher

@@ -105,6 +105,16 @@ SENSOR_TYPES: Final = (
         value_fn=lambda device: device.max_temp,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    SensiSensorEntityDescription(
+        key="fan_speed",
+        name="Fan speed",
+        value_fn=lambda device: device.fan_speed,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_registry_enabled_default=False,
+        icon="mdi:fan",
+    ),
 )
 
 
