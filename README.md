@@ -44,9 +44,17 @@ On adding the Sensi integration, you should see one device and some related enti
 - Auxiliary heating
   - Homeassistant currently doesn't handle aux heat case well. One will see "Heating" as the action for aux heating.
   - Homeassistant stopped supporting aux_heat as of 2024.4.0. The aux heating setting now appears as a switch under device configuration, if the thermostat is setup for auxiliary heating.
+
+
+### Diagostic Sensors
+- Battery
+- Fan speed
+  - This entity is **disabled by default** and can be accessed by expanding the Diagostic section from where it can be enabled.
 - Min/Max setpoints
   - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action. You can see the setpoint values under Diagnostic section of the device.
 
+
+### Attributes
 Sample attributes on the climate entity:
 
 ```
