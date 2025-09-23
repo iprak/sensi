@@ -1,4 +1,4 @@
-name: Maunal release
+name: Manual release
 on:
   workflow_dispatch:
 
@@ -29,7 +29,7 @@ jobs:
           echo "Version: ${{steps.semantic_release_info.outputs.version}}"
           sed -i "s/\"version\": \".*\"/\"version\": \"${{steps.semantic_release_info.outputs.version}}\"/g" custom_components/sensi/manifest.json
           git add -A
-          git commit -m "chore: bumping version to ${{next_tag}}"
+          git commit -m "chore: bumping version to ${next_tag}"
 
           git tag ${next_tag} -f
           git push --tags -f
