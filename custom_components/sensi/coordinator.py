@@ -334,6 +334,11 @@ class SensiDevice:
         # AC0/AC1/HP1 state=off
         # operating_mode=off, current_operating_mode=off, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
 
+        demand_status = state["demand_status"]
+
+        fan_speed = int(demand_status.get("fan", 0))
+        self.fan_speed = max(0, min(100, fan_speed))
+        
         if self.operating_mode == OperatingModes.OFF:
             self.hvac_action = HVACAction.OFF
             return
@@ -343,11 +348,7 @@ class SensiDevice:
             self.hvac_action = HVACAction.HEATING
             return
 
-        demand_status = state["demand_status"]
         self.last_action_heat = demand_status.get("last") == "heat"
-
-        fan_speed = int(demand_status.get("fan", 0))
-        self.fan_speed = max(0, min(100, fan_speed))
 
         # AC0
         #   state=heat, target temp higher
