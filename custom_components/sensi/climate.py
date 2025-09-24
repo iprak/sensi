@@ -175,12 +175,18 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature."""
+        if self._device.hvac_mode == HVACMode.HEAT or self._device.last_action_heat:
+            return 45
+
         return self._device.min_temp
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature."""
-        return self._device.max_temp
+        if self._device.hvac_mode != HVACMode.COOL or self._device.last_action_heat:
+            return self._device.max_temp
+
+        return 80
 
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
