@@ -51,9 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     try:
         config = await refresh_access_token(hass)
-        coordinator = SensiUpdateCoordinator(hass, config)
-        await coordinator.async_config_entry_first_refresh()
-
+        coordinator = await SensiUpdateCoordinator.create(hass, config)
         hass.data[SENSI_DOMAIN][entry.entry_id] = {
             DOMAIN_DATA_COORDINATOR_KEY: coordinator,
         }
@@ -103,6 +101,8 @@ class SensiEntity(CoordinatorEntity):
             name=device.name,
             manufacturer="Sensi",
             model=device.model,
+            model_id=device.model_id,
+            serial_number=device.serial_number,
         )
 
     @property
