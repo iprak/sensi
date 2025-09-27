@@ -338,7 +338,7 @@ class SensiDevice:
 
         fan_speed = int(demand_status.get("fan", 0))
         self.fan_speed = max(0, min(100, fan_speed))
-        
+
         if self.operating_mode == OperatingModes.OFF:
             self.hvac_action = HVACAction.OFF
             return
@@ -729,7 +729,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                         self._last_update_failed = False
 
             except (
-                asyncio.TimeoutError,
+                TimeoutError,
                 WebSocketException,
             ) as exception:
                 done = True

@@ -74,7 +74,7 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
                 headers=headers,
                 allow_redirects=True,
             )
-    except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+    except (TimeoutError, aiohttp.ClientError) as err:
         LOGGER.warning("Timed out getting access token", exc_info=True)
         raise SensiConnectionError("Timed out getting access token") from err
 
