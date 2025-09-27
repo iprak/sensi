@@ -17,6 +17,6 @@ homeassistant:
   temperature_unit: F
 
 logger:
-  default: info
+  default: warn
   logs:
-    custom_components.sensi: info
+    custom_components.sensi: debug
