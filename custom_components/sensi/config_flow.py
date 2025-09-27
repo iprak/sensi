@@ -18,12 +18,8 @@ from .auth import (
 )
 from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
-# REAUTH_SCHEMA = vol.Schema({vol.Required(CONFIG_REFRESH_TOKEN): str})
-
 AUTH_DATA_SCHEMA = vol.Schema(
     {
-        # vol.Required(CONF_USERNAME): str,
-        # vol.Required(CONF_PASSWORD): str,
         vol.Required(CONFIG_REFRESH_TOKEN): str,
     }
 )
@@ -60,8 +56,6 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             config = AuthenticationConfig(
-                # username=user_input[CONF_USERNAME],
-                # password=user_input[CONF_PASSWORD],
                 refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
             errors = await self._try_login(config)
@@ -88,11 +82,8 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Handle reauthentication."""
         errors = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
-        # username = existing_entry.data[CONF_USERNAME]
         if user_input is not None:
             config = AuthenticationConfig(
-                # username=username,
-                # password=user_input[CONF_PASSWORD],
                 refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
             errors = await self._try_login(config)
@@ -101,7 +92,6 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
                     existing_entry,
                     data={
                         **existing_entry.data,
-                        # CONF_PASSWORD: user_input[CONF_PASSWORD],
                         CONFIG_REFRESH_TOKEN: user_input[CONFIG_REFRESH_TOKEN],
                     },
                 )

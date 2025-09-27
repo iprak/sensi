@@ -41,9 +41,6 @@ class AuthenticationConfig:
     """Internal Sensi authentication configuration."""
 
     user_id: str | None = None
-    # username: str | None = None
-    # password: str | None = None
-    # scan_interval: timedelta | None = None
     access_token: str | None = None
     expires_at: float | None = None
     refresh_token: str | None = None
