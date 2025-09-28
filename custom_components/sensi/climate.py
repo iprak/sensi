@@ -316,6 +316,12 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Device state update callback."""
 
         if self._retry_property_name:
+            LOGGER.debug(
+                "%s: Device state updated, checking if %s not matching",
+                self._device.name,
+                self._retry_property_name,
+            )
+
             value = getattr(self, self._retry_property_name)
             if value != self._retry_expected_value:
                 LOGGER.info(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import voluptuous as vol
@@ -18,12 +19,8 @@ from .auth import (
 )
 from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
-# REAUTH_SCHEMA = vol.Schema({vol.Required(CONFIG_REFRESH_TOKEN): str})
-
 AUTH_DATA_SCHEMA = vol.Schema(
     {
-        # vol.Required(CONF_USERNAME): str,
-        # vol.Required(CONF_PASSWORD): str,
         vol.Required(CONFIG_REFRESH_TOKEN): str,
     }
 )
@@ -38,19 +35,19 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Start a config flow."""
         self._reauth_unique_id = None
 
-    async def _try_login(self, config: AuthenticationConfig):
+    async def _try_login(self, config: AuthenticationConfig) -> LoginResponse:
         """Try login with supplied credentials."""
         try:
-            await refresh_access_token(self.hass, config.refresh_token)
+            new_config = await refresh_access_token(self.hass, config.refresh_token)
         except SensiConnectionError:
-            return {"base": "cannot_connect"}
+            return LoginResponse(errors={"base": "cannot_connect"}, config=None)
         except AuthenticationError:
-            return {"base": "invalid_auth"}
+            return LoginResponse(errors={"base": "invalid_auth"}, config=None)
         except Exception as err:  # pylint: disable=broad-except # noqa: BLE001
             LOGGER.exception(str(err))
-            return {"base": "unknown"}
+            return LoginResponse(errors={"base": "unknown"}, config=None)
 
-        return None
+        return LoginResponse(errors=None, config=new_config)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -60,17 +57,16 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             config = AuthenticationConfig(
-                # username=user_input[CONF_USERNAME],
-                # password=user_input[CONF_PASSWORD],
                 refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
-            errors = await self._try_login(config)
-            if not errors:
-                await self.async_set_unique_id(
-                    config.user_id
-                )  # Use user_id as unique_id
+            result = await self._try_login(config)
+            if not result.errors:
+                # Use the user_id obtained via login as the  unique_id
+                await self.async_set_unique_id(result.config.user_id)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=SENSI_NAME, data=user_input)
+
+            errors = result.errors
 
         return self.async_show_form(
             step_id="user",
@@ -86,27 +82,25 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
 
     async def async_step_reauth_confirm(self, user_input=None):
         """Handle reauthentication."""
-        errors = {}
+        errors: dict[str, str] = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
-        # username = existing_entry.data[CONF_USERNAME]
         if user_input is not None:
             config = AuthenticationConfig(
-                # username=username,
-                # password=user_input[CONF_PASSWORD],
                 refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
-            errors = await self._try_login(config)
-            if not errors:
+            result = await self._try_login(config)
+            if not result.errors:
                 self.hass.config_entries.async_update_entry(
                     existing_entry,
                     data={
                         **existing_entry.data,
-                        # CONF_PASSWORD: user_input[CONF_PASSWORD],
                         CONFIG_REFRESH_TOKEN: user_input[CONFIG_REFRESH_TOKEN],
                     },
                 )
                 await self.hass.config_entries.async_reload(existing_entry.entry_id)
                 return self.async_abort(reason="reauth_successful")
+
+            errors = result.errors
 
         # The input for user and re_config is the same
         return self.async_show_form(
@@ -114,3 +108,11 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
             data_schema=AUTH_DATA_SCHEMA,
             errors=errors,
         )
+
+
+@dataclass
+class LoginResponse:
+    """Response from login attempt."""
+
+    errors: dict[str, str] | None
+    config: AuthenticationConfig

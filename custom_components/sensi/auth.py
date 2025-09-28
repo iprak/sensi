@@ -41,9 +41,6 @@ class AuthenticationConfig:
     """Internal Sensi authentication configuration."""
 
     user_id: str | None = None
-    # username: str | None = None
-    # password: str | None = None
-    # scan_interval: timedelta | None = None
     access_token: str | None = None
     expires_at: float | None = None
     refresh_token: str | None = None
@@ -77,7 +74,7 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
                 headers=headers,
                 allow_redirects=True,
             )
-    except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+    except (TimeoutError, aiohttp.ClientError) as err:
         LOGGER.warning("Timed out getting access token", exc_info=True)
         raise SensiConnectionError("Timed out getting access token") from err
 
