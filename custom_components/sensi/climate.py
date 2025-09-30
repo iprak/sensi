@@ -59,6 +59,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     _enable_turn_on_off_backwards_compatibility = False
 
     _retry_property_name: str
+    """The property to retry if the value did not update as expected."""
+
     _retry_expected_value: float | str | HVACMode
     _retry_callback: Callable[[float | str | HVACMode]]
 
@@ -67,7 +69,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         super().__init__(device)
 
-        device.on_device_updated = self._on_device_updated
         self._retry_property_name = ""
 
         self._entry = entry
@@ -306,8 +307,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         self._retry_expected_value = expected_value
         self._retry_callback = callback
 
-    def _on_device_updated(self) -> None:
-        """Device state update callback."""
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
         asyncio.run_coroutine_threadsafe(
             self._async_on_device_updated(), self.hass.loop
         )
