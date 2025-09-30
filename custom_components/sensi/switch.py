@@ -11,23 +11,21 @@ from homeassistant.components.switch import (
     SwitchEntity,
     SwitchEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import SensiDescriptionEntity, get_fan_support, set_fan_support
+from . import SensiConfigEntry, SensiDescriptionEntity, get_fan_support, set_fan_support
 from .const import (
     CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
-    DOMAIN_DATA_COORDINATOR_KEY,
     SENSI_DOMAIN,
     Capabilities,
     OperatingModes,
     Settings,
 )
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice
 
 
 @dataclass
@@ -79,12 +77,11 @@ SWITCH_TYPES: Final = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat setting switches."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
+    coordinator = entry.runtime_data
 
     entities = []
     for device in coordinator.get_devices():
@@ -135,7 +132,7 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
     """Representation of Sensi thermostat fan support setting."""
 
-    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
+    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
         """Initialize the setting."""
 
         description = SwitchEntityDescription(
@@ -188,7 +185,7 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
 
     _last_hvac_mode_before_aux_heat: HVACMode | str | None
 
-    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
+    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
         """Initialize the setting."""
 
         description = SwitchEntityDescription(

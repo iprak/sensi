@@ -13,7 +13,6 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -21,9 +20,8 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from . import SensiEntity, get_fan_support
+from . import SensiConfigEntry, SensiEntity, get_fan_support
 from .const import (
-    DOMAIN_DATA_COORDINATOR_KEY,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     LOGGER,
     SENSI_DOMAIN,
@@ -32,19 +30,18 @@ from .const import (
     SENSI_FAN_ON,
     Capabilities,
 )
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiDevice
 
 FORCE_REFRESH_DELAY = 3
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
+    coordinator = entry.runtime_data
     entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
     async_add_entities(entities)
 
@@ -64,7 +61,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     _retry_expected_value: float | str | HVACMode
     _retry_callback: Callable[[float | str | HVACMode]]
 
-    def __init__(self, device: SensiDevice, entry: ConfigEntry) -> None:
+    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
         """Initialize the device."""
 
         super().__init__(device)

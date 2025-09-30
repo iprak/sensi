@@ -13,12 +13,13 @@ from .auth import AuthenticationError, refresh_access_token
 from .const import (
     CONFIG_FAN_SUPPORT,
     DEFAULT_FAN_SUPPORT,
-    DOMAIN_DATA_COORDINATOR_KEY,
     LOGGER,
     SENSI_ATTRIBUTION,
     SENSI_DOMAIN,
 )
 from .coordinator import SensiDevice, SensiUpdateCoordinator
+
+type SensiConfigEntry = ConfigEntry[SensiUpdateCoordinator]
 
 SUPPORTED_PLATFORMS = [
     Platform.CLIMATE,
@@ -44,7 +45,7 @@ def send_notification(
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     """Set up the Sensi component."""
 
     hass.data.setdefault(SENSI_DOMAIN, {})
@@ -54,9 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         coordinator = SensiUpdateCoordinator(hass, config)
         await coordinator.async_config_entry_first_refresh()
 
-        hass.data[SENSI_DOMAIN][entry.entry_id] = {
-            DOMAIN_DATA_COORDINATOR_KEY: coordinator,
-        }
+        entry.runtime_data = coordinator
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
     except ConfigEntryAuthFailed:
         # Pass ConfigEntryAuthFailed, this can be raised from the coordinator
@@ -135,7 +134,7 @@ class SensiDescriptionEntity(SensiEntity):
         self._attr_unique_id = f"{device.identifier}_{description.key}"
 
 
-def get_fan_support(device: SensiDevice, entry: ConfigEntry) -> bool:
+def get_fan_support(device: SensiDevice, entry: SensiConfigEntry) -> bool:
     """Determine if fan is supported."""
 
     options = entry.options.get(CONFIG_FAN_SUPPORT, {})
@@ -143,7 +142,7 @@ def get_fan_support(device: SensiDevice, entry: ConfigEntry) -> bool:
 
 
 def set_fan_support(
-    hass: HomeAssistant, device: SensiDevice, entry: ConfigEntry, value: bool
+    hass: HomeAssistant, device: SensiDevice, entry: SensiConfigEntry, value: bool
 ) -> None:
     """Update the fan support status in ConfigEntry."""
 
