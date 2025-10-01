@@ -13,21 +13,15 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import SensiDescriptionEntity
-from .const import (
-    ATTR_BATTERY_VOLTAGE,
-    DOMAIN_DATA_COORDINATOR_KEY,
-    SENSI_DOMAIN,
-    Settings,
-)
-from .coordinator import SensiDevice, SensiUpdateCoordinator
+from . import SensiConfigEntry, SensiDescriptionEntity
+from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN, Settings
+from .coordinator import SensiDevice
 
 
 def calculate_battery_level(voltage: float) -> int | None:
@@ -120,13 +114,11 @@ SENSOR_TYPES: Final = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up Sensi thermostat sensors."""
-    data = hass.data[SENSI_DOMAIN][entry.entry_id]
-    coordinator: SensiUpdateCoordinator = data[DOMAIN_DATA_COORDINATOR_KEY]
-
+    coordinator = entry.runtime_data
     entities = [
         SensiSensorEntity(device, description)
         for device in coordinator.get_devices()
