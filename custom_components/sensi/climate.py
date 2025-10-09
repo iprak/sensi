@@ -309,6 +309,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         asyncio.run_coroutine_threadsafe(
             self._async_on_device_updated(), self.hass.loop
         )
+        super()._handle_coordinator_update()
 
     async def _async_on_device_updated(self) -> None:
         """Device state update callback."""
