@@ -655,6 +655,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         found_state = False
 
         parsed_json = json.loads(msg[2:])
+        LOGGER.debug("Data marker found, parsed_json=%s", parsed_json)
         if parsed_json[0] == "state":
             for device_data in parsed_json[1]:
                 icd_id = device_data.get("icd_id")
