@@ -666,8 +666,8 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
                 if icd_id in devices:
                     devices[icd_id].update(device_data)
                 else:
-                    LOGGER.info("Creating device %s", icd_id)
                     devices[icd_id] = SensiDevice(self, device_data)
+                    LOGGER.info("Created device %s (%s)", devices[icd_id].name, icd_id)
 
                 if "capabilities" in device_data:
                     devices[icd_id].update_capabilities(device_data["capabilities"])
