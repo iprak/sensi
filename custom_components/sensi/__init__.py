@@ -84,7 +84,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-class SensiEntity(CoordinatorEntity):
+class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
     """Representation of a Sensi entity."""
 
     _attr_has_entity_name = True
