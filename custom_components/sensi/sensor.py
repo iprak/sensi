@@ -13,7 +13,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS,
+    EntityCategory,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -108,6 +113,16 @@ SENSOR_TYPES: Final = (
         native_unit_of_measurement=PERCENTAGE,
         entity_registry_enabled_default=False,
         icon="mdi:fan",
+    ),
+    SensiSensorEntityDescription(
+        key="wifi_strength",
+        name="Wifi strength",
+        value_fn=lambda device: device.wifi_strength,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
+        entity_registry_enabled_default=False,
+        icon="mdi:wifi-strength-outline",
     ),
 )
 
