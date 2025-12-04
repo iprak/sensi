@@ -39,7 +39,6 @@ ATTR_CIRCULATING_FAN: Final = "circulating_fan"
 ATTR_CIRCULATING_FAN_DUTY_CYCLE: Final = "circulating_fan_duty_cycle"
 ATTR_OFFLINE: Final = "offline"
 ATTR_POWER_STATUS: Final = "power_status"
-ATTR_WIFI_QUALITY: Final = "wifi_connection_quality"
 ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
 
 

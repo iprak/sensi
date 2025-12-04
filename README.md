@@ -52,6 +52,7 @@ On adding the Sensi integration, you should see one device and some related enti
   - This entity is **disabled by default** and can be accessed by expanding the Diagostic section from where it can be enabled.
 - Min/Max setpoints
   - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action. You can see the setpoint values under Diagnostic section of the device.
+- Wifi strength
 
 
 ### Attributes
@@ -67,7 +68,6 @@ temperature: 76
 current_humidity: 99
 fan_mode: Circulate
 offline: false
-wifi_connection_quality: 66
 battery_voltage: 2.981
 hvac_action: null
 circulating_fan: on

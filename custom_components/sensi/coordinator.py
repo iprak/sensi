@@ -26,7 +26,6 @@ from .const import (
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_OFFLINE,
     ATTR_POWER_STATUS,
-    ATTR_WIFI_QUALITY,
     CAPABILITIES_VALUE_GETTER,
     COOL_MIN_TEMPERATURE,
     COORDINATOR_UPDATE_INTERVAL,
@@ -109,6 +108,7 @@ class SensiDevice:
     cool_target: float | None = None
     heat_target: float | None = None
     battery_voltage: float | None = None
+    wifi_strength: float | None = None
     offline: bool | None = None
     authenticated: bool = False
 
@@ -186,7 +186,7 @@ class SensiDevice:
                 LOGGER.warning("Property 'display_scale' not found in data")
 
             self.attributes[ATTR_POWER_STATUS] = state.get("power_status")
-            self.attributes[ATTR_WIFI_QUALITY] = state.get("wifi_connection_quality")
+            self.wifi_strength = state.get("wifi_connection_quality")
 
             self.battery_voltage = state.get("battery_voltage")
 
