@@ -22,7 +22,9 @@ from homeassistant.helpers.event import async_call_later
 
 from . import SensiConfigEntry, SensiEntity, get_fan_support
 from .const import (
+    COOL_MIN_TEMPERATURE,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    HEAT_MAX_TEMPERATURE,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
@@ -172,13 +174,25 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def min_temp(self) -> float:
-        """Return the minimum temperature."""
-        return self._device.min_temp
+        """Return the minimum temperature. This gets used as the lower bounds in UI."""
+
+        # Use the thermostat defined minimum temperature if not heating.
+        return (
+            COOL_MIN_TEMPERATURE
+            if self.hvac_mode == HVACMode.HEAT
+            else self._device.min_temp
+        )
 
     @property
     def max_temp(self) -> float:
-        """Return the maximum temperature."""
-        return self._device.max_temp
+        """Return the maximum temperature. This gets used as the upper bounds in UI."""
+
+        # Use the thermostat defined maximum temperature if not cooling.
+        return (
+            HEAT_MAX_TEMPERATURE
+            if self.hvac_mode == HVACMode.COOL
+            else self._device.max_temp
+        )
 
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
