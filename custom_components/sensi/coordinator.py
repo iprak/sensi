@@ -19,6 +19,8 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util.ssl import get_default_context
+from homeassistant.util.unit_conversion import TemperatureConverter
+from homeassistant.util.unit_system import METRIC_SYSTEM
 
 from .auth import AuthenticationConfig, refresh_access_token
 from .const import (
@@ -103,8 +105,6 @@ class SensiDevice:
 
     fan_mode: str | None = None
     attributes: dict[str, str | float] = None
-    min_temp = COOL_MIN_TEMPERATURE
-    max_temp = HEAT_MAX_TEMPERATURE
     cool_target: float | None = None
     heat_target: float | None = None
     battery_voltage: float | None = None
@@ -114,8 +114,26 @@ class SensiDevice:
 
     # List of setters can be found in the enum SetSettingsEventNames (SetSettingsEventNames.java)
 
-    def __init__(self, coordinator, data_json: dict) -> None:
+    def __init__(self, coordinator: SensiUpdateCoordinator, data_json: dict) -> None:
         """Initialize a Sensi thermostate device."""
+
+        unit = (
+            UnitOfTemperature.CELSIUS
+            if coordinator.hass.config.units is METRIC_SYSTEM
+            else UnitOfTemperature.FAHRENHEIT
+        )
+
+        self.default_min_temp = self.min_temp = TemperatureConverter.convert(
+            COOL_MIN_TEMPERATURE,
+            UnitOfTemperature.FAHRENHEIT,
+            unit,
+        )
+
+        self.default_max_temp = self.max_temp = TemperatureConverter.convert(
+            HEAT_MAX_TEMPERATURE,
+            UnitOfTemperature.FAHRENHEIT,
+            unit,
+        )
 
         self._capabilities = {}
         self._properties = {}
@@ -190,8 +208,8 @@ class SensiDevice:
 
             self.battery_voltage = state.get("battery_voltage")
 
-            self.min_temp = state.get("cool_min_temp", COOL_MIN_TEMPERATURE)
-            self.max_temp = state.get("heat_max_temp", HEAT_MAX_TEMPERATURE)
+            self.min_temp = state.get("cool_min_temp", self.default_min_temp)
+            self.max_temp = state.get("heat_max_temp", self.default_max_temp)
 
             self.cool_target = state.get("current_cool_temp")
             self.heat_target = state.get("current_heat_temp")
