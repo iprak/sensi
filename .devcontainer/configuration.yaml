@@ -7,14 +7,14 @@ logbook:
 
 homeassistant:
   name: Home
-  unit_system: us_customary
+  unit_system: metric 
   time_zone: America/Chicago
   latitude: 41.881832
   longitude: -87.623177
   elevation: 181
   currency: USD
   country: US
-  temperature_unit: F
+  temperature_unit: C
 
 logger:
   default: warn
