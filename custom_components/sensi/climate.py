@@ -13,12 +13,13 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE
+from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import SensiConfigEntry, SensiEntity, get_fan_support
 from .const import (
@@ -177,22 +178,27 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Return the minimum temperature. This gets used as the lower bounds in UI."""
 
         # Use the thermostat defined minimum temperature if not heating.
-        return (
-            COOL_MIN_TEMPERATURE
-            if self.hvac_mode == HVACMode.HEAT
-            else self._device.min_temp
-        )
+        if self.hvac_mode == HVACMode.HEAT:
+            return TemperatureConverter.convert(
+                COOL_MIN_TEMPERATURE,
+                UnitOfTemperature.FAHRENHEIT,
+                self.temperature_unit,
+            )
+        return self._device.min_temp
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature. This gets used as the upper bounds in UI."""
 
         # Use the thermostat defined maximum temperature if not cooling.
-        return (
-            HEAT_MAX_TEMPERATURE
-            if self.hvac_mode == HVACMode.COOL
-            else self._device.max_temp
-        )
+        if self.hvac_mode == HVACMode.COOL:
+            return TemperatureConverter.convert(
+                HEAT_MAX_TEMPERATURE,
+                UnitOfTemperature.FAHRENHEIT,
+                self.temperature_unit,
+            )
+
+        return self._device.max_temp
 
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
