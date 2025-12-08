@@ -13,7 +13,12 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE, UnitOfTemperature
+from homeassistant.const import (
+    ATTR_TEMPERATURE,
+    PRECISION_HALVES,
+    PRECISION_WHOLE,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -52,8 +57,6 @@ async def async_setup_entry(
 class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
 
-    _attr_target_temperature_step = PRECISION_WHOLE
-
     # This is to suppress 'therefore implicitly supports the turn_on/turn_off methods
     # without setting the proper ClimateEntityFeature' warning
     _enable_turn_on_off_backwards_compatibility = False
@@ -67,6 +70,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
         """Initialize the device."""
 
+        hass = device.coordinator.hass
         super().__init__(device)
 
         self._retry_property_name = ""
@@ -75,7 +79,13 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}",
-            hass=device.coordinator.hass,
+            hass=hass,
+        )
+
+        self._attr_target_temperature_step = (
+            PRECISION_HALVES
+            if hass.config.units.temperature_unit == UnitOfTemperature.CELSIUS
+            else PRECISION_WHOLE
         )
 
     @property
