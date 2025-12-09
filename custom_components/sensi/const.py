@@ -23,9 +23,9 @@ FAN_CIRCULATE_DEFAULT_DUTY_CYCLE = 10
 STORAGE_VERSION: Final = 1
 STORAGE_KEY: Final = SENSI_DOMAIN
 
-# The Sensi app defines min/max values as 45 ad 99. We will use 66 and 78 which are more practical values.
-COOL_MIN_TEMPERATURE: Final = 66
-HEAT_MAX_TEMPERATURE: Final = 78
+# The Sensi app defines min/max values as 45 ad 99. We will use a slightly lower range as absolute range limits.
+COOL_MIN_TEMPERATURE: Final = 50
+HEAT_MAX_TEMPERATURE: Final = 95
 
 LOGGER = logging.getLogger(__package__)
 
