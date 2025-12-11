@@ -173,6 +173,16 @@ class SensiDevice:
             self.temperature = state.get("display_temp")
             self.humidity = state.get("humidity")
 
+            # Set extended humidification attributes
+            if humidification := state.get("humidity_control", {}).get("humidification"):
+                humidification_enabled = humidification.get("enabled")
+                # 1. Set the enabled status attribute
+                self.attributes['humidification_enabled'] = humidification_enabled
+                # 2. Conditionally retrieve and set the target attribute ONLY if the feature is "on"
+                if humidification_enabled == "on":
+                    # Retrieve the target and assign it directly as the attribute value
+                    self.attributes['humidification_target_percent'] = humidification.get("target_percent")
+
             self.parse_thermostat_mode_action(state)
 
             if "display_scale" in state:
