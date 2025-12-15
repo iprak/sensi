@@ -110,3 +110,56 @@ HVAC_MODE_TO_OPERATING_MODE = {
     HVACMode.AUTO: OperatingModes.AUTO,
     HVACMode.OFF: OperatingModes.OFF,
 }
+
+
+class DehumidificationMode(StrEnum):
+    """Control status for humidity control."""
+
+    OPTIMAL_DEHUMIDIFICATION = "overcooling"
+    OPTIMAL_COMFORT = "fan_speed"
+    HUMIDIFIER = "humidifier"
+    UNKNOWN = "unknown"
+
+
+class HumidityControlStatus(StrEnum):
+    """Control status for humidity control."""
+
+    HUMIDIFYING = "humidifying"
+    DEHUMIDIFYING = "dehumidifying"
+    OVERCOOLING = "overcooling"
+    OVERCOOLED = "overcooled"
+    NONE = "none"
+
+
+class OperatingMode(StrEnum):
+    """Representation of Operating Modes."""
+
+    OFF = "off"
+    AUX = "aux"
+    HEAT = "heat"
+    COOL = "cool"
+    AUTO = "auto"
+    UNKNOWN = "unknown"
+
+
+class FanMode(StrEnum):
+    """Representation of Fan Modes."""
+
+    ON = "on"
+    AUTO = "auto"
+    SMART = "smart"
+    UNKNOWN = "unknown"
+
+
+class OnOff(StrEnum):
+    """Representation of On/Off status."""
+
+    ON = "on"
+    OFF = "off"
+
+
+class YesNo(StrEnum):
+    """Representation of Yes/No status."""
+
+    YES = "yes"
+    NO = "no"

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import timedelta
 import json
 from multiprocessing import AuthenticationError
+import socketio
 from typing import Any, Final
 
 import websockets.client
@@ -754,6 +755,90 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             await websocket.send("421" + data)
             msg = await asyncio.wait_for(websocket.recv(), timeout=5)
             LOGGER.debug("invoke_command response=%s", msg)
+
+    @staticmethod
+    async def refresh(access_token: str) -> Any:
+        """Refresh the data."""
+
+        sio = socketio.AsyncClient(logger=True, engineio_logger=True)
+        headers = {"Authorization": "bearer " + access_token}
+        state_data: Any = None
+
+        @sio.on("state")
+        async def on_state(data):
+            nonlocal state_data
+
+            state_data = data
+            await sio.disconnect()
+
+        await sio.connect(
+            "https://rt.sensiapi.io",
+            headers=headers,
+            socketio_path="/thermostat",
+            transports=["websocket"],
+        )
+
+        await sio.sleep(2)
+        await sio.disconnect()
+        return state_data
+
+    @staticmethod
+    async def get_thermostat_id(access_token: str) -> str | None:
+        """Refresh the data."""
+
+        sio = socketio.AsyncClient()
+        headers = {"Authorization": "bearer " + access_token}
+        state_data: Any = None
+
+        @sio.on("state")
+        async def on_state(data):
+            nonlocal state_data
+
+            state_data = data
+
+        await sio.connect(
+            "https://rt.sensiapi.io",
+            headers=headers,
+            socketio_path="/thermostat",
+            transports=["websocket"],
+        )
+
+        await sio.sleep(2)
+        await sio.disconnect()
+
+        if state_data:
+            return state_data[0].get("icd_id")
+
+        return None
+
+    @staticmethod
+    async def get_initial_state(access_token: str) -> str | None:
+        """Refresh the data."""
+
+        sio = socketio.AsyncClient()
+        headers = {"Authorization": "bearer " + access_token}
+        state_data: Any = None
+
+        @sio.on("state")
+        async def on_state(data):
+            nonlocal state_data
+
+            state_data = data
+
+        await sio.connect(
+            "https://rt.sensiapi.io",
+            headers=headers,
+            socketio_path="/thermostat",
+            transports=["websocket"],
+        )
+
+        await sio.sleep(2)
+        await sio.disconnect()
+
+        if state_data:
+            return state_data[0].get("icd_id")
+
+        return None
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""

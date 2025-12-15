@@ -1,0 +1,11 @@
+from custom_components.sensi.data import State, DemandStatus
+
+
+def test_demand_status_parsing(mock_json) -> None:
+    """Test DemandStatus parsing using sample.json."""
+    state_dict = mock_json.get("state", {})
+    state_obj = State(state_dict)
+
+    assert isinstance(state_obj.demand_status, DemandStatus)
+    assert state_obj.demand_status.fan == 0
+    assert state_obj.demand_status.last == "heat"

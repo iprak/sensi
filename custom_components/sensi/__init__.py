@@ -52,8 +52,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
 
     try:
         config = await refresh_access_token(hass)
+        # icd_id = await SensiUpdateCoordinator.get_thermostat_id(config.access_token)
         coordinator = SensiUpdateCoordinator(hass, config)
-        await coordinator.async_config_entry_first_refresh()
+        # await coordinator.async_config_entry_first_refresh()
 
         entry.runtime_data = coordinator
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
