@@ -1,4 +1,4 @@
-from custom_components.sensi.data import State, DemandStatus
+from custom_components.sensi.data import DemandStatus, State
 
 
 def test_demand_status_parsing(mock_json) -> None:

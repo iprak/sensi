@@ -316,6 +316,24 @@ class Thermostat:
         self.capabilities = Capabilities(data.get("capabilities", {}))
         self.thermostat_info = ThermostatInfo(data.get("thermostat_info", {}))
 
+    def update_state(self, data: dict) -> None:
+        """Update the thermostat state from data dictionary."""
+        source = data.get("state")
+        if source:
+            self.state = State(source)
+
+    def update_capabilities(self, data: dict) -> None:
+        """Update the thermostat capabilities from data dictionary."""
+        source = data.get("capabilities")
+        if source:
+            self.capabilities = Capabilities(source)
+
+    def update_thermostat_info(self, data: dict) -> None:
+        """Update the thermostat info from data dictionary."""
+        source = data.get("thermostat_info")
+        if source:
+            self.thermostat_info = ThermostatInfo(source)
+
 
 # def to_bool(value: str) -> bool:
 #     """Convert 'yes'/'no' string to boolean."""
@@ -330,6 +348,11 @@ def onoff_to_bool(value: str) -> bool:
 def to_bool(value: str) -> bool:
     """Determine if a value is truthy."""
     return value == "true" or value.lower() == "yes" or value.lower() == "on"
+
+
+def extract_icd_id(data: dict) -> str:
+    """Return the thermostat ICD ID."""
+    return data.get("icd_id", "") if data else ""
 
 
 # get_settings

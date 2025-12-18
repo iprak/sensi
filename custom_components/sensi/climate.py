@@ -50,7 +50,9 @@ async def async_setup_entry(
 ):
     """Set up Sensi thermostat."""
     coordinator = entry.runtime_data
-    entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
+    thermostats = coordinator.get_thermostats()
+    # entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
+    entities = [SensiThermostat(device, entry) for device in thermostats]
     async_add_entities(entities)
 
 
