@@ -24,9 +24,9 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import SensiConfigEntry, SensiDescriptionEntity
 from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN, Settings
-from .coordinator import SensiDevice
+from .coordinator import SensiConfigEntry, SensiDevice
+from .entity import SensiDescriptionEntity
 
 
 def calculate_battery_level(voltage: float) -> int | None:

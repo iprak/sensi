@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import SensiConfigEntry, SensiDescriptionEntity, get_fan_support, set_fan_support
+from . import get_fan_support, set_fan_support
 from .const import (
     CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
@@ -25,7 +25,8 @@ from .const import (
     OperatingModes,
     Settings,
 )
-from .coordinator import SensiDevice
+from .coordinator import SensiConfigEntry, SensiDevice
+from .entity import SensiDescriptionEntity
 
 
 @dataclass

@@ -9,19 +9,18 @@ import json
 from multiprocessing import AuthenticationError
 from typing import Any, Final
 
-import socketio
 import websockets.client
 from websockets.exceptions import WebSocketException
 
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util.ssl import get_default_context
 
-from .auth import AuthenticationConfig, refresh_access_token
 from .client import SensiClient
 from .const import (
     ATTR_CIRCULATING_FAN,
@@ -41,7 +40,9 @@ from .const import (
     OperatingModes,
     Settings,
 )
-from .data import Thermostat
+from .data import AuthenticationConfig, SensiDevice
+
+type SensiConfigEntry = ConfigEntry[SensiUpdateCoordinator]
 
 # This is based on IOWrapper.java
 # pylint: disable=line-too-long
@@ -72,7 +73,7 @@ def parse_bool(state: dict[str, Any], key: str) -> bool | None:
     return None
 
 
-class SensiDevice:
+class SensiDeviceOld:
     """Class representing a Sensi thermostat device."""
 
     # pylint: disable=too-many-instance-attributes
@@ -611,23 +612,21 @@ class SensiDevice:
 class SensiUpdateCoordinator(DataUpdateCoordinator):
     """The Sensi data update coordinator."""
 
-    _client: SensiClient = None
-    _config: AuthenticationConfig = None
-    _client_creation_task: Any = None
-
-    def __init__(self, hass: HomeAssistant, config: AuthenticationConfig) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config: AuthenticationConfig,
+        client: SensiClient,
+    ) -> None:
         """Initialize Sensi coordinator."""
 
-        self._devices: dict[str, SensiDevice] = {}
+        self._config = config
+
         # self._login_retry = 0
         self._last_update_failed = False  # Used for debugging
 
         # For testing unavailable on token refresh
         # self.update_counter = 0
-
-        self._setup_headers(config)
-        self._config = config
-        # self._session = async_get_clientsession(hass)
 
         super().__init__(
             hass,
@@ -636,51 +635,17 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )
 
-    async def get_client(self) -> SensiClient:
-        """Get the Sensi client."""
-        if self._client:
-            return self._client
-
-        if not self._client_creation_task:
-            self._client_creation_task = self.hass.async_create_task(
-                self._create_client()
-            )
-
-        await self._client_creation_task
-        return self._client
-
-    async def _create_client(self) -> None:
-        self._client = SensiClient(
-            self.hass,
-            self._config.access_token,
-            self._config.refresh_token,
-        )
-
-        # await self._client.get_thermostats()
-        self._client_creation_task = None
-
-    async def _close(self) -> None:
-        if self._client:
-            await self._client.close()
-            self._client = None
-            self._client_creation_task = None
+        self._setup_headers(config)
+        self.client = client
 
     def _setup_headers(self, config: AuthenticationConfig):
         # self._access_token = config.access_token
         self._headers = {"Authorization": "bearer " + config.access_token}
         # self._expires_at = config.expires_at
 
-    def get_thermostats(self) -> list[Thermostat]:
-        """Sensi devices."""
-        return self._client.get_thermostats()
-
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""
-        return self._devices.values()
-
-    def get_device(self, icd_id):
-        """Return a specific Sensi device."""
-        return self._devices.get(icd_id)
+        return self.client.get_devices()
 
     def _parse_socket_response(self, msg: str, devices: dict[str, SensiDevice]) -> bool:
         """Parse the websocket device response."""
@@ -719,76 +684,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
         return found_state
 
-    async def _async_update_data(self) -> list[Thermostat]:
-        # dict[str, Thermostat]:
+    async def _async_update_data(self) -> None:
         """Update device data. This is invoked by DataUpdateCoordinator."""
-
-        try:
-            client = await self.get_client()
-
-            # Close if has thermostats or 5 seconds have elapsed
-            await client.close()
-
-            values = client.get_thermostats()
-            return values
-            # return await self._fetch_device_data()
-        except AuthenticationError:
-            LOGGER.debug("Token expired, getting new token")
-
-            try:
-                self._setup_headers(await refresh_access_token(self.hass))
-            except AuthenticationError as exception_inner:
-                raise ConfigEntryAuthFailed from exception_inner
-
-            # Try updating data again with new token
-            return await self._fetch_device_data()
-
-    async def _fetch_device_data(self) -> dict[str, SensiDevice]:
-        """Fetch device data from url."""
-
-        # Use the current access_tooken. AuthenticationError will thrown if token has expired.
-
-        url = f"{WS_URL}&capabilities={CAPABILITIES_PARAM}"
-
-        fetch_count = 0
-        done = False
-
-        # Flag devices as unauthenticated and then authenticated on successful data retreival
-        for device in self.get_devices():
-            device.authenticated = False
-
-        # Uncomment to test failed token refresh
-        # self.update_counter = self.update_counter + 1
-        # if self.update_counter > 5:
-        #    raise AuthenticationError
-
-        # https://websockets.readthedocs.io/en/9.1/api/client.html
-        async with websockets.client.connect(
-            url, extra_headers=self._headers, ssl=_SSL_CONTEXT
-        ) as websocket:
-            try:
-                while (not done) and (fetch_count < MAX_DATA_FETCH_COUNT):
-                    msg = await asyncio.wait_for(websocket.recv(), timeout=10)
-                    done = self._parse_socket_response(msg, self._devices)
-                    fetch_count = fetch_count + 1
-
-                    if self._last_update_failed:
-                        LOGGER.debug("Data updated, it failed last time")
-                        self._last_update_failed = False
-
-            except (
-                TimeoutError,
-                WebSocketException,
-            ) as exception:
-                done = True
-                self._last_update_failed = True
-                raise UpdateFailed(exception) from exception
-            # Pass AuthenticationError
-
-        for device in self.get_devices():
-            device.authenticated = True
-
-        return self._devices
+        await self.client.async_update_devices()
 
     async def async_invoke_command(self, data: str) -> None:
         """Send a JSON request.
@@ -804,64 +702,6 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             await websocket.send("421" + data)
             msg = await asyncio.wait_for(websocket.recv(), timeout=5)
             LOGGER.debug("invoke_command response=%s", msg)
-
-    @staticmethod
-    async def get_thermostat_id(access_token: str) -> str | None:
-        """Refresh the data."""
-
-        sio = socketio.AsyncClient()
-        headers = {"Authorization": "bearer " + access_token}
-        state_data: Any = None
-
-        @sio.on("state")
-        async def on_state(data):
-            nonlocal state_data
-
-            state_data = data
-
-        await sio.connect(
-            "https://rt.sensiapi.io",
-            headers=headers,
-            socketio_path="/thermostat",
-            transports=["websocket"],
-        )
-
-        await sio.sleep(2)
-        await sio.disconnect()
-
-        if state_data:
-            return state_data[0].get("icd_id")
-
-        return None
-
-    @staticmethod
-    async def get_initial_state(access_token: str) -> str | None:
-        """Refresh the data."""
-
-        sio = socketio.AsyncClient()
-        headers = {"Authorization": "bearer " + access_token}
-        state_data: Any = None
-
-        @sio.on("state")
-        async def on_state(data):
-            nonlocal state_data
-
-            state_data = data
-
-        await sio.connect(
-            "https://rt.sensiapi.io",
-            headers=headers,
-            socketio_path="/thermostat",
-            transports=["websocket"],
-        )
-
-        await sio.sleep(2)
-        await sio.disconnect()
-
-        if state_data:
-            return state_data[0].get("icd_id")
-
-        return None
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""

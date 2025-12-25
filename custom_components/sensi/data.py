@@ -6,8 +6,20 @@ from homeassistant.util.enum import try_parse_enum
 
 from .const import DehumidificationMode, FanMode, HumidityControlStatus, OperatingMode
 
-# ["state",[{"icd_id":"36-6f-92-ff-fe-0c-0b-07",
-# "registration":{"city":"Madison","name":"Living Room","state":"Wisconsin","country":"US","address1":"Somewhere","address2":null,"timezone":"America/Chicago","postal_code":"53719","product_type":"Sensi Classic with HomeKit","contractor_id":null,"fleet_enabled":false,"fleet_enabled_date":null},
+
+@dataclass
+class AuthenticationConfig:
+    """Internal Sensi authentication configuration."""
+
+    user_id: str | None = None
+    access_token: str | None = None
+    expires_at: float | None = None
+    refresh_token: str | None = None
+
+    @property
+    def headers(self):
+        """Get request headers."""
+        return {"Authorization": "bearer " + self.access_token}
 
 
 class CirculatingFan:
@@ -139,7 +151,7 @@ class State:
 
 
 @dataclass
-class SetTempeatureInfo:
+class SetTemperatureEventInfo:
     """Thermostat information sent to Sensi websocket."""
 
     icd_id: str
@@ -148,13 +160,18 @@ class SetTempeatureInfo:
     target_temp: float
 
 
-# @dataclass
-# class TemperatureInfo:
-#     """Thermostat information returned from Sensi websocket."""
+class SetTemperatureSuccessResponse:
+    """Representation of set_temperature success response."""
 
-#     current_temp: float
-#     mode: str
-#     target_temp: float
+    current_temp: int
+    mode: str
+    target_temp: int
+
+    def __init__(self, data: dict) -> None:
+        """Initialize SetTemperatureSuccessResponse from data dictionary."""
+        self.current_temp = data.get("current_temp", 0)
+        self.mode = data.get("mode", "")
+        self.target_temp = data.get("target_temp", 0)
 
 
 class FirmwareInfo:
@@ -165,7 +182,7 @@ class FirmwareInfo:
     wifi_version: str
 
     def __init__(self, data: dict) -> None:
-        """Initialize Images from data dictionary."""
+        """Initialize FirmwareInfo from data dictionary."""
         self.firmware_version = data.get("firmware_version", "")
         self.bootloader_version = data.get("bootloader_version", "")
         self.wifi_version = data.get("wifi_version", "")
@@ -218,7 +235,7 @@ class SystemModes:
 class CirculatingFanCapabilities:
     """Representation of Circulating Fan capabilities."""
 
-    capable: str
+    capable: bool
     max_duty_cycle: int
     min_duty_cycle: int
     step: int
@@ -299,22 +316,26 @@ class Capabilities:
         )
 
 
-class Thermostat:
+class SensiDevice:
     """Representation of a Sensi Thermostat."""
 
-    icd_id: str
+    identifier: str
     name: str
     state: State
     capabilities: Capabilities
-    thermostat_info: ThermostatInfo
+    info: ThermostatInfo
 
     def __init__(self, data: dict) -> None:
         """Initialize Thermostat from data dictionary."""
-        self.icd_id = data.get("icd_id", "")
+        self.identifier = data.get("icd_id", "")
+
+        # ["state",[{"icd_id":"36-6f-92-ff-fe-0c-0b-07",
+        # "registration":{"city":"Madison","name":"Living Room","state":"Wisconsin","country":"US","address1":"Somewhere","address2":null,"timezone":"America/Chicago","postal_code":"53719","product_type":"Sensi Classic with HomeKit","contractor_id":null,"fleet_enabled":false,"fleet_enabled_date":null},
+
         self.name = data.get("registration", {}).get("name", "")
         self.state = State(data.get("state", {}))
         self.capabilities = Capabilities(data.get("capabilities", {}))
-        self.thermostat_info = ThermostatInfo(data.get("thermostat_info", {}))
+        self.info = ThermostatInfo(data.get("thermostat_info", {}))
 
     def update_state(self, data: dict) -> None:
         """Update the thermostat state from data dictionary."""
@@ -324,20 +345,15 @@ class Thermostat:
 
     def update_capabilities(self, data: dict) -> None:
         """Update the thermostat capabilities from data dictionary."""
-        source = data.get("capabilities")
+        source = data  # .get("capabilities")
         if source:
             self.capabilities = Capabilities(source)
 
-    def update_thermostat_info(self, data: dict) -> None:
+    def update_info(self, data: dict) -> None:
         """Update the thermostat info from data dictionary."""
-        source = data.get("thermostat_info")
+        source = data  # .get("thermostat_info")
         if source:
-            self.thermostat_info = ThermostatInfo(source)
-
-
-# def to_bool(value: str) -> bool:
-#     """Convert 'yes'/'no' string to boolean."""
-#     return value.lower() == "yes"
+            self.info = ThermostatInfo(source)
 
 
 def onoff_to_bool(value: str) -> bool:
