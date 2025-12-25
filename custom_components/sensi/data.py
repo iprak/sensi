@@ -168,12 +168,6 @@ class SetTemperatureSuccessResponse:
     mode: str
     target_temp: int
 
-    # def __init__(self, data: dict) -> None:
-    #     """Initialize SetTemperatureSuccessResponse from data dictionary."""
-    #     self.current_temp = data.get("current_temp", 0)
-    #     self.mode = data.get("mode", "")
-    #     self.target_temp = data.get("target_temp", 0)
-
 
 @dataclass
 class SetOperatingModeEventInfo:
@@ -278,6 +272,34 @@ class FanModes:
         self.smart = to_bool(data.get("smart", "no"))
 
 
+class HumidityCapabilities:
+    """Representation of humidification capabilities."""
+
+    max: int
+    min: int
+    step: int
+    types: list[any]
+
+    def __init__(self, data: dict) -> None:
+        """Initialize Capabilities from data dictionary."""
+        self.max = data.get("max", 0)
+        self.min = data.get("min", 0)
+        self.step = data.get("step", 0)
+        self.types = data.get("types", [])
+
+
+class HumidityControlCapabilities:
+    """Representation of humidification control capabilities."""
+
+    humidification: HumidityCapabilities
+    dehumidification: HumidityCapabilities
+
+    def __init__(self, data: dict) -> None:
+        """Initialize Capabilities from data dictionary."""
+        self.humidification = data.get("humidification", {})
+        self.dehumidification = data.get("dehumidification", {})
+
+
 class Capabilities:
     """Representation of Thermostat capabilities."""
 
@@ -304,6 +326,7 @@ class Capabilities:
     display_outdoor_temp: bool
     display_time: bool
     fan_mode_settings: FanModes
+    humidity_control: HumidityControlCapabilities
     keypad_lockout: bool
     max_cool_setpoint: int
     max_heat_setpoint: int
@@ -322,6 +345,9 @@ class Capabilities:
         self.display_outdoor_temp = to_bool(data.get("display_outdoor_temp", "no"))
         self.display_time = to_bool(data.get("display_time", "no"))
         self.fan_mode_settings = FanModes(data.get("fan_mode_settings", {}))
+        self.humidity_control = HumidityControlCapabilities(
+            data.get("humidity_control", {})
+        )
         self.keypad_lockout = to_bool(data.get("keypad_lockout", "no"))
         self.max_cool_setpoint = data.get("max_cool_setpoint", 0)
         self.max_heat_setpoint = data.get("max_heat_setpoint", 0)

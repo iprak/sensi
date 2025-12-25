@@ -27,27 +27,6 @@ from .data import (
 
 SOCKET_URL = "https://rt.sensiapi.io"
 
-# public static final String APPLICATION_ID = "com.asynchrony.emerson.sensi";
-# public static final String BUILD_TYPE = "release";
-# public static final boolean DEBUG = false;
-# public static final String FLAVOR = "prod";
-# public static final String GIT_SHA = "89c6503711";
-# public static final Boolean SHOW_FEATURE_DIALOG;
-# public static final int VERSION_CODE = 241;
-# public static final String VERSION_NAME = "9.3.0";
-# public static final Boolean httpLogsEnabled;
-# public static final String iconUrl = "https://itunes.apple.com";
-# public static final String locationUrl = "https://maps.googleapis.com/";
-# public static final String loginUrl = "https://oauth.sensiapi.io/";
-# public static final String recaptchaKeyId = "6LdS6SYpAAAAAFCti9uo4Yg47fSIGygzTGl_6lEV";
-# public static final String restUrl = "https://sensiapi.io";
-# public static final String runtimesUrl = "https://runtimes.sensiapi.io";
-# public static final String serviceRemindersUrl = "https://reminders.sensiapi.io";
-# public static final String sharedUrl = "https://sensiapi.io";
-# public static final String socketThermostatPath = "/thermostat";
-# public static final String socketUrl = "https://rt.sensiapi.io";
-# public static final String thermostatUrl = "https://thermostat.sensiapi.io";
-
 
 class SensiClient:
     """Sensi Client for connecting to Sensi thermostats via socketio."""
@@ -187,10 +166,7 @@ class SensiClient:
 
         This can raise TimeoutError, SensiConnectionError.
         """
-        # sio = socketio.AsyncClient(logger=True, engineio_logger=True)
-        # self._sio = socketio.AsyncClient(
-        #     logger=False, http_session=self._connector, ssl_verify=False
-        # )
+
         sio = self._sio = socketio.AsyncClient(logger=LOGGER)
 
         @sio.event
@@ -209,7 +185,7 @@ class SensiClient:
         async def any_event(event, data):
             await self._on_event(event, data)
 
-        # raise SensiConnectionError("Fake error, could not connect")
+        # raise SensiConnectionError("Fake error, could not connect")   # For testing
 
         try:
             self._connect_error_data = None
@@ -290,9 +266,8 @@ class SensiClient:
                 else:
                     self._devices[icd_id].update_state(item)
 
-                self._resolve_futures(
-                    "state", "", item
-                )  # We don't have the icd_id when creating devices
+                # We don't have the icd_id when creating devices
+                self._resolve_futures("state", "", item)
                 self._resolve_futures("state", icd_id, item)
 
     def _update_info(self, data):
