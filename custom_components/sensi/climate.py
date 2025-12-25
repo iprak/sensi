@@ -29,6 +29,7 @@ from .const import (
     COOL_MIN_TEMPERATURE,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     HEAT_MAX_TEMPERATURE,
+    HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
     OPERATING_MODE_TO_HVAC_MODE,
     SENSI_DOMAIN,
@@ -286,15 +287,19 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         temperature = kwargs.get(ATTR_TEMPERATURE)
 
         temperature = round(temperature)
-        await self.coordinator.client.async_set_temperature(self._device, temperature)
-        self.async_write_ha_state()
+        if await self.coordinator.client.async_set_temperature(
+            self._device, temperature
+        ):
+            self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
         # First invoke the setter operation. If it throws due to invalid value,
         # then retry doesn't need to be attempted.
-        if await self._device.async_set_hvac_mode(hvac_mode):
+        if await self.coordinator.client.async_set_operating_mode(
+            self._device, HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
+        ):
             self.async_write_ha_state()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
@@ -328,26 +333,3 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         if await self._device.async_set_fan_mode(HVACMode.AUTO):
             self.async_write_ha_state()
-
-    # def _force_refresh_state(self) -> None:
-    #     """Force refresh after a delay."""
-
-    #     # Write the current state and then force update
-    #     self.async_write_ha_state()
-
-    #     # Testing showed that update after a event request failed to bring new data.
-    #     # Scheduing the next refresh after a delay.
-    #     async_call_later(
-    #         self.hass, FORCE_REFRESH_DELAY, self._async_force_refresh_state
-    #     )
-
-    # async def _async_force_refresh_state(self, *_: Any) -> None:
-    #     """Refresh the state."""
-    #     await self.async_update()
-
-    # def _handle_coordinator_update(self) -> None:
-    #     """Handle updated data from the coordinator."""
-    #     asyncio.run_coroutine_threadsafe(
-    #         self._async_on_device_updated(), self.hass.loop
-    #     )
-    #     super()._handle_coordinator_update()

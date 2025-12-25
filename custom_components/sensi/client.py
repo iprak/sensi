@@ -18,6 +18,8 @@ from .const import LOGGER, OperatingMode
 from .data import (
     AuthenticationConfig,
     SensiDevice,
+    SetOperatingModeEventInfo,
+    SetOperatingModeSuccessResponse,
     SetTemperatureEventInfo,
     SetTemperatureSuccessResponse,
     extract_icd_id,
@@ -81,7 +83,7 @@ class SensiClient:
 
         async def _wait_for_devices() -> None:
             await self._connect()
-            await self._wait_for_event("state", "", 10)
+            await self._wait_for_event("state", "", 3)
 
             await self._load_device_info()
             await self._load_device_capabilities()
@@ -102,16 +104,14 @@ class SensiClient:
     async def _load_device_info(self) -> None:
         """Load info about the thermostat devices."""
         for icd_id in self._devices:
-            event_data = {"icd_id": icd_id}
-            await self._send_event("get_info", event_data)
-            await self._wait_for_event("info", icd_id, 2)
+            await self._send_event("get_info", {"icd_id": icd_id})
+            await self._wait_for_event("info", icd_id, 3)
 
     async def _load_device_capabilities(self) -> None:
         """Load capabilities of the thermostat devices."""
         for icd_id in self._devices:
-            event_data = {"icd_id": icd_id}
-            await self._send_event("get_capabilities", event_data)
-            await self._wait_for_event("capabilities", icd_id, 2)
+            await self._send_event("get_capabilities", {"icd_id": icd_id})
+            await self._wait_for_event("capabilities", icd_id, 3)
 
     async def _wait_for_event(self, event: str, icd_id: str, timeout: int = 1) -> None:
         """Wait for an event response."""
@@ -132,7 +132,7 @@ class SensiClient:
         try:
             return await asyncio.wait_for(future, timeout)
         except asyncio.exceptions.TimeoutError:
-            LOGGER.error(f"Timeout waiting for event {event} for device {icd_id}.")
+            LOGGER.error(f"Timeout waiting for event '{event}' on device {icd_id}.")
 
     async def _on_event(self, event: str, data):
         if event == "state":
@@ -292,7 +292,7 @@ class SensiClient:
 
                 self._resolve_futures(
                     "state", "", item
-                )  # We don't know the icd_id when creating devices
+                )  # We don't have the icd_id when creating devices
                 self._resolve_futures("state", icd_id, item)
 
     def _update_info(self, data):
@@ -313,13 +313,13 @@ class SensiClient:
 
                 self._resolve_futures("capabilities", icd_id, data)
 
-    async def async_set_temperature(self, device: SensiDevice, value: int) -> None:
+    async def async_set_temperature(self, device: SensiDevice, value: int) -> bool:
         """Set the target temperature.
 
         This raises HomeAssistantError for failures.
         """
 
-        response_data = SetTemperatureEventInfo(
+        request_data = SetTemperatureEventInfo(
             device.identifier,
             device.state.display_scale,
             device.state.operating_mode.value,
@@ -331,28 +331,71 @@ class SensiClient:
         def event_callback(error: dict, data: dict | None = None) -> None:
             future.set_result((error, data))
 
-        await self._send_event("set_temperature", asdict(response_data), event_callback)
+        await self._send_event("set_temperature", asdict(request_data), event_callback)
         await asyncio.wait_for(future, 2)
 
-        if future.done():
-            (response_error, response_data) = future.result()
+        if not future.done():
+            return False
 
-            if response_error:
-                raise HomeAssistantError(
-                    f"Unable to set temperature. {get_error_description_from_event_callback(response_error)}"
-                )
+        (response_error, response_data) = future.result()
 
-            # {'current_temp': 70, 'mode': 'heat', 'target_temp': 75}
-            response_data = SetTemperatureSuccessResponse(response_data)
+        if response_error:
+            raise HomeAssistantError(
+                f"Unable to set temperature. {get_error_description_from_event_callback(response_error)}"
+            )
 
-            state = device.state
-            state.display_temp = response_data.current_temp
-            state.operating_mode = try_parse_enum(OperatingMode, response_data.mode)
+        # {'current_temp': 70, 'mode': 'heat', 'target_temp': 75}
+        response_data = SetTemperatureSuccessResponse(**response_data)
 
-            if state.operating_mode == OperatingMode.HEAT:
-                state.current_heat_temp = response_data.target_temp
-            if state.operating_mode == OperatingMode.COOL:
-                state.current_cool_temp = response_data.target_temp
+        state = device.state
+        state.display_temp = response_data.current_temp
+        state.operating_mode = try_parse_enum(OperatingMode, response_data.mode)
+
+        if state.operating_mode == OperatingMode.HEAT:
+            state.current_heat_temp = response_data.target_temp
+        if state.operating_mode == OperatingMode.COOL:
+            state.current_cool_temp = response_data.target_temp
+
+        print("async_set_temperature done")
+        return True
+
+    async def async_set_operating_mode(
+        self, device: SensiDevice, value: OperatingMode
+    ) -> bool:
+        """Set new hvac operating mode.
+
+        This raises HomeAssistantError for failures.
+        """
+
+        request_data = SetOperatingModeEventInfo(
+            device.identifier,
+            value.value,
+        )
+
+        future = self._hass.loop.create_future()
+
+        def event_callback(error: dict, data: dict | None = None) -> None:
+            future.set_result((error, data))
+
+        await self._send_event(
+            "set_operating_mode", asdict(request_data), event_callback
+        )
+        await asyncio.wait_for(future, 2)
+
+        if not future.done():
+            return False
+
+        (response_error, response_data) = future.result()
+
+        if response_error:
+            raise HomeAssistantError(
+                f"Unable to set operating_mode. {get_error_description_from_event_callback(response_error)}"
+            )
+
+        response_data = SetOperatingModeSuccessResponse(**response_data)
+        device.state.operating_mode = response_data.mode
+        print("async_set_operating_mode done")
+        return True
 
 
 def get_error_description_from_event_callback(error: dict) -> str:

@@ -152,7 +152,7 @@ class State:
 
 @dataclass
 class SetTemperatureEventInfo:
-    """Thermostat information sent to Sensi websocket."""
+    """Thermostat information sent for set_temperature event."""
 
     icd_id: str
     scale: str
@@ -160,6 +160,7 @@ class SetTemperatureEventInfo:
     target_temp: float
 
 
+@dataclass
 class SetTemperatureSuccessResponse:
     """Representation of set_temperature success response."""
 
@@ -167,11 +168,26 @@ class SetTemperatureSuccessResponse:
     mode: str
     target_temp: int
 
-    def __init__(self, data: dict) -> None:
-        """Initialize SetTemperatureSuccessResponse from data dictionary."""
-        self.current_temp = data.get("current_temp", 0)
-        self.mode = data.get("mode", "")
-        self.target_temp = data.get("target_temp", 0)
+    # def __init__(self, data: dict) -> None:
+    #     """Initialize SetTemperatureSuccessResponse from data dictionary."""
+    #     self.current_temp = data.get("current_temp", 0)
+    #     self.mode = data.get("mode", "")
+    #     self.target_temp = data.get("target_temp", 0)
+
+
+@dataclass
+class SetOperatingModeEventInfo:
+    """Thermostat information sent for set_tset_operating_modeemperature event."""
+
+    icd_id: str
+    mode: str
+
+
+@dataclass
+class SetOperatingModeSuccessResponse:
+    """Representation of set_operating_mode success response."""
+
+    mode: str
 
 
 class FirmwareInfo:
