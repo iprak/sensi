@@ -29,17 +29,19 @@ from .const import (
     COOL_MIN_TEMPERATURE,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     HEAT_MAX_TEMPERATURE,
-    HVAC_MODE_TO_OPERATING_MODE,
     LOGGER,
-    OPERATING_MODE_TO_HVAC_MODE,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
-    OperatingMode,
 )
 from .coordinator import SensiUpdateCoordinator
-from .data import SensiDevice
+from .data import (
+    OperatingMode,
+    SensiDevice,
+    get_hvac_mode_from_operating_mode,
+    get_operating_mode_from_hvac_mode,
+)
 from .entity import SensiEntity
 
 FORCE_REFRESH_DELAY = 3
@@ -144,7 +146,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode | None:
         """Return hvac operation ie. heat, cool mode."""
-        return OPERATING_MODE_TO_HVAC_MODE.get(self._state.operating_mode)
+        return get_hvac_mode_from_operating_mode(self._state.operating_mode)
 
     @property
     def hvac_action(self) -> HVACAction | None:
@@ -295,10 +297,15 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
+        operating_mode = get_operating_mode_from_hvac_mode(hvac_mode)
+
+        if not operating_mode:
+            raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
+
         # First invoke the setter operation. If it throws due to invalid value,
         # then retry doesn't need to be attempted.
         if await self.coordinator.client.async_set_operating_mode(
-            self._device, HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
+            self._device, operating_mode
         ):
             self.async_write_ha_state()
 

@@ -56,10 +56,15 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
 class SensiDescriptionEntity(SensiEntity):
     """Representation of a Sensi description entity."""
 
-    def __init__(self, device: SensiDevice, description: EntityDescription) -> None:
+    def __init__(
+        self,
+        device: SensiDevice,
+        description: EntityDescription,
+        coordinator: SensiUpdateCoordinator,
+    ) -> None:
         """Initialize the entity."""
 
-        super().__init__(device)
+        super().__init__(device, coordinator)
         self.entity_description = description
 
         # Override the _attr_unique_id to include description.key

@@ -1,10 +1,82 @@
 """Data models for Sensi thermostats."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 
+from homeassistant.components.climate import HVACMode
+from homeassistant.const import UnitOfTemperature
 from homeassistant.util.enum import try_parse_enum
 
-from .const import DehumidificationMode, FanMode, HumidityControlStatus, OperatingMode
+from .const import COOL_MIN_TEMPERATURE, HEAT_MAX_TEMPERATURE
+from .utils import to_bool
+
+
+class OperatingMode(StrEnum):
+    """Representation of Operating Modes."""
+
+    OFF = "off"
+    AUX = "aux"
+    HEAT = "heat"
+    COOL = "cool"
+    AUTO = "auto"
+    UNKNOWN = "unknown"
+
+
+def get_hvac_mode_from_operating_mode(mode: OperatingMode) -> HVACMode:
+    """Convert OperatingMode to HVACMode."""
+    if mode in (OperatingMode.AUX, OperatingMode.HEAT):
+        return HVACMode.HEAT
+
+    if mode == OperatingMode.COOL:
+        return HVACMode.COOL
+    if mode == OperatingMode.AUTO:
+        return HVACMode.AUTO
+    if mode == OperatingMode.OFF:
+        return HVACMode.OFF
+
+    return HVACMode.AUTO
+
+
+def get_operating_mode_from_hvac_mode(mode: HVACMode) -> OperatingMode | None:
+    """Convert HVACMode to OperatingMode."""
+    if mode == HVACMode.HEAT:
+        return OperatingMode.HEAT
+    if mode == HVACMode.COOL:
+        return OperatingMode.COOL
+    if mode == HVACMode.AUTO:
+        return OperatingMode.AUTO
+    if mode == HVACMode.OFF:
+        return OperatingMode.OFF
+
+    return None
+
+
+class HumidityControlStatus(StrEnum):
+    """Control status for humidity control."""
+
+    HUMIDIFYING = "humidifying"
+    DEHUMIDIFYING = "dehumidifying"
+    OVERCOOLING = "overcooling"
+    OVERCOOLED = "overcooled"
+    NONE = "none"
+
+
+class FanMode(StrEnum):
+    """Representation of Fan Modes."""
+
+    ON = "on"
+    AUTO = "auto"
+    SMART = "smart"
+    UNKNOWN = "unknown"
+
+
+class DehumidificationMode(StrEnum):
+    """Control status for humidity control."""
+
+    OPTIMAL_DEHUMIDIFICATION = "overcooling"
+    OPTIMAL_COMFORT = "fan_speed"
+    HUMIDIFIER = "humidifier"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -30,7 +102,7 @@ class CirculatingFan:
 
     def __init__(self, data: dict) -> None:
         """Initialize CirculatingFan from data dictionary."""
-        self.enabled = onoff_to_bool(data.get("enabled", ""))
+        self.enabled = to_bool(data.get("enabled", ""))
         self.duty_cycle = data.get("duty_cycle", 0)
 
 
@@ -124,7 +196,7 @@ class State:
         self.battery_voltage = data.get("battery_voltage", 0.0)
         self.circulating_fan = CirculatingFan(data.get("circulating_fan", {}))
         self.continuous_backlight = to_bool(data.get("continuous_backlight", ""))
-        self.cool_min_temp = data.get("cool_min_temp", 0)
+        self.cool_min_temp = data.get("cool_min_temp", COOL_MIN_TEMPERATURE)
         self.current_cool_temp = data.get("current_cool_temp", 0)
         self.current_heat_temp = data.get("current_heat_temp", 0)
 
@@ -137,7 +209,7 @@ class State:
         self.display_temp = data.get("display_temp", 0.0)
         self.display_time = to_bool(data.get("display_time", ""))
         self.fan_mode = try_parse_enum(FanMode, data.get("fan_mode", FanMode.UNKNOWN))
-        self.heat_max_temp = data.get("heat_max_temp", 0)
+        self.heat_max_temp = data.get("heat_max_temp", HEAT_MAX_TEMPERATURE)
         self.humidity = data.get("humidity", 0)
         self.humidity_control = HumidityControl(data.get("humidity_control", {}))
         self.humidity_offset = data.get("humidity_offset", 0)
@@ -149,42 +221,14 @@ class State:
         self.temp_offset = data.get("temp_offset", 0)
         self.wifi_connection_quality = data.get("wifi_connection_quality", 0)
 
-
-@dataclass
-class SetTemperatureEventInfo:
-    """Thermostat information sent for set_temperature event."""
-
-    icd_id: str
-    scale: str
-    mode: str
-    target_temp: float
+        self.temperature_unit = (
+            UnitOfTemperature.CELSIUS
+            if self.display_scale == "c"
+            else UnitOfTemperature.FAHRENHEIT
+        )
 
 
-@dataclass
-class SetTemperatureSuccessResponse:
-    """Representation of set_temperature success response."""
-
-    current_temp: int
-    mode: str
-    target_temp: int
-
-
-@dataclass
-class SetOperatingModeEventInfo:
-    """Thermostat information sent for set_tset_operating_modeemperature event."""
-
-    icd_id: str
-    mode: str
-
-
-@dataclass
-class SetOperatingModeSuccessResponse:
-    """Representation of set_operating_mode success response."""
-
-    mode: str
-
-
-class FirmwareInfo:
+class Firmware:
     """Thermostat firmware information."""
 
     firmware_version: str
@@ -198,7 +242,7 @@ class FirmwareInfo:
         self.wifi_version = data.get("wifi_version", "")
 
 
-class ThermostatInfo:
+class Thermostat:
     """Thermostat information returned from Sensi websocket."""
 
     test_date: str
@@ -207,7 +251,7 @@ class ThermostatInfo:
     model_number: str
     unique_hardware_id: str
     wifi_mac_address: str
-    images: FirmwareInfo
+    images: Firmware
     last_changed_timestamp: int
 
     def __init__(self, data: dict) -> None:
@@ -220,7 +264,7 @@ class ThermostatInfo:
         self.model_number = data.get("model_number", "")
         self.unique_hardware_id = data.get("unique_hardware_id", "")
         self.wifi_mac_address = data.get("wifi_mac_address", "")
-        self.images = FirmwareInfo(data.get("images", {}))
+        self.images = Firmware(data.get("images", {}))
         self.last_changed_timestamp = data.get("last_changed_timestamp", 0)
 
 
@@ -365,7 +409,7 @@ class SensiDevice:
     name: str
     state: State
     capabilities: Capabilities
-    info: ThermostatInfo
+    info: Thermostat
 
     def __init__(self, data: dict) -> None:
         """Initialize Thermostat from data dictionary."""
@@ -377,7 +421,7 @@ class SensiDevice:
         self.name = data.get("registration", {}).get("name", "")
         self.state = State(data.get("state", {}))
         self.capabilities = Capabilities(data.get("capabilities", {}))
-        self.info = ThermostatInfo(data.get("thermostat_info", {}))
+        self.info = Thermostat(data.get("thermostat_info", {}))
 
     def update_state(self, data: dict) -> None:
         """Update the thermostat state from data dictionary."""
@@ -395,31 +439,4 @@ class SensiDevice:
         """Update the thermostat info from data dictionary."""
         source = data  # .get("thermostat_info")
         if source:
-            self.info = ThermostatInfo(source)
-
-
-def onoff_to_bool(value: str) -> bool:
-    """Convert 'on'/'off' string to boolean."""
-    return value.lower() == "on"
-
-
-def to_bool(value: str) -> bool:
-    """Determine if a value is truthy."""
-    return value == "true" or value.lower() == "yes" or value.lower() == "on"
-
-
-def extract_icd_id(data: dict) -> str:
-    """Return the thermostat ICD ID."""
-    return data.get("icd_id", "") if data else ""
-
-
-# get_settings
-# {"display_scale":"f","heat_max_temp":77,"cool_min_temp":75,"hold_mode":"off","operating_mode":"heat","scheduling":"off","fan_mode":"auto",
-# "display_humidity":"on","continuous_backlight":"off","compressor_lockout":"on","early_start":"off","keypad_lockout":"off","temp_offset":0,
-# "aux_cycle_rate":"medium","cool_cycle_rate":"medium","heat_cycle_rate":"medium","aux_boost":"on","heat_boost":"off","cool_boost":"off",
-# "dst_offset":60,"dst_observed":"yes","tz_offset":-360,"hold_end":null,"deadband":2,"display_time":"on",
-# "circulating_fan":{"enabled":"on","duty_cycle":10},"humidity_offset":0,
-# "partial_keypad_lockout":{"setpoint":"on","system_mode":"on","fan_mode":"on","schedule_mode":"on","settings_menu":"on"},
-# "humidity_control":{"humidification":{"target_percent":5,"enabled":"off","mode":"humidifier"},
-# "dehumidification":{"target_percent":40,"enabled":"off","mode":"overcooling"},"status":"none"},"lcd_sleep_mode":null,"night_light":null,
-# "outdoor_weather_display":"ff:00:00:ff:ff:ff:00:00:ff:00:00:ff:00:00:ff:00:00:ff:00","geofencing":null,"remote_sensor_status":"00","target_off_temp":60}]
+            self.info = Thermostat(source)
