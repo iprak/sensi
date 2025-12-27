@@ -94,6 +94,18 @@ class SetFanModeEventSuccessInfo:
     mode: str
 
 
+@dataclass
+class SetBoolSettingEventInfo:
+    """Thermostat information sent for set_operating_mode event."""
+
+    icd_id: str
+    value: str
+
+    def __init__(self, value: bool) -> None:
+        """Create an instance of SetCirculatingFanEventValue."""
+        self.value = bool_to_onoff(value)
+
+
 # get_settings
 # {"display_scale":"f","heat_max_temp":77,"cool_min_temp":75,"hold_mode":"off","operating_mode":"heat","scheduling":"off","fan_mode":"auto",
 # "display_humidity":"on","continuous_backlight":"off","compressor_lockout":"on","early_start":"off","keypad_lockout":"off","temp_offset":0,

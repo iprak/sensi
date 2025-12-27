@@ -18,6 +18,7 @@ from .auth import SensiConnectionError, refresh_access_token
 from .const import LOGGER
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
+    SetBoolSettingEventInfo,
     SetCirculatingFanEventInfo,
     SetCirculatingFanEventValue,
     SetFanModeEventInfo,
@@ -174,7 +175,7 @@ class SensiClient:
             device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
         )
         response = await self._async_invoke_setter(
-            "set_circulating_fan", asdict(request)
+            SettingEventName.CIRCULATING_FAN, asdict(request)
         )
 
         if not response:
@@ -204,7 +205,7 @@ class SensiClient:
     async def async_set_temperature_limits(
         self, device: SensiDevice, min_temp: bool, value: int
     ) -> bool:
-        """Set the minimum thermostat temperature."""
+        """Set the minimum/maximum thermostat temperature limits."""
 
         request = {
             "scale": device.state.display_scale,
@@ -223,10 +224,27 @@ class SensiClient:
 
         if isinstance(response, str):
             if response == "accepted":
-                device.state.cool_min_temp = value
+                if min_temp:
+                    device.state.cool_min_temp = value
+                else:
+                    device.state.heat_max_temp = value
+
                 return True
 
         return False
+
+    async def async_set_bool_setting(
+        self, device: SensiDevice, event: SettingEventName, value: bool
+    ) -> bool:
+        """Set the generic setting."""
+
+        request = SetBoolSettingEventInfo(device.identifier, value)
+        response = await self._async_invoke_setter(event, asdict(request))
+
+        if not response:
+            return False
+
+        return True
 
     async def _async_invoke_setter(
         self, event: str, request_data: dict

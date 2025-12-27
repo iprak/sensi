@@ -185,6 +185,7 @@ class State:
     humidity: int
     humidity_control: HumidityControl
     humidity_offset: int
+    keypad_lockout: bool
     operating_mode: OperatingMode
     power_status: str
     status: str
@@ -213,6 +214,7 @@ class State:
         self.humidity = data.get("humidity", 0)
         self.humidity_control = HumidityControl(data.get("humidity_control", {}))
         self.humidity_offset = data.get("humidity_offset", 0)
+        self.keypad_lockout = to_bool(data.get("keypad_lockout", ""))
         self.operating_mode = try_parse_enum(
             OperatingMode, data.get("operating_mode", OperatingMode.UNKNOWN)
         )

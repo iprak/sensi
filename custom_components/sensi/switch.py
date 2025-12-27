@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -17,24 +18,19 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import get_fan_support, set_fan_support
-from .const import (
-    CONFIG_AUX_HEATING,
-    CONFIG_FAN_SUPPORT,
-    SENSI_DOMAIN,
-    Capabilities,
-    OperatingModes,
-    Settings,
-)
-from .coordinator import SensiConfigEntry, SensiDevice
+from .const import CONFIG_AUX_HEATING, CONFIG_FAN_SUPPORT, SENSI_DOMAIN
+from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
+from .data import Capabilities, OperatingMode, SensiDevice
 from .entity import SensiDescriptionEntity
+from .event import SettingEventName
 
 
 @dataclass
 class SensiCapabilityEntityDescriptionMixin:
     """Mixin for Sensi thermostat setting."""
 
-    capability: Capabilities
-    """Capability related to the description"""
+    supports_fn: Callable[[Capabilities], bool]
+    value_fn: Callable[[SensiDevice], bool]
 
 
 @dataclass
@@ -43,35 +39,37 @@ class SensiCapabilityEntityDescription(
 ):
     """Representation of a Sensi thermostat setting."""
 
+    entity_category = EntityCategory.CONFIG
+
 
 SWITCH_TYPES: Final = (
     SensiCapabilityEntityDescription(
-        key=Settings.DISPLAY_HUMIDITY,
+        key=SettingEventName.DISPLAY_HUMIDITY,
         name="Display Humidity",
         icon="mdi:water-percent",
-        entity_category=EntityCategory.CONFIG,
-        capability=Capabilities.DISPLAY_HUMIDITY,
+        supports_fn=lambda src: src.display_humidity,
+        value_fn=lambda device: device.state.display_humidity,
     ),
     SensiCapabilityEntityDescription(
-        key=Settings.CONTINUOUS_BACKLIGHT,
+        key=SettingEventName.CONTINUOUS_BACKLIGHT,
         name="Continuous Backlight",
         icon="mdi:wall-sconce-flat",
-        entity_category=EntityCategory.CONFIG,
-        capability=Capabilities.CONTINUOUS_BACKLIGHT,
+        supports_fn=lambda src: src.continuous_backlight,
+        value_fn=lambda device: device.state.continuous_backlight,
     ),
     SensiCapabilityEntityDescription(
-        key=Settings.DISPLAY_TIME,
+        key=SettingEventName.DISPLAY_TIME,
         name="Display Time",
         icon="mdi:clock",
-        entity_category=EntityCategory.CONFIG,
-        capability=Capabilities.DISPLAY_TIME,
+        supports_fn=lambda src: src.display_time,
+        value_fn=lambda device: device.state.display_time,
     ),
     SensiCapabilityEntityDescription(
-        key=Settings.KEYPAD_LOCKOUT,
+        key=SettingEventName.KEYPAD_LOCKOUT,
         name="Keypad lockout",
         icon="mdi:lock",
-        entity_category=EntityCategory.CONFIG,
-        capability=Capabilities.KEYPAD_LOCKOUT,
+        supports_fn=lambda src: src.keypad_lockout,
+        value_fn=lambda device: device.state.keypad_lockout,
     ),
 )
 
@@ -86,15 +84,16 @@ async def async_setup_entry(
 
     entities = []
     for device in coordinator.get_devices():
+        capabilities = device.capabilities
         # A device might not support a setting e.g. Continuous Backlight
         entities.extend(
-            SensiCapabilitySettingSwitch(device, description)
+            SensiCapabilitySettingSwitch(device, description, coordinator)
             for description in SWITCH_TYPES
-            if device.supports(description.capability)
+            if description.supports_fn(capabilities)
         )
 
-        entities.append(SensiFanSupportSwitch(device, entry))
-        entities.append(SensiAuxHeatSwitch(device, entry))
+        # entities.append(SensiFanSupportSwitch(device, entry))
+        # entities.append(SensiAuxHeatSwitch(device, entry))
 
     async_add_entities(entities)
 
@@ -103,21 +102,24 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
     """Representation of a Sensi thermostat capability setting."""
 
     def __init__(
-        self, device: SensiDevice, description: SwitchEntityDescription
+        self,
+        device: SensiDevice,
+        description: SwitchEntityDescription,
+        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the setting."""
-        super().__init__(device, description)
+        super().__init__(device, description, coordinator)
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
-            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=device.coordinator.hass,
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",  # Use same key as before
+            hass=coordinator.hass,
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        return self._device.get_setting(self.entity_description.key)
+        return self.entity_description.value_fn(self._device)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
@@ -210,12 +212,13 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self._device.supports(Capabilities.OPERATING_MODE_AUX)
+        return self._device.capabilities.operating_mode_settings.aux
+        # (Capabilities.OPERATING_MODE_AUX)
 
     @property
     def is_on(self) -> bool | None:
         """Return True if aux heating is on."""
-        return self._device.operating_mode == OperatingModes.AUX
+        return self._device.state.operating_mode == OperatingMode.AUX
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""

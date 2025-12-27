@@ -18,8 +18,8 @@ from .data import SensiDevice
 
 SUPPORTED_PLATFORMS = [
     Platform.CLIMATE,
-    # Platform.SENSOR,
-    # Platform.SWITCH,
+    Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 
