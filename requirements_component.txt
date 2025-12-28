@@ -1,2 +1,2 @@
 # Custom requirements
-  websockets>=11.0.1
+python-socketio==5.15.0
