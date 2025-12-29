@@ -27,8 +27,9 @@ HEAT_MAX_TEMPERATURE: Final = 95
 LOGGER = logging.getLogger(__package__)
 
 CONFIG_FAN_SUPPORT: Final = "fan_support"
+DEFAULT_CONFIG_FAN_SUPPORT: Final = True
+
 CONFIG_AUX_HEATING: Final = "aux_heat"
-DEFAULT_FAN_SUPPORT: Final = True
 
 COORDINATOR_UPDATE_INTERVAL: Final = 30
 

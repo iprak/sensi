@@ -16,8 +16,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import get_fan_support, set_fan_support
-from .const import CONFIG_AUX_HEATING, CONFIG_FAN_SUPPORT, SENSI_DOMAIN
+from . import get_config_option, set_config_option
+from .const import (
+    CONFIG_AUX_HEATING,
+    CONFIG_FAN_SUPPORT,
+    DEFAULT_CONFIG_FAN_SUPPORT,
+    SENSI_DOMAIN,
+)
 from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 from .data import OperatingMode
 from .entity import SensiDescriptionEntity
@@ -89,7 +94,7 @@ async def async_setup_entry(
             if getattr(capabilities, description.key)
         )
 
-        # entities.append(SensiFanSupportSwitch(device, entry))
+        entities.append(SensiFanSupportSwitch(device, entry, coordinator))
         entities.append(SensiAuxHeatSwitch(device, coordinator))
 
     async_add_entities(entities)
@@ -141,7 +146,12 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
     """Representation of Sensi thermostat fan support setting."""
 
-    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
+    def __init__(
+        self,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
+        coordinator: SensiUpdateCoordinator,
+    ) -> None:
         """Initialize the setting."""
 
         description = SwitchEntityDescription(
@@ -151,7 +161,7 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
             entity_category=EntityCategory.CONFIG,
         )
 
-        super().__init__(device, description)
+        super().__init__(device, description, coordinator)
 
         # Cache status to avoid querying ConfigEntry
         self._status: bool | None = None
@@ -160,33 +170,38 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=device.coordinator.hass,
+            hass=coordinator.hass,
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
         if self._status is None:
-            self._status = get_fan_support(self._device, self._entry)
+            self._status = get_config_option(
+                self._device,
+                self._entry,
+                CONFIG_FAN_SUPPORT,
+                DEFAULT_CONFIG_FAN_SUPPORT,
+            )
         return self._status
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
-        set_fan_support(self.hass, self._device, self._entry, True)
-        self._status = True
-        self.async_write_ha_state()
-
-        # Force coordinator refresh to get climate entity to use new fan status
-        await self._device.coordinator.async_request_refresh()
+        await self._set_value(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
-        set_fan_support(self.hass, self._device, self._entry, False)
-        self._status = False
+        await self._set_value(False)
+
+    async def _set_value(self, value: bool) -> None:
+        set_config_option(
+            self.hass, self._device, self._entry, CONFIG_FAN_SUPPORT, value
+        )
+        self._status = value
         self.async_write_ha_state()
 
         # Force coordinator refresh to get climate entity to use new fan status
-        await self._device.coordinator.async_request_refresh()
+        await self.coordinator.async_request_refresh()
 
 
 class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
