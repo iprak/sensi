@@ -17,6 +17,7 @@ from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
 from .data import SensiDevice
 
 SUPPORTED_PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.SENSOR,
     Platform.SWITCH,
