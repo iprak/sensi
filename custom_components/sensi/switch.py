@@ -90,7 +90,7 @@ async def async_setup_entry(
         )
 
         # entities.append(SensiFanSupportSwitch(device, entry))
-        # entities.append(SensiAuxHeatSwitch(device, entry))
+        entities.append(SensiAuxHeatSwitch(device, coordinator))
 
     async_add_entities(entities)
 
@@ -194,32 +194,34 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
 
     _last_hvac_mode_before_aux_heat: HVACMode | str | None
 
-    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
+    def __init__(
+        self,
+        device: SensiDevice,
+        coordinator: SensiUpdateCoordinator,
+    ) -> None:
         """Initialize the setting."""
 
         description = SwitchEntityDescription(
             key=CONFIG_AUX_HEATING,
-            name="Aux Heating",
+            name="Auxiliary Heating",
             icon="mdi:heat-pump",
             entity_category=EntityCategory.CONFIG,
         )
 
-        super().__init__(device, description)
+        super().__init__(device, description, coordinator)
 
-        self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=device.coordinator.hass,
+            hass=coordinator.hass,
         )
 
-        self._last_hvac_mode_before_aux_heat = device.hvac_mode
+        self._last_operating_mode_before_aux_heat = device.state.operating_mode
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._device.capabilities.operating_mode_settings.aux
-        # (Capabilities.OPERATING_MODE_AUX)
 
     @property
     def is_on(self) -> bool | None:
@@ -228,15 +230,22 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""
-        if self._device.offline:
-            return
 
-        self._last_hvac_mode_before_aux_heat = self._device.hvac_mode
+        self._last_operating_mode_before_aux_heat = self._device.state.operating_mode
 
-        if await self._device.async_enable_aux_mode():
-            self.async_schedule_update_ha_state(True)
+        (error, _) = await self.coordinator.client.async_set_operating_mode(
+            self._device, OperatingMode.AUX
+        )
+        raise_if_error(error, "operating mode", OperatingMode.AUX.value)
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn aux heating off."""
-        if await self._device.async_set_hvac_mode(self._last_hvac_mode_before_aux_heat):
-            self.async_schedule_update_ha_state(True)
+
+        (error, _) = await self.coordinator.client.async_set_operating_mode(
+            self._device, self._last_operating_mode_before_aux_heat
+        )
+        raise_if_error(
+            error, "operating mode", self._last_operating_mode_before_aux_heat.value
+        )
+        self.async_write_ha_state()
