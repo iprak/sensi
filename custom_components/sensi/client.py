@@ -15,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.util.enum import try_parse_enum
 
 from .auth import SensiConnectionError, refresh_access_token
-from .const import LOGGER
+from .const import LOGGER, SENSI_DOMAIN
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
     SetBoolSettingEvent,
@@ -108,14 +108,32 @@ class SensiClient:
                 f"Initialization timed out after {PREPARE_DEVICES_TIMEOUT} seconds"
             ) from err
 
+    async def stop(self) -> None:
+        """Disconnect and stop the client."""
+        await self._async_disconnect()
+
+        if self._emit_loop_task:
+            self._emit_loop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._emit_loop_task
+
+            self._emit_loop_task = None
+
+    async def _async_disconnect(self) -> None:
+        """Disconnect the client."""
+        if self._sio:
+            await self._sio.disconnect()
+            await self._sio.wait()
+            self._sio = None
+
     async def async_update_devices(self) -> list[SensiDevice]:
         """Update the thermostat devices.
 
         This can raise SensiConnectionError.
         """
 
+        # Disconnect and reconnect. There doesn't seem to be event for force state refresh.
         await self._async_disconnect()
-
         await self._connect()
 
         # Refresh does no create new devices so let us just want for device states
@@ -415,7 +433,7 @@ class SensiClient:
 
             # Log approximately every 10 seconds based on EMIT_LOOP_DELAY
             if (count % 20) == 0:
-                LOGGER.debug(f"In event emit loop {count}")
+                LOGGER.debug(f"In event emit loop ({self._config.user_id}): {count} ")
 
             count = count + 1
 
@@ -495,15 +513,16 @@ class SensiClient:
         )
 
     def _ensure_emit_loop(self):
-        if not self._emit_loop_task:
-            self._emit_loop_task = asyncio.ensure_future(self._emit_loop())
+        if self._emit_loop_task and not self._emit_loop_task.done():
+            return
 
-    async def _async_disconnect(self) -> None:
-        """Disconnect the client."""
-        if self._sio:
-            await self._sio.disconnect()
-            await self._sio.wait()
-            self._sio = None
+        LOGGER.debug(
+            f"Creating background task for the event emit loop ({self._config.user_id})"
+        )
+        self._emit_loop_task = self._hass.async_create_background_task(
+            self._emit_loop(),
+            name=f"{SENSI_DOMAIN}._emit_loop.{self._config.user_id}",
+        )
 
     async def _update_state(self, data):
         """Handle state event from socketio."""
