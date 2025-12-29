@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.typing import StateType
 from homeassistant.util.ssl import get_default_context
 
 from .auth import AuthenticationError, SensiConnectionError, get_stored_config
 from .client import SensiClient
-from .const import CONFIG_FAN_SUPPORT, DEFAULT_FAN_SUPPORT, LOGGER, SENSI_DOMAIN
+from .const import LOGGER, SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
 from .data import SensiDevice
 
@@ -77,22 +80,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return await hass.config_entries.async_unload_platforms(entry, SUPPORTED_PLATFORMS)
 
 
-def get_fan_support(device: SensiDevice, entry: SensiConfigEntry) -> bool:
-    """Determine if fan is supported."""
+def get_config_option(
+    device: SensiDevice, entry: SensiConfigEntry, key: str, default: StateType
+) -> StateType:
+    """Get the value of a config option."""
 
-    options = entry.options.get(CONFIG_FAN_SUPPORT, {})
-    return options.get(device.identifier, DEFAULT_FAN_SUPPORT)
+    options = entry.options.get(key, {})
+    return options.get(device.identifier, default)
 
 
-def set_fan_support(
-    hass: HomeAssistant, device: SensiDevice, entry: SensiConfigEntry, value: bool
+def set_config_option(
+    hass: HomeAssistant,
+    device: SensiDevice,
+    entry: SensiConfigEntry,
+    key: str,
+    value: StateType,
 ) -> None:
-    """Update the fan support status in ConfigEntry."""
+    """Set the value of a config option."""
 
-    new_data = entry.data.copy()
-    new_options = entry.options.copy()
-    fan_options = new_options.get(CONFIG_FAN_SUPPORT, {})
-    fan_options[device.identifier] = value
-    new_options[CONFIG_FAN_SUPPORT] = fan_options
+    new_options = deepcopy({**entry.options})
+    options = new_options.get(key, {})
+    options[device.identifier] = value
+    new_options[key] = options
 
-    hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
+    hass.config_entries.async_update_entry(entry, options=new_options)

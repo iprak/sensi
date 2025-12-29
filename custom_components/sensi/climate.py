@@ -23,11 +23,13 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
 
-from . import SensiConfigEntry, get_fan_support
+from . import SensiConfigEntry, get_config_option
 from .const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    CONFIG_FAN_SUPPORT,
     COOL_MIN_TEMPERATURE,
+    DEFAULT_CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     HEAT_MAX_TEMPERATURE,
     LOGGER,
@@ -121,7 +123,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             | ClimateEntityFeature.TURN_OFF
         )
 
-        if get_fan_support(self._device, self._entry):
+        if get_config_option(
+            self._device, self._entry, CONFIG_FAN_SUPPORT, DEFAULT_CONFIG_FAN_SUPPORT
+        ):
             supported = supported | ClimateEntityFeature.FAN_MODE
 
         return supported
@@ -292,7 +296,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
 
-        if not get_fan_support(self._device, self._entry):
+        if not get_config_option(
+            self._device, self._entry, CONFIG_FAN_SUPPORT, DEFAULT_CONFIG_FAN_SUPPORT
+        ):
             return None
 
         return (
