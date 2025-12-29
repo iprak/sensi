@@ -6,7 +6,6 @@ from copy import deepcopy
 
 import aiohttp
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
@@ -75,8 +74,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: SensiConfigEntry) -> bool:
     """Unload a config entry."""
+    coordinator = entry.runtime_data
+    if coordinator:
+        await coordinator.client.stop()
     return await hass.config_entries.async_unload_platforms(entry, SUPPORTED_PLATFORMS)
 
 
