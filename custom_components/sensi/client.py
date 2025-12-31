@@ -32,6 +32,8 @@ from .event import (
 SOCKET_URL = "https://rt.sensiapi.io"
 PREPARE_DEVICES_TIMEOUT = 20
 SET_EVENT_TIMEOUT = 5
+EMIT_LOOP_DELAY = 0.5
+EMIT_LOOP_DELAY_WHEN_DISCONNECTED = 1
 
 
 class SensiClient:
@@ -389,22 +391,27 @@ class SensiClient:
         count = 0
 
         while True:
-            try:
-                while item := self._event_queue.get_nowait():
-                    if self._sio.connected:
-                        await self._sio.emit(item.name, item.data, None, item.callback)
-                    else:
-                        LOGGER.info(
-                            f"Not connected. Putting {item.name} back on queue and quitting"
-                        )
-                        self._event_queue.put_nowait(item)
-                        break
-            except asyncio.QueueEmpty:
-                pass
-            except TypeError:
-                LOGGER.exception("Unable to emit event")
+            if self._sio.connected:
+                try:
+                    while item := self._event_queue.get_nowait():
+                        if self._sio.connected:
+                            await self._sio.emit(
+                                item.name, item.data, None, item.callback
+                            )
+                        else:
+                            LOGGER.info(
+                                f"Not connected. Putting {item.name} back on queue and quitting"
+                            )
+                            self._event_queue.put_nowait(item)
+                            break
+                except asyncio.QueueEmpty:
+                    pass
+                except TypeError:
+                    LOGGER.exception("Unable to emit event")
 
-            await asyncio.sleep(0.5)
+                await asyncio.sleep(EMIT_LOOP_DELAY)
+            else:
+                await asyncio.sleep(EMIT_LOOP_DELAY_WHEN_DISCONNECTED)
 
             # Log approximately every 10 seconds based on EMIT_LOOP_DELAY
             if (count % 20) == 0:
