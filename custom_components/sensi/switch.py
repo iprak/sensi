@@ -22,6 +22,7 @@ from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 from .data import OperatingMode
 from .entity import SensiDescriptionEntity
 from .event import SettingEventName
+from .utils import raise_if_error
 
 
 @dataclass
@@ -122,21 +123,18 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
 
-        if await self.coordinator.client.async_set_bool_setting(
-            self._device, self.entity_description.setting.value, True
-        ):
-            setattr(self._device.state, self.entity_description.key, True)
-            self.async_write_ha_state()
-        # The setting should not change thermostat operation, so let update happen on regular schedule
+        await self._set_value(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
+        await self._set_value(False)
 
-        if await self.coordinator.client.async_set_bool_setting(
-            self._device, self.entity_description.setting.value, False
-        ):
-            setattr(self._device.state, self.entity_description.key, False)
-            self.async_write_ha_state()
+    async def _set_value(self, value: bool) -> None:
+        (error, _) = await self.coordinator.client.async_set_bool_setting(
+            self._device, self.entity_description.setting, value
+        )
+        raise_if_error(error, self.entity_description.name, value)
+        self.async_write_ha_state()
         # The setting should not change thermostat operation, so let update happen on regular schedule
 
 
