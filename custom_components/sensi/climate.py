@@ -147,7 +147,15 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         """Return the fan setting."""
-        return self._state.fan_mode
+
+        # Create a special mode 'circulate' base on 'auto' when 'circulating_fan' contains 'enabled'='on'.
+        if (
+            self._state.fan_mode == FanMode.AUTO
+            and self._device.state.circulating_fan.enabled
+        ):
+            return SENSI_FAN_CIRCULATE
+
+        return self._state.fan_mode.value
 
     @property
     def hvac_mode(self) -> HVACMode | None:
