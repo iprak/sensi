@@ -25,6 +25,8 @@ from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import SensiConfigEntry, get_fan_support
 from .const import (
+    ATTR_CIRCULATING_FAN,
+    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     COOL_MIN_TEMPERATURE,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     HEAT_MAX_TEMPERATURE,
@@ -94,7 +96,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
-        return {}
+        return {
+            ATTR_CIRCULATING_FAN: self._device.state.circulating_fan.enabled,
+            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._device.state.circulating_fan.duty_cycle,
+        }
 
     @property
     def name(self) -> str:
@@ -152,6 +157,65 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current running hvac operation if supported."""
+
+        # [Aux mode]
+        #     Off
+        #     operating_mode=current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #     Heat
+        #     operating_mode=current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706456258}
+
+        #     Cool
+        #     operating_mode=current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706456358}
+
+        #     Aux
+        #     operating_mode=current_operating_mode=aux
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1706456438}
+
+        # [Off]
+        #     Off
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Heat]
+        #     Heating:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706461614}
+
+        #     Heating (multistage) where heat can be 50:
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 50, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706461614}
+
+        #     idle:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Cool]
+        #     Idle:
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'cool', 'last_start': None}
+
+        #     Cooling:
+        #     operating_mode=cool, current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706461689}
+
+        # [Auto]
+        #     cooling:
+        #     operating_mode=auto, current_operating_mode=auto_cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706462094}
+
+        #     idle:
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #     heating
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706462635}
+
+        # When thermostat is set to Off, operating_mode and current_operating_mode are both Off. Themostat should not be be demanding heating or cooling.
+
         operating_mode = self._state.operating_mode
 
         # AC0/AC1/HP1 state=off
@@ -163,6 +227,12 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # Treat Aux as Heating
         if operating_mode == OperatingMode.AUX:
             return HVACAction.HEATING
+
+        # https://sensi.copeland.com/en-us/support/how-do-i-configure-my-thermostat
+        # HP1 = heat pump
+        # AC0 = no cooling
+        # AC1 =  air conditioning uni
+        # HP2/AC2 = more than one stage cooling/heating
 
         # AC0
         #   state=heat, target temp higher
