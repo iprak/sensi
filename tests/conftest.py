@@ -1,3 +1,5 @@
+"""Fixtures for Sensi tests."""
+
 import json
 import os
 
@@ -18,11 +20,12 @@ def load_json(filename):
 @pytest.fixture(name="mock_coordinator")
 def create_mock_crumb_coordinator(hass: HomeAssistant) -> SensiUpdateCoordinator:
     """Fixture to provide a test instance of CrumbCoordinator."""
+    client = {}
     config = AuthenticationConfig()
     config.access_token = "access_token"
     config.expires_at = 12345
     config.refresh_token = "refresh_token"
-    return SensiUpdateCoordinator(hass, config)
+    return SensiUpdateCoordinator(hass, config, client)
 
 
 @pytest.fixture
