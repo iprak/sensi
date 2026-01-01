@@ -97,6 +97,9 @@ async def async_setup_entry(
         entities.append(SensiFanSupportSwitch(device, entry, coordinator))
         entities.append(SensiAuxHeatSwitch(device, coordinator))
 
+        if device.capabilities.humidity_control.humidification:
+            entities.append(SensiHumidificationSwitch(device, entry, coordinator))
+
     async_add_entities(entities)
 
 
@@ -263,4 +266,52 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
         raise_if_error(
             error, "operating mode", self._last_operating_mode_before_aux_heat.value
         )
+        self.async_write_ha_state()
+
+
+class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
+    """Representation of Sensi thermostat humidification support setting."""
+
+    def __init__(
+        self,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
+        coordinator: SensiUpdateCoordinator,
+    ) -> None:
+        """Initialize the setting."""
+
+        description = SwitchEntityDescription(
+            key="Humidification",
+            name="Humidification",
+            icon="mdi:air-humidifier",
+            entity_category=EntityCategory.CONFIG,
+        )
+
+        super().__init__(device, description, coordinator)
+
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
+            hass=coordinator.hass,
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if entity is on."""
+        return self._device.state.humidity_control.humidification.enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._set_value(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._set_value(False)
+
+    async def _set_value(self, enabled: bool) -> None:
+        (error, _) = await self.coordinator.client.async_enable_humidification(
+            self._device, enabled
+        )
+
+        raise_if_error(error, "humidification", enabled)
         self.async_write_ha_state()

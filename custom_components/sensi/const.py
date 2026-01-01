@@ -24,6 +24,13 @@ STORAGE_KEY: Final = SENSI_DOMAIN
 COOL_MIN_TEMPERATURE: Final = 50
 HEAT_MAX_TEMPERATURE: Final = 95
 
+# Min and max humidity levels as defined in the mobile app.
+DEFAULT_MIN_HUMIDITY: Final = 5
+DEFAULT_MAX_HUMIDITY: Final = 50
+
+# Sensi only allows humidity to be changed in steps of 5 or else returns an error.
+DEFAULT_HUMIDITY_STEP: Final = 5
+
 LOGGER = logging.getLogger(__package__)
 
 CONFIG_FAN_SUPPORT: Final = "fan_support"

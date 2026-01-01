@@ -22,6 +22,8 @@ from .event import (
     SetCirculatingFanEvent,
     SetCirculatingFanEventValue,
     SetFanModeEvent,
+    SetHumidityEvent,
+    SetHumidityEventValue,
     SetOperatingModeEvent,
     SetOperatingModeEventSuccess,
     SetTemperatureEvent,
@@ -133,6 +135,7 @@ class SensiClient:
         """
 
         # Disconnect and reconnect. There doesn't seem to be event for force state refresh.
+        LOGGER.info("Updating devices - reconnecting and updating")
         await self._async_disconnect()
         await self._connect()
 
@@ -313,6 +316,48 @@ class SensiClient:
 
         return (None, response)
 
+    async def async_set_humidification(
+        self, device: SensiDevice, enabled: bool, humidity: int
+    ) -> tuple[any, any]:
+        """Set the target humidity. This updates the device on success.
+
+        Returns a tuple representing error and response.
+        """
+
+        humidity = round_humidity(
+            humidity,
+            device.state.humidity_control.humidification.target_percent,
+            device.capabilities.humidity_control.humidification.step,
+        )
+
+        request = SetHumidityEvent(
+            device.identifier, SetHumidityEventValue(enabled, humidity)
+        )
+        (error, response) = await self._async_invoke_setter(
+            "set_humidification", asdict(request)
+        )
+
+        if error:
+            return (error, response)
+
+        device.state.humidity_control.humidification.enabled = enabled
+        device.state.humidity_control.humidification.target_percent = humidity
+
+        return (None, response)
+
+    async def async_enable_humidification(
+        self, device: SensiDevice, enabled: bool
+    ) -> tuple[any, any]:
+        """Update the humidification status. This updates the device on success.
+
+        Returns a tuple representing error and response.
+        """
+
+        # Use current target as the value
+        return await self.async_set_humidification(
+            device, enabled, device.state.humidity_control.humidification.target_percent
+        )
+
     async def _async_invoke_setter(
         self, event: str, request_data: dict
     ) -> tuple[any, any]:
@@ -443,7 +488,9 @@ class SensiClient:
         This can raise SensiConnectionError.
         """
 
-        sio = self._sio = socketio.AsyncClient(logger=LOGGER)
+        sio = self._sio = socketio.AsyncClient(
+            logger=LOGGER
+        )  # , engineio_logger=LOGGER
 
         @sio.event
         async def connect():
@@ -582,6 +629,26 @@ def is_token_expired(error_details):
 def extract_icd_id(data: dict) -> str:
     """Get the thermostat ICD ID."""
     return data.get("icd_id", "") if data else ""
+
+
+def round_humidity(humidity: int, current_humidity: int, step: int) -> int:
+    """Return the rounded target humidity value."""
+
+    # e.g. 12 -> 10, 14 -> 15, 17 -> 15, 20 -> 20
+    rounded_to_nearest_5 = step * round(humidity / step)
+
+    if humidity > current_humidity:
+        if rounded_to_nearest_5 == current_humidity:
+            humidity = current_humidity + step
+        else:
+            humidity = rounded_to_nearest_5
+    elif humidity < current_humidity:
+        if rounded_to_nearest_5 == current_humidity:
+            humidity = current_humidity - step
+        else:
+            humidity = rounded_to_nearest_5
+
+    return humidity
 
 
 @dataclass

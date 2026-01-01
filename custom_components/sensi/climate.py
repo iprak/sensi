@@ -128,6 +128,13 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         ):
             supported = supported | ClimateEntityFeature.FAN_MODE
 
+        # If device is humidification capable (has something in humidification) and humidification is enabled
+        if (
+            self._device.capabilities.humidity_control.humidification
+            and self._device.state.humidity_control.humidification.enabled
+        ):
+            supported = supported | ClimateEntityFeature.TARGET_HUMIDITY
+
         return supported
 
     @property
@@ -370,6 +377,27 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         return self._state.heat_max_temp
 
+    @property
+    def current_humidity(self) -> float | None:
+        """Return the current humidity."""
+        return self._device.state.humidity
+
+    @property
+    def target_humidity(self) -> float | None:
+        """Return the humidity we try to reach."""
+        humidification = self._device.state.humidity_control.humidification
+        return humidification.target_percent if humidification.enabled else None
+
+    @property
+    def min_humidity(self) -> float:
+        """Return the minimum humidity."""
+        return self._device.capabilities.humidity_control.humidification.min
+
+    @property
+    def max_humidity(self) -> float:
+        """Return the maximum humidity."""
+        return self._device.capabilities.humidity_control.humidification.max
+
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
 
@@ -443,4 +471,13 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             self._device, FanMode.AUTO.value
         )
         raise_if_error(error, "fan mode", FanMode.AUTO.value)
+        self.async_write_ha_state()
+
+    async def async_set_humidity(self, humidity: int) -> None:
+        """Set new target humidity."""
+
+        (error, _) = await self.coordinator.client.async_set_humidification(
+            self._device, True, humidity
+        )
+        raise_if_error(error, "humidity", humidity)
         self.async_write_ha_state()
