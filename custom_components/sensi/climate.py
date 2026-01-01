@@ -36,6 +36,7 @@ from .const import (
 )
 from .coordinator import SensiUpdateCoordinator
 from .data import (
+    FanMode,
     OperatingMode,
     SensiDevice,
     get_hvac_mode_from_operating_mode,
@@ -319,20 +320,24 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
         if fan_mode == SENSI_FAN_CIRCULATE:
-            if await self._device.async_set_circulating_fan_mode(
-                True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            if await self.coordinator.client.async_set_circulating_fan_mode(
+                self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             ):
-                success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
+                success = await self.async_turn_on()
         else:
             # Reset circulating fan mode state
             success = (
-                await self._device.async_set_circulating_fan_mode(False, 0)
-                if self._device.supports_circulating_fan_mode()
+                await self.coordinator.client.async_set_circulating_fan_mode(
+                    self._device, False, 0
+                )
+                if self._device.capabilities.circulating_fan.capable
                 else True
             )
 
             if success:
-                success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
+                success = await self.coordinator.client.async_set_fan_mode(
+                    self._device, fan_mode
+                )  # on or auto
 
         if success:
             self.async_write_ha_state()
@@ -341,5 +346,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
 
-        if await self._device.async_set_fan_mode(HVACMode.AUTO):
+        if await self.coordinator.client.async_set_fan_mode(
+            self._device, FanMode.AUTO.value
+        ):
             self.async_write_ha_state()

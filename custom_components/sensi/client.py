@@ -16,7 +16,7 @@ from homeassistant.util.enum import try_parse_enum
 
 from .auth import SensiConnectionError, refresh_access_token
 from .const import LOGGER
-from .data import AuthenticationConfig, OperatingMode, SensiDevice
+from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
     SetBoolSettingEvent,
     SetCirculatingFanEvent,
@@ -217,9 +217,11 @@ class SensiClient:
             "set_fan_mode", asdict(request)
         )
 
-        if not response:
+        if response is None:
             return False
 
+        # Doesn't look like the mode can change at server end, no response was received.
+        device.state.fan_mode = try_parse_enum(FanMode, mode)
         return True
 
     async def async_set_temperature_limits(
@@ -287,7 +289,7 @@ class SensiClient:
 
         if response_error:
             raise HomeAssistantError(
-                f"Unable to set operating_mode. {get_error_description_from_event_callback(response_error)}"
+                f"Unable to set {event}. {get_error_description_from_event_callback(response_error)}"
             )
 
         return response_data or {}
@@ -377,7 +379,6 @@ class SensiClient:
         while True:
             try:
                 while item := self._event_queue.get_nowait():
-                    # print(f"Emitting event {item.name}")
                     if self._sio.connected:
                         await self._sio.emit(item.name, item.data, None, item.callback)
                     else:
