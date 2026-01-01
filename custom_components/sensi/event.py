@@ -100,6 +100,27 @@ class SetBoolSettingEvent:
         self.value = bool_to_onoff(value)
 
 
+@dataclass
+class SetHumidityEventValue:
+    """Data for set_temperature event."""
+
+    enabled: str
+    target_percent: int
+
+    def __init__(self, enabled: bool, target_percent: int) -> None:
+        """Create an instance of SetHumidityEventValue."""
+        self.enabled = bool_to_onoff(enabled)
+        self.target_percent = target_percent
+
+
+@dataclass
+class SetHumidityEvent:
+    """Data for set_humidification event."""
+
+    icd_id: str
+    value: SetHumidityEventValue
+
+
 # get_settings
 # {"display_scale":"f","heat_max_temp":77,"cool_min_temp":75,"hold_mode":"off","operating_mode":"heat","scheduling":"off","fan_mode":"auto",
 # "display_humidity":"on","continuous_backlight":"off","compressor_lockout":"on","early_start":"off","keypad_lockout":"off","temp_offset":0,

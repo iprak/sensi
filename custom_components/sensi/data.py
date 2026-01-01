@@ -7,7 +7,14 @@ from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.util.enum import try_parse_enum
 
-from .const import COOL_MIN_TEMPERATURE, HEAT_MAX_TEMPERATURE, LOGGER
+from .const import (
+    COOL_MIN_TEMPERATURE,
+    DEFAULT_HUMIDITY_STEP,
+    DEFAULT_MAX_HUMIDITY,
+    DEFAULT_MIN_HUMIDITY,
+    HEAT_MAX_TEMPERATURE,
+    LOGGER,
+)
 from .utils import to_bool
 
 
@@ -134,7 +141,7 @@ class Humidity:
 
     def __init__(self, data: dict) -> None:
         """Initialize humidification settings."""
-        self.target_percent = data.get("target_percent", 0)
+        self.target_percent = data.get("target_percent", DEFAULT_MIN_HUMIDITY)
         self.enabled = data.get("enabled", "off") == "on"
         self.status = try_parse_enum(
             DehumidificationMode, data.get("mode", "humidifier")
@@ -348,9 +355,9 @@ class HumidityCapabilities:
 
     def __init__(self, data: dict) -> None:
         """Initialize Capabilities from data dictionary."""
-        self.max = data.get("max", 0)
-        self.min = data.get("min", 0)
-        self.step = data.get("step", 0)
+        self.max = data.get("max", DEFAULT_MIN_HUMIDITY)
+        self.min = data.get("min", DEFAULT_MAX_HUMIDITY)
+        self.step = data.get("step", DEFAULT_HUMIDITY_STEP)
         self.types = data.get("types", [])
 
 
@@ -362,8 +369,8 @@ class HumidityControlCapabilities:
 
     def __init__(self, data: dict) -> None:
         """Initialize Capabilities from data dictionary."""
-        self.humidification = data.get("humidification", {})
-        self.dehumidification = data.get("dehumidification", {})
+        self.humidification = HumidityCapabilities(data.get("humidification", {}))
+        self.dehumidification = HumidityCapabilities(data.get("dehumidification", {}))
 
 
 class Capabilities:
