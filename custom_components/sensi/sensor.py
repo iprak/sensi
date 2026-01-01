@@ -24,9 +24,9 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import SensiConfigEntry, SensiDescriptionEntity
-from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN, Settings
-from .coordinator import SensiDevice
+from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN
+from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
+from .entity import SensiDescriptionEntity
 
 
 def calculate_battery_level(voltage: float) -> int | None:
@@ -59,72 +59,75 @@ class SensiSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[SensiDevice], StateType] = None
 
 
-SENSOR_TYPES: Final = (
+SENSOR_TYPES: Final = [
     SensiSensorEntityDescription(
+        device_class=SensorDeviceClass.TEMPERATURE,
         key="temperature",
         name="Temperature",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
-        value_fn=lambda device: device.temperature,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.state.display_temp,
     ),
     SensiSensorEntityDescription(
+        device_class=SensorDeviceClass.HUMIDITY,
         key="humidity",
         name="Humidity",
-        device_class=SensorDeviceClass.HUMIDITY,
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda device: device.humidity,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.state.humidity,
     ),
     SensiSensorEntityDescription(
+        device_class=SensorDeviceClass.BATTERY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        extra_state_attributes_fn=lambda device: {
+            ATTR_BATTERY_VOLTAGE: device.state.battery_voltage
+        },
         key="battery",
         name="Battery",
-        device_class=SensorDeviceClass.BATTERY,
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
-        extra_state_attributes_fn=lambda device: {
-            ATTR_BATTERY_VOLTAGE: device.battery_voltage
-        },
-        value_fn=lambda device: calculate_battery_level(device.battery_voltage),
-        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: calculate_battery_level(device.state.battery_voltage),
     ),
     SensiSensorEntityDescription(
-        key=Settings.COOL_MIN_TEMP,
-        name="Min setpoint",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:thermometer-low",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        value_fn=lambda device: device.min_temp,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        key="cool_min_temp",
+        name="Min setpoint",
+        value_fn=lambda device: device.state.cool_min_temp,
     ),
     SensiSensorEntityDescription(
-        key=Settings.HEAT_MAX_TEMP,
-        name="Max setpoint",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:thermometer-high",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        value_fn=lambda device: device.max_temp,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        key="heat_max_temp",
+        name="Max setpoint",
+        value_fn=lambda device: device.state.heat_max_temp,
     ),
     SensiSensorEntityDescription(
-        key="fan_speed",
-        name="Fan speed",
-        value_fn=lambda device: device.fan_speed,
         entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
         entity_registry_enabled_default=False,
         icon="mdi:fan",
+        key="fan_speed",
+        name="Fan speed",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.state.demand_status.fan,
     ),
     SensiSensorEntityDescription(
-        key="wifi_strength",
-        name="Wifi strength",
-        value_fn=lambda device: device.wifi_strength,
         entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorDeviceClass.SIGNAL_STRENGTH,
-        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
         entity_registry_enabled_default=False,
         icon="mdi:wifi-strength-outline",
+        key="wifi_strength",
+        name="Wifi strength",
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
+        state_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        value_fn=lambda device: device.state.wifi_connection_quality,
     ),
-)
+]
 
 
 async def async_setup_entry(
@@ -135,7 +138,7 @@ async def async_setup_entry(
     """Set up Sensi thermostat sensors."""
     coordinator = entry.runtime_data
     entities = [
-        SensiSensorEntity(device, description)
+        SensiSensorEntity(hass, device, description, coordinator)
         for device in coordinator.get_devices()
         for description in SENSOR_TYPES
     ]
@@ -150,17 +153,19 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         description: SensiSensorEntityDescription,
+        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(device, description)
+        super().__init__(device, description, coordinator)
 
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=device.coordinator.hass,
+            hass=hass,
         )
 
     @property
@@ -176,7 +181,7 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the sensor, if any."""
         return (
-            self._device.temperature_unit
+            self._device.state.temperature_unit
             if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
             else self.entity_description.native_unit_of_measurement
         )
