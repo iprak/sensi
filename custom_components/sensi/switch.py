@@ -48,6 +48,7 @@ class SensiCapabilityEntityDescription(
 
 SWITCH_TYPES: Final = [
     # The `key` represents the attribute on State and Capabilities
+    # These switches do not need to update the climate entity.
     SensiCapabilityEntityDescription(
         key="display_humidity",
         setting=SettingEventName.DISPLAY_HUMIDITY,
@@ -203,8 +204,8 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         self._status = value
         self.async_write_ha_state()
 
-        # Force coordinator refresh to get climate entity to use new fan status
-        await self.coordinator.async_request_refresh()
+        # Use coordinator to notify climate entity
+        self.coordinator.async_update_listeners()
 
 
 class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
@@ -257,6 +258,9 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
         raise_if_error(error, "operating mode", OperatingMode.AUX.value)
         self.async_write_ha_state()
 
+        # Use coordinator to notify climate entity
+        self.coordinator.async_update_listeners()
+
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn aux heating off."""
 
@@ -267,6 +271,9 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
             error, "operating mode", self._last_operating_mode_before_aux_heat.value
         )
         self.async_write_ha_state()
+
+        # Use coordinator to notify climate entity
+        self.coordinator.async_update_listeners()
 
 
 class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
@@ -315,3 +322,6 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
 
         raise_if_error(error, "humidification", enabled)
         self.async_write_ha_state()
+
+        # Use coordinator to notify climate entity
+        self.coordinator.async_update_listeners()
