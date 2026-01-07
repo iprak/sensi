@@ -54,7 +54,7 @@ class SensiClient:
         self._connector = connector
 
         self._event_queue = asyncio.Queue()
-        self._futures: dict[tuple[str, str], list[asyncio.Future]] = {}
+        self._futures: dict[tuple[str, str | None], list[asyncio.Future]] = {}
         self._emit_loop_task = None
         self._sio: socketio.AsyncClient = None
         self._connect_error_data = None
@@ -228,6 +228,7 @@ class SensiClient:
                 f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
 
+        # "circulating_fan":{"capable":"yes","max_duty_cycle":100,"min_duty_cycle":10,"step":5}
         request = SetCirculatingFanEvent(
             device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
         )
@@ -425,9 +426,13 @@ class SensiClient:
             self._update_info(data)
         else:
             # Resolve future for all other events
-            self._resolve_futures(event, "", None)
+            self._resolve_futures(event, None, None)
 
-    def _resolve_futures(self, event: str, icd_id: str, data: any) -> None:
+    def _resolve_futures(self, event: str, icd_id: str | None, data: any) -> None:
+        """Resolve futures.
+
+        icd_id is None for the initial `state` event.
+        """
         future_key = (event, icd_id)
         pending_futures = self._futures.pop(
             future_key, []
@@ -478,7 +483,7 @@ class SensiClient:
 
             # Log approximately every 10 seconds based on EMIT_LOOP_DELAY
             if (count % 20) == 0:
-                LOGGER.debug(f"In event emit loop ({self._config.user_id}): {count} ")
+                LOGGER.debug(f"In event emit loop ({self._config.user_id}): {count}")
 
             count = count + 1
 
@@ -577,7 +582,7 @@ class SensiClient:
             return
 
         # We don't have the icd_id when creating devices
-        self._resolve_futures("state", "", None)
+        self._resolve_futures("state", None, None)
 
         for item in data:
             icd_id = extract_icd_id(item)
