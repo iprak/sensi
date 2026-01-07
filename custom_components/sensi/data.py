@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Self
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
@@ -452,28 +453,57 @@ class SensiDevice:
     capabilities: Capabilities
     info: ThermostatInfo
 
-    def __init__(self, data: dict) -> None:
-        """Initialize Thermostat from data dictionary."""
-        self.identifier = data.get("icd_id", "")
+    def __init__(
+        self,
+        identifier: str,
+        registration: dict,
+        capabilities: dict,
+        info: dict,
+        state: dict,
+    ) -> None:
+        """Initialize Thermostat from data values."""
 
         # ["state",[{"icd_id":"36-6f-92-ff-fe-0c-0b-07",
         # "registration":{"city":"Madison","name":"Living Room","state":"Wisconsin","country":"US","address1":"Somewhere","address2":null,"timezone":"America/Chicago","postal_code":"53719","product_type":"Sensi Classic with HomeKit","contractor_id":null,"fleet_enabled":false,"fleet_enabled_date":null},
 
-        self.name = data.get("registration", {}).get("name", "")
-        self.state = State(data.get("state", {}))
-        self.capabilities = Capabilities(data.get("capabilities", {}))
-        self.info = ThermostatInfo(data.get("thermostat_info", {}))
+        self.capabilities = Capabilities(capabilities)
+        self.identifier = identifier
+        self.info = ThermostatInfo(info)
+        self.name = registration.get("name", "")
+        self.state = State(state)
 
+        LOGGER.debug(f"{self.identifier} Capabilities={self.capabilities}")
         LOGGER.debug(f"{self.identifier} Info={self.info}")
         LOGGER.debug(f"{self.identifier} State={self.state}")
-        LOGGER.debug(f"{self.identifier} Capabilities={self.capabilities}")
 
-    def update_state(self, data: dict) -> None:
+    @classmethod
+    def create(cls, data: any) -> tuple[bool, Self]:
+        """Create a SensiDevice instance from data dictionary.
+
+        Returns a tuple of (have_state, SensiDevice).
+        """
+        identifier = data.get("icd_id", "")
+
+        registration = data.get("registration", {})
+        capabilities = data.get("capabilities", {})
+        info = data.get("thermostat_info", {})
+        state = data.get("state", {})
+
+        have_state = bool(state)
+        return (
+            have_state,
+            SensiDevice(identifier, registration, capabilities, info, state),
+        )
+
+    def update_state(self, data: dict) -> bool:
         """Update the thermostat state from data dictionary."""
         source = data.get("state")
         if source:
             self.state = State(source)
             LOGGER.debug(f"{self.identifier} State updated to {self.state}")
+            return True
+
+        return False
 
     def update_capabilities(self, source: dict) -> None:
         """Update the thermostat capabilities from data dictionary."""
