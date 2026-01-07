@@ -84,30 +84,49 @@ class SensiClient:
         This can raise ConfigEntryNotReady, AuthenticationError.
         """
 
-        async def _wait_for_devices() -> None:
-            # Wait for the generic `state` event.
+        async def _wait_for_device_info() -> None:
+            """Wait for info and capabilities getter events."""
+
+            if self._devices:
+                tasks = []
+                for icd_id in self._devices:
+                    data = {"icd_id": icd_id}
+                    await self._send_event("get_info", data)
+                    await self._send_event("get_capabilities", data)
+
+                    tasks.append(await self._create_event_future("info", icd_id))
+                    tasks.append(
+                        await self._create_event_future("capabilities", icd_id)
+                    )
+
+                await asyncio.wait_for(asyncio.gather(*tasks), PREPARE_DEVICES_TIMEOUT)
+
+        async def _wait_for_state_and_device_info() -> None:
+            """Wait for the initial `state` event so that we can iterate and issue info and capabilities getter events."""
+
             await self._wait_for_event("state", None, PREPARE_DEVICES_TIMEOUT)
             LOGGER.info(f"{len(self._devices)} devices found")
-
-            tasks = []
-            for icd_id in self._devices:
-                data = {"icd_id": icd_id}
-                await self._send_event("get_info", data)
-                await self._send_event("get_capabilities", data)
-
-                tasks.append(await self._create_event_future("info", icd_id))
-                tasks.append(await self._create_event_future("capabilities", icd_id))
-
-            await asyncio.wait_for(asyncio.gather(*tasks), PREPARE_DEVICES_TIMEOUT)
+            await _wait_for_device_info()
 
         try:
             await self._connect()
-            await _wait_for_devices()
+            await _wait_for_state_and_device_info()
+        except SensiConnectionError as err:
+            raise ConfigEntryNotReady from err
+        except TimeoutError:
+            LOGGER.warning(
+                f"Unable to gather device information in {PREPARE_DEVICES_TIMEOUT} seconds, retrying"
+            )
+        else:
+            return
+
+        try:
+            await _wait_for_device_info()
         except SensiConnectionError as err:
             raise ConfigEntryNotReady from err
         except TimeoutError as err:
             raise ConfigEntryNotReady(
-                f"Initialization timed out after {PREPARE_DEVICES_TIMEOUT} seconds"
+                f"Unable to gather device information in {PREPARE_DEVICES_TIMEOUT} seconds"
             ) from err
 
     async def stop(self) -> None:
@@ -139,7 +158,8 @@ class SensiClient:
         await self._async_disconnect()
         await self._connect()
 
-        # Refresh does no create new devices so let us just want for device states
+        # Refresh does no create new devices so let us just wait for device states. We don't
+        # care the order in which state event is received. It can come before or after connected.
         async def _wait_for_device_states() -> None:
             tasks = [
                 await self._create_event_future("state", icd_id)
@@ -581,18 +601,31 @@ class SensiClient:
         if not data or len(data) == 0:
             return
 
-        # We don't have the icd_id when creating devices
-        self._resolve_futures("state", None, None)
+        futures_to_resolve = []
 
         for item in data:
             icd_id = extract_icd_id(item)
             if icd_id:
-                if icd_id not in self._devices:
-                    self._devices[icd_id] = SensiDevice(item)
-                else:
-                    self._devices[icd_id].update_state(item)
+                have_state = False
 
-                self._resolve_futures("state", icd_id, item)
+                # The first state event received on connect usually only contains registration and capabilities.
+                # The second state event received on connect contains registration, capabilities and state.
+                # Only resolve `state` futures if we received state data.
+
+                if icd_id not in self._devices:
+                    (have_state, device) = SensiDevice.create(item)
+                    self._devices[icd_id] = device
+                else:
+                    have_state = self._devices[icd_id].update_state(item)
+
+                if have_state:
+                    futures_to_resolve.append((icd_id, item))
+
+        # First resolve the initial `state` event future and then per-device futures.
+        self._resolve_futures("state", None, None)
+
+        for item in futures_to_resolve:
+            self._resolve_futures("state", item[0], item[1])
 
     def _update_info(self, data):
         if data:
