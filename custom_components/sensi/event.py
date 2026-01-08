@@ -88,8 +88,8 @@ class SetFanModeEvent:
 
 
 @dataclass
-class SetBoolSettingEvent:
-    """Data for setting bool setting event."""
+class BoolEventData:
+    """Data for bool setting event."""
 
     icd_id: str
     value: str

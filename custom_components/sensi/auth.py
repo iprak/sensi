@@ -14,6 +14,7 @@ from homeassistant.helpers import aiohttp_client, storage
 
 from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 from .data import AuthenticationConfig
+from .utils import to_int
 
 DEFAULT_TIMEOUT = 10
 
@@ -82,7 +83,7 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
         KEY_USER_ID
     )  # This is used as unique_id in config flow
 
-    expires_in = int(response_json.get("expires_in"))
+    expires_in = to_int(response_json.get("expires_in"), 0)
     result[KEY_EXPIRES_AT] = (
         datetime.now() + timedelta(seconds=expires_in)
     ).timestamp()

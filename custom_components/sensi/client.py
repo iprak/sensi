@@ -18,7 +18,7 @@ from .auth import SensiConnectionError, refresh_access_token
 from .const import LOGGER, SENSI_DOMAIN
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
-    SetBoolSettingEvent,
+    BoolEventData,
     SetCirculatingFanEvent,
     SetCirculatingFanEventValue,
     SetFanModeEvent,
@@ -306,7 +306,7 @@ class SensiClient:
         Returns a tuple representing error and response.
         """
 
-        request = SetBoolSettingEvent(device.identifier, value)
+        request = BoolEventData(device.identifier, value)
         event_name = event.value
         (error, response) = await self._async_invoke_setter(event_name, asdict(request))
 
@@ -371,7 +371,9 @@ class SensiClient:
         future = self._hass.loop.create_future()
 
         def event_callback(error: dict, data: dict | None = None) -> None:
-            future.set_result((error, data))
+            if not future.cancelled():
+                with contextlib.suppress(asyncio.exceptions.InvalidStateError):
+                    future.set_result((error, data))
 
         await self._send_event(event, request_data, event_callback)
 
