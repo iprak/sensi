@@ -7,79 +7,113 @@
 
 This integration allows displaying and controlling [Sensi](https://sensi.emerson.com/en-us) thermostat.
 
-It was developed by reverse engineering the mobile app and work done by https://github.com/w1ll1am23/pysensi, so the integration could fail at some point.
+It was developed by reverse engineering the mobile app and original work done by https://github.com/w1ll1am23/pysensi, so the integration could fail at some point.
 
-### Update 3/14/24
-
-Sensi recently updated its apps (8.6.3) and end point to force reCaptcha based authentication. This currently cannot be replicated so instead of username/password, one is required to navigate to https://manager.sensicomfort.com/ in a browser and copy-n-paste the refresh_token.
-
-1. Open Chrome or Edge browser
-1. Go to https://manager.sensicomfort.com/
-1. Press F12 to open DevTools and then switch to the `Network` tab
-1. Enter your credentials to log in. You don’t need to go any further or subscribe.
-1. Switch back to DevTools and copy the `refresh_token` value (without quotes) from the `Response` of the `token?device=` request. Note: You might see two requests, and the first one might not have a Response.
-![how_to_get_refresh_token](https://github.com/iprak/sensi/assets/6459774/3d33a6c1-6c07-4886-b4f0-3289e62d41e4)
-
-Similar action can be taken in other browsers.
-
-You will have the repeat the same process for re-authentication on password change.
 
 ## Setup
+
+You need the refresh_token to setup the integration.
+
+### Refresh Token
+
+Sensi app v8.6.3+ now requires reCaptcha-based authentication. Since this cannot be replicated programmatically, you must obtain a refresh token manually:
+
+1. Open Chrome or Edge and go to https://manager.sensicomfort.com/
+1. Press F12 to open DevTools, then select the `Network` tab
+1. Log in with your credentials (no need to subscribe or proceed further)
+1. In DevTools, find the `token?device=` request and copy the `refresh_token` value from its Response
+
+**Note:** You may see two requests; use the one with a Response.
+
+![how_to_get_refresh_token](https://github.com/iprak/sensi/assets/6459774/3d33a6c1-6c07-4886-b4f0-3289e62d41e4)
+
+This process works in other browsers as well. Repeat these steps if you change your password.
+
+### Add Integration
+
+Add Sensi integration using the `Add integration` button on Integrations page of your HomeAssistant instance.
+
+![Add integration](images/image.png)
 
 On adding the Sensi integration, you should see one device and some related entities.
 
 ![image](https://github.com/iprak/sensi/assets/6459774/222a21ac-8d5f-4530-b3d6-ec87ae668b6d)
 
 
-- Only single target temperature is supported; temperature range is not supported. You will have to set heat/cool mode yourself.
-- The available operating modes `Auto/Heat/Cool/Off` are based on thermostat setup.
-- Supported fan modes are: Auto, On and Circulate (10% duty cycle). Not all Sensi thermostats support circulation mode and the option will be unavailable in that case.
-  - Fan support can be disabled, in which case `fan modes` will not be available.
+## Features
+- Single target temperature only (temperature ranges not supported). Manually set heat/cool modes.
+- Operating modes: `Auto, Heat, Cool, Off` (available modes depend on thermostat configuration).
+- Fan modes: `Auto, On, Circulate` (10% duty cycle). Circulation mode availability depends on thermostat.
 - Data is refreshed every 30 seconds.
-- Some Thermostat display properties such as Display Humidity, Display Time and Continuous Backlight can also be controlled. Not all thermostats support Continuous Backlight feature and the option will be unavailable in that case.
-- The `Fan Support` configuration can be used to disable fan.
-- If the thermostat is `Offline`, the entities will appear unavailable.
-- Idle state
-  - The target temperature from the previous action will be displayed.
-- Auxiliary heating
-  - Homeassistant currently doesn't handle aux heat case well. One will see "Heating" as the action for aux heating.
-  - Homeassistant stopped supporting aux_heat as of 2024.4.0. The aux heating setting now appears as a switch under device configuration, if the thermostat is setup for auxiliary heating.
 
 
-### Diagostic Sensors
+## Configuration Options
+
+Available settings (support varies by thermostat):
+- Auxiliary Heating
+- Continuous Backlight
+- Display Humidity
+- Display Time
+- Fan
+- Humidification
+- Keypad Lockout
+
+
+### Auxiliary Heating
+
+As of HomeAssistant 2024.4.0, auxiliary heating appears as a switch under device configuration rather than as a climate attribute. Note: HomeAssistant displays aux heating as "Heating" action.
+
+### Humidification
+
+Available on thermostats with humidification support.
+- Humidity control configured as a configuration setting.
+- HomeAssistant card supports humidity level only.
+- Sensi uses 5% increments; values are rounded to the nearest step.
+- When enabled, the climate entity gains: `min_humidity`, `max_humidity`, `humidity` (target), and `current_humidity` attributes.
+- Dehumidification is not supported.
+
+### Sensors
+
+**Enabled by default:**
+- Temperature
+- Humidity
+
+**Disabled by default:**
 - Battery
-- Fan speed
-  - This entity is **disabled by default** and can be accessed by expanding the Diagostic section from where it can be enabled.
 - Min/Max setpoints
-  - Homeassistant supports on one min and one max setpoint. The properties for those are cached and do not account for the hvac action. You can see the setpoint values under Diagnostic section of the device.
-- Wifi strength
+- Fan speed
+- WiFi strength
 
 
 ### Attributes
 Sample attributes on the climate entity:
 
+
 ```
 hvac_modes: off, heat, cool, auto
-min_temp: 45
-max_temp: 99
+min_temp: 50
+max_temp: 73
+target_temp_step: 1
 fan_modes: auto, on, Circulate
-current_temperature: 70
-temperature: 76
-current_humidity: 99
+current_temperature: 69
+temperature: 69
+current_humidity: 51
 fan_mode: Circulate
-offline: false
-battery_voltage: 2.981
-hvac_action: null
-circulating_fan: on
-circulating_fan_cuty_cycle: 10
+hvac_action: heating
+circulating_fan: true
+circulating_fan_duty_cycle: 10
 attribution: Data provided by Sensi
 friendly_name: Living Room
-supported_features: 9
+supported_features: 397
+min_humidity: 5
+max_humidity: 50
+humidity: 5
 ```
 
 ## Issues
 
-So far, simultaneous logins from mobile app and integration have not been problematic. But it has been noticed that sometimes changing thermostat properties does not take effect, this could be either due to something going on at Sensi backend or the thermostat temporarily going offline.
+Simultaneous logins from the mobile app and integration typically work without issues. However, thermostat property changes may occasionally fail to apply, potentially due to Sensi backend issues or the thermostat temporarily going offline.
+
 
 ## Installation
 
@@ -93,6 +127,15 @@ So far, simultaneous logins from mobile app and integration have not been proble
 None
 
 ## Breaking Changes
+
+### Revision 2.0.0
+
+Major rewrite with breaking changes and new features:
+- Internal architecture rewritten to use python-socketio instead of websockets
+- Thermostat temperature and settings now align with Sensi app for improved reliability
+- Humidification support added
+- Configuration setting and sensor names/IDs corrected
+
 
 ### Revision 1.3.0
 Switched to `refresh_token` instead of userName/password for authentication.
