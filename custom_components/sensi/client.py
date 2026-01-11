@@ -19,6 +19,7 @@ from .const import LOGGER, SENSI_DOMAIN
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
     BoolEventData,
+    NumberEventData,
     SetCirculatingFanEvent,
     SetCirculatingFanEventValue,
     SetFanModeEvent,
@@ -345,6 +346,36 @@ class SensiClient:
 
         # Treat anything else other than "accepted" as error
         return ActionResponse(f"Failed to parse `{response}`", None)
+
+    async def async_set_temperature_offset(
+        self, device: SensiDevice, value: int
+    ) -> ActionResponse:
+        """Set the temperature offset. This updates the device on success."""
+
+        # Limits are enforced in the entity description
+        request = NumberEventData(device.identifier, value)
+        response = await self._async_invoke_setter("set_temp_offset", asdict(request))
+
+        if not response.error:
+            device.state.temp_offset = value
+
+        return response
+
+    async def async_set_humidity_offset(
+        self, device: SensiDevice, value: int
+    ) -> ActionResponse:
+        """Set the humidity offset. This updates the device on success."""
+
+        # Limits are enforced in the entity description
+        request = NumberEventData(device.identifier, value)
+        response = await self._async_invoke_setter(
+            "set_humidity_offset", asdict(request)
+        )
+
+        if not response.error:
+            device.state.humidity_offset = value
+
+        return response
 
     async def async_set_bool_setting(
         self, device: SensiDevice, event: SettingEventName, value: bool
