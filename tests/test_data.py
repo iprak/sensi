@@ -14,7 +14,39 @@ def test_demand_status_parsing(mock_json) -> None:
     assert state_obj.demand_status.last == "heat"
 
 
-def test_update(mock_json) -> None:
-    """Test update of SensiDevice."""
-    device = SensiDevice(mock_json)
-    assert device.state.fan_mode == FanMode.ON
+def test_sensi_device_create_with_state(mock_json) -> None:
+    """Test SensiDevice.create with valid state data."""
+    have_state, device = SensiDevice.create(mock_json)
+
+    assert have_state is True
+    assert device.identifier == mock_json.get("icd_id")
+    assert device.name == mock_json.get("registration", {}).get("name")
+    assert isinstance(device.state, State)
+
+
+def test_sensi_device_create_without_state(mock_json) -> None:
+    """Test SensiDevice.create without state data."""
+    data = {
+        "icd_id": "test-id",
+        "registration": {"name": "Test Device"},
+        "capabilities": {},
+        "thermostat_info": {},
+    }
+
+    have_state, device = SensiDevice.create(data)
+
+    assert have_state is False
+    assert device.identifier == "test-id"
+
+
+def test_sensi_device_create_missing_fields(mock_json) -> None:
+    """Test SensiDevice.create with missing optional fields."""
+    data = {"icd_id": "test-id"}
+
+    have_state, device = SensiDevice.create(data)
+
+    assert have_state is False
+    assert device.identifier == "test-id"
+    assert device.name == ""
+
+
