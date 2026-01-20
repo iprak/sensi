@@ -23,14 +23,3 @@ jobs:
           draft: false
           prerelease: true
 
-      - name: "ZIP the integration directory"
-        shell: "bash"
-        run: |
-          cd "${{ github.workspace }}/custom_components/sensi"
-          zip sensi.zip -r ./
-
-      - name: "Upload the ZIP file to the release"
-        uses: "softprops/action-gh-release@v2.0.8"
-        with:
-          tag_name: ${{ steps.next_minor_tag.outputs.next_tag }}
-          files: ${{ github.workspace }}/custom_components/sensi/sensi.zip
