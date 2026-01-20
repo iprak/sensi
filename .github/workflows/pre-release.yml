@@ -1,0 +1,36 @@
+name: Pre-release
+on:
+  workflow_dispatch:
+    inputs:
+      pre_release_version:
+        description: 'Pre-release version'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.1.0
+
+      - name: Create GitHub Release
+        uses: aaiezza/create-release@master
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          release_branch: ${{ github.ref_name }}
+          tag: ${{ github.event.inputs.pre_release_version }}
+          draft: false
+          prerelease: true
+
+      - name: "ZIP the integration directory"
+        shell: "bash"
+        run: |
+          cd "${{ github.workspace }}/custom_components/sensi"
+          zip sensi.zip -r ./
+
+      - name: "Upload the ZIP file to the release"
+        uses: "softprops/action-gh-release@v2.0.8"
+        with:
+          tag_name: ${{ steps.next_minor_tag.outputs.next_tag }}
+          files: ${{ github.workspace }}/custom_components/sensi/sensi.zip
