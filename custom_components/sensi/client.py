@@ -38,6 +38,18 @@ EMIT_LOOP_DELAY = 0.5
 EMIT_LOOP_DELAY_WHEN_DISCONNECTED = 1
 
 
+@dataclass
+class ActionResponse:
+    """Response for an action.
+
+    For a failure, error is the error code or message and data is None.
+    For a success, error is None and the data can be empty.
+    """
+
+    error: str | None
+    data: any
+
+
 class SensiClient:
     """Sensi Client for connecting to Sensi thermostats via socketio."""
 
@@ -173,11 +185,8 @@ class SensiClient:
 
     async def async_set_temperature(
         self, device: SensiDevice, value: int
-    ) -> tuple[any, any]:
-        """Set the target temperature. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set the target temperature. This updates the device on success."""
 
         request = SetTemperatureEvent(
             device.identifier,
@@ -185,15 +194,15 @@ class SensiClient:
             device.state.operating_mode.value,
             value,
         )
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             "set_temperature", asdict(request)
         )
 
-        if error:
-            return (error, response)
+        if action_response.error:
+            return action_response
 
         # {'current_temp': 70, 'mode': 'heat', 'target_temp': 75}
-        response = SetTemperatureEventSuccess(**response)
+        response = SetTemperatureEventSuccess(**action_response.data)
 
         state = device.state
         state.display_temp = response.current_temp
@@ -204,44 +213,48 @@ class SensiClient:
         if state.operating_mode == OperatingMode.COOL:
             state.current_cool_temp = response.target_temp
 
-        return (None, response)
+        return ActionResponse(None, response)
 
     async def async_set_operating_mode(
         self, device: SensiDevice, value: OperatingMode
-    ) -> tuple[any, any]:
-        """Set new hvac operating mode. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set new hvac operating mode. This updates the device on success."""
 
         request = SetOperatingModeEvent(
             device.identifier,
             value.value,
         )
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             "set_operating_mode", asdict(request)
         )
 
-        if error:
-            return (error, response)
+        if action_response.error:
+            return action_response
+
+        response = action_response.data
 
         # We can receive a string instead of JSON
         if isinstance(response, str):
             if response == "accepted":
                 device.state.operating_mode = value
-        else:
-            response = SetOperatingModeEventSuccess(**response)
-            device.state.operating_mode = response.mode
+                return action_response
 
-        return (None, response)
+            # Treat anything else other than "accepted" as error
+            return ActionResponse(response, None)
+
+        if response:
+            try:
+                parsed_response = SetOperatingModeEventSuccess(**response)
+                device.state.operating_mode = parsed_response.mode
+            except (ValueError, TypeError):
+                return ActionResponse(f"Failed to parse `{response}`", None)
+
+        return ActionResponse("No response received", None)
 
     async def async_set_circulating_fan_mode(
         self, device: SensiDevice, enabled: bool, duty_cycle: int
-    ) -> tuple[any, any]:
-        """Set the circulating fan mode. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set the circulating fan mode. This updates the device on success."""
 
         if not device.capabilities.circulating_fan.capable:
             raise HomeAssistantError(
@@ -252,59 +265,53 @@ class SensiClient:
         request = SetCirculatingFanEvent(
             device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
         )
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             SettingEventName.CIRCULATING_FAN, asdict(request)
         )
 
-        if error:
-            return (error, response)
+        if not action_response.error:
+            device.state.circulating_fan.enabled = enabled
+            device.state.circulating_fan.duty_cycle = duty_cycle
 
-        device.state.circulating_fan.enabled = enabled
-        device.state.circulating_fan.duty_cycle = duty_cycle
-        return (None, response)
+        return action_response
 
     async def async_set_fan_mode(
         self, device: SensiDevice, mode: str
-    ) -> tuple[any, any]:
-        """Set the fan mode. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set the fan mode. This updates the device on success."""
 
         request = SetFanModeEvent(device.identifier, mode)
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             "set_fan_mode", asdict(request)
         )
 
-        if error:
-            return (error, response)
+        if not action_response.error:
+            # Doesn't look like the mode can change at server end, no response was received.
+            device.state.fan_mode = try_parse_enum(FanMode, mode)
 
-        # Doesn't look like the mode can change at server end, no response was received.
-        device.state.fan_mode = try_parse_enum(FanMode, mode)
-        return (None, response)
+        return action_response
 
     async def async_set_temperature_limits(
         self, device: SensiDevice, min_temp: bool, value: int
-    ) -> tuple[any, any]:
-        """Set the minimum/maximum thermostat temperature limits. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set the minimum/maximum thermostat temperature limits. This updates the device on success."""
 
         request = {
             "scale": device.state.display_scale,
             "value": value,
             "icd_id": device.identifier,
         }
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             SettingEventName.COOL_MIN_TEMP
             if min_temp
             else SettingEventName.HEAT_MAX_TEMP,
             request,
         )
 
-        if error:
-            return (error, response)
+        if action_response.error:
+            return action_response
+
+        response = action_response.data
 
         if isinstance(response, str):
             if response == "accepted":
@@ -313,37 +320,30 @@ class SensiClient:
                 else:
                     device.state.heat_max_temp = value
 
-                return True
+                return action_response
 
-        return (None, response)
+        # Treat anything else other than "accepted" as error
+        return ActionResponse(f"Failed to parse `{response}`", None)
 
     async def async_set_bool_setting(
         self, device: SensiDevice, event: SettingEventName, value: bool
-    ) -> tuple[any, any]:
-        """Set a generic bool setting. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set a generic bool setting. This updates the device on success."""
 
         request = BoolEventData(device.identifier, value)
         event_name = event.value
-        (error, response) = await self._async_invoke_setter(event_name, asdict(request))
+        action_response = await self._async_invoke_setter(event_name, asdict(request))
 
-        if error:
-            return (error, response)
+        if not action_response.error:
+            attr_name = event_name[4:]
+            setattr(device.state, attr_name, value)
 
-        attr_name = event_name[4:]
-        setattr(device.state, attr_name, value)
-
-        return (None, response)
+        return action_response
 
     async def async_set_humidification(
         self, device: SensiDevice, enabled: bool, humidity: int
-    ) -> tuple[any, any]:
-        """Set the target humidity. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Set the target humidity. This updates the device on success."""
 
         humidity = round_humidity(
             humidity,
@@ -354,25 +354,20 @@ class SensiClient:
         request = SetHumidityEvent(
             device.identifier, SetHumidityEventValue(enabled, humidity)
         )
-        (error, response) = await self._async_invoke_setter(
+        action_response = await self._async_invoke_setter(
             "set_humidification", asdict(request)
         )
 
-        if error:
-            return (error, response)
+        if not action_response.error:
+            device.state.humidity_control.humidification.enabled = enabled
+            device.state.humidity_control.humidification.target_percent = humidity
 
-        device.state.humidity_control.humidification.enabled = enabled
-        device.state.humidity_control.humidification.target_percent = humidity
-
-        return (None, response)
+        return action_response
 
     async def async_enable_humidification(
         self, device: SensiDevice, enabled: bool
-    ) -> tuple[any, any]:
-        """Update the humidification status. This updates the device on success.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Update the humidification status. This updates the device on success."""
 
         # Use current target as the value
         return await self.async_set_humidification(
@@ -381,11 +376,8 @@ class SensiClient:
 
     async def _async_invoke_setter(
         self, event: str, request_data: dict
-    ) -> tuple[any, any]:
-        """Emit event to update a setting.
-
-        Returns a tuple representing error and response.
-        """
+    ) -> ActionResponse:
+        """Emit event to update a setting."""
 
         future = self._hass.loop.create_future()
 
@@ -399,15 +391,18 @@ class SensiClient:
         with contextlib.suppress(asyncio.exceptions.TimeoutError):
             await asyncio.wait_for(future, SET_EVENT_TIMEOUT)
 
+        # Treat this as failure
         if not future.done():
-            return None
+            return ActionResponse("Future not done", None)
 
         (response_error, response_data) = future.result()
 
         if response_error:
-            return (get_error_description_from_event_callback(response_error), None)
+            return ActionResponse(
+                get_error_description_from_event_callback(response_error), None
+            )
 
-        return (None, response_data or {})
+        return ActionResponse(None, response_data or {})
 
     async def _wait_for_event(
         self, event: str, icd_id: str | None, timeout: int = 5
@@ -698,3 +693,14 @@ class EventInfo:
     name: str
     data: any
     callback: Callable[[any, any], None]
+
+
+def raise_if_error(response: ActionResponse, property: str, value: any) -> None:
+    """Raise HomeAssistantError if error is defined.
+
+    The exception is raised with the message `Unable to set {property} to {value}. {error}`.
+    """
+    if response.error:
+        raise HomeAssistantError(
+            f"Unable to set {property} to {value}. {response.error}"
+        )

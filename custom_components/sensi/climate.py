@@ -24,6 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import SensiConfigEntry, get_config_option
+from .client import raise_if_error
 from .const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
@@ -47,7 +48,6 @@ from .data import (
     get_operating_mode_from_hvac_mode,
 )
 from .entity import SensiEntity
-from .utils import raise_if_error
 
 FORCE_REFRESH_DELAY = 3
 
@@ -425,10 +425,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         temperature = kwargs.get(ATTR_TEMPERATURE)
 
         temperature = round(temperature)
-        (error, _) = await self.coordinator.client.async_set_temperature(
+        response = await self.coordinator.client.async_set_temperature(
             self._device, temperature
         )
-        raise_if_error(error, "temperature", temperature)
+        raise_if_error(response, "temperature", temperature)
         self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -439,10 +439,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if not operating_mode:
             raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
-        (error, _) = await self.coordinator.client.async_set_operating_mode(
+        response = await self.coordinator.client.async_set_operating_mode(
             self._device, operating_mode
         )
-        raise_if_error(error, "operating mode", operating_mode.value)
+        raise_if_error(response, "operating mode", operating_mode.value)
         self.async_write_ha_state()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
@@ -455,40 +455,36 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         if fan_mode == SENSI_FAN_CIRCULATE:
             # First set fan_mode to auto
-            (error, _) = await self.coordinator.client.async_set_fan_mode(
+            response = await self.coordinator.client.async_set_fan_mode(
                 self._device, SENSI_FAN_AUTO
             )
-            raise_if_error(error, "fan mode", fan_mode)
+            raise_if_error(response, "fan mode", fan_mode)
 
             # Next enable the circulating fan state
-            (
-                error,
-                _,
-            ) = await self.coordinator.client.async_set_circulating_fan_mode(
+            response = await self.coordinator.client.async_set_circulating_fan_mode(
                 self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             )
             raise_if_error(
-                error, "fan mode", f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle"
+                response.error,
+                "fan mode",
+                f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
             )
 
         else:
             # First reset circulating fan mode state and then force set fan mode
             if self._device.capabilities.circulating_fan.capable:
-                (
-                    error,
-                    _,
-                ) = await self.coordinator.client.async_set_circulating_fan_mode(
+                response = await self.coordinator.client.async_set_circulating_fan_mode(
                     self._device, False, 0
                 )
 
                 raise_if_error(
-                    error, "circulating fan mode", "False with duty cycle of 0"
+                    response.error, "circulating fan mode", "False with duty cycle of 0"
                 )
 
-            (error, _) = await self.coordinator.client.async_set_fan_mode(
+            response = await self.coordinator.client.async_set_fan_mode(
                 self._device, fan_mode
             )
-            raise_if_error(error, "fan mode", fan_mode)
+            raise_if_error(response, "fan mode", fan_mode)
 
         self.async_write_ha_state()
         LOGGER.info("%s: Setting fan_mode to %s", self._device.name, fan_mode)
@@ -500,17 +496,17 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # async_turn_off is not implemented. Base sets OFF hvac mode.
         await super().async_turn_on()
 
-        (error, _) = await self.coordinator.client.async_set_fan_mode(
+        response = await self.coordinator.client.async_set_fan_mode(
             self._device, FanMode.AUTO.value
         )
-        raise_if_error(error, "fan mode", FanMode.AUTO.value)
+        raise_if_error(response, "fan mode", FanMode.AUTO.value)
         self.async_write_ha_state()
 
     async def async_set_humidity(self, humidity: int) -> None:
         """Set new target humidity."""
 
-        (error, _) = await self.coordinator.client.async_set_humidification(
+        response = await self.coordinator.client.async_set_humidification(
             self._device, True, humidity
         )
-        raise_if_error(error, "humidity", humidity)
+        raise_if_error(response, "humidity", humidity)
         self.async_write_ha_state()

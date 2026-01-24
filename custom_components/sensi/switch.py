@@ -17,6 +17,7 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import get_config_option, set_config_option
+from .client import raise_if_error
 from .const import (
     CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
@@ -27,7 +28,6 @@ from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 from .data import OperatingMode
 from .entity import SensiDescriptionEntity
 from .event import SettingEventName
-from .utils import raise_if_error
 
 
 @dataclass
@@ -139,10 +139,10 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
         await self._set_value(False)
 
     async def _set_value(self, value: bool) -> None:
-        (error, _) = await self.coordinator.client.async_set_bool_setting(
+        response = await self.coordinator.client.async_set_bool_setting(
             self._device, self.entity_description.setting, value
         )
-        raise_if_error(error, self.entity_description.name, value)
+        raise_if_error(response, self.entity_description.name, value)
         self.async_write_ha_state()
         # The setting should not change thermostat operation, so let update happen on regular schedule
 
@@ -252,10 +252,10 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
 
         self._last_operating_mode_before_aux_heat = self._device.state.operating_mode
 
-        (error, _) = await self.coordinator.client.async_set_operating_mode(
+        response = await self.coordinator.client.async_set_operating_mode(
             self._device, OperatingMode.AUX
         )
-        raise_if_error(error, "operating mode", OperatingMode.AUX.value)
+        raise_if_error(response, "operating mode", OperatingMode.AUX.value)
         self.async_write_ha_state()
 
         # Use coordinator to notify climate entity
@@ -264,11 +264,13 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn aux heating off."""
 
-        (error, _) = await self.coordinator.client.async_set_operating_mode(
+        response = await self.coordinator.client.async_set_operating_mode(
             self._device, self._last_operating_mode_before_aux_heat
         )
         raise_if_error(
-            error, "operating mode", self._last_operating_mode_before_aux_heat.value
+            response,
+            "operating mode",
+            self._last_operating_mode_before_aux_heat.value,
         )
         self.async_write_ha_state()
 
@@ -316,11 +318,11 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
         await self._set_value(False)
 
     async def _set_value(self, enabled: bool) -> None:
-        (error, _) = await self.coordinator.client.async_enable_humidification(
+        response = await self.coordinator.client.async_enable_humidification(
             self._device, enabled
         )
 
-        raise_if_error(error, "humidification", enabled)
+        raise_if_error(response, "humidification", enabled)
         self.async_write_ha_state()
 
         # Use coordinator to notify climate entity
