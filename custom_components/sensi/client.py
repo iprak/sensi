@@ -390,7 +390,9 @@ class SensiClient:
         future = self._hass.loop.create_future()
 
         def event_callback(error: dict, data: dict | None = None) -> None:
-            future.set_result((error, data))
+            if not future.cancelled():
+                with contextlib.suppress(asyncio.exceptions.InvalidStateError):
+                    future.set_result((error, data))
 
         await self._send_event(event, request_data, event_callback)
 
