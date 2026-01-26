@@ -29,15 +29,15 @@ from .const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     CONFIG_FAN_SUPPORT,
-    COOL_MIN_TEMPERATURE,
     DEFAULT_CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
-    HEAT_MAX_TEMPERATURE,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
+    TEMPERATURE_LOWER_LIMIT,
+    TEMPERATURE_UPPER_LIMIT,
 )
 from .coordinator import SensiUpdateCoordinator
 from .data import (
@@ -332,21 +332,21 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        hvac_action = self.hvac_action
-
-        if hvac_action == HVACAction.OFF:
-            return None
 
         state = self._state
+
+        if state.operating_mode == OperatingMode.OFF:
+            return None
+
         cool_target = state.current_cool_temp
         heat_target = state.current_heat_temp
 
-        if hvac_action == HVACAction.HEATING:
+        if state.operating_mode == OperatingMode.HEAT:
             return heat_target
-        if hvac_action == HVACAction.COOLING:
+        if state.operating_mode == OperatingMode.COOL:
             return cool_target
 
-        # HVACAction.IDLE
+        # For other modes use the last demand_status
         last_action_heat = state.demand_status.last == "heat"
         return heat_target if last_action_heat else cool_target
 
@@ -357,7 +357,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # Use the thermostat defined minimum temperature if not heating.
         if self.hvac_mode == HVACMode.HEAT:
             return TemperatureConverter.convert(
-                COOL_MIN_TEMPERATURE,
+                TEMPERATURE_LOWER_LIMIT,
                 UnitOfTemperature.FAHRENHEIT,
                 self.temperature_unit,
             )
@@ -370,7 +370,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # Use the thermostat defined maximum temperature if not cooling.
         if self.hvac_mode == HVACMode.COOL:
             return TemperatureConverter.convert(
-                HEAT_MAX_TEMPERATURE,
+                TEMPERATURE_UPPER_LIMIT,
                 UnitOfTemperature.FAHRENHEIT,
                 self.temperature_unit,
             )
@@ -426,7 +426,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         temperature = round(temperature)
         response = await self.coordinator.client.async_set_temperature(
-            self._device, temperature
+            self._device, self._device.state.operating_mode, temperature
         )
         raise_if_error(response, "temperature", temperature)
         self.async_write_ha_state()

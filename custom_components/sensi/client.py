@@ -184,14 +184,35 @@ class SensiClient:
             await _wait_for_device_states()
 
     async def async_set_temperature(
-        self, device: SensiDevice, value: int
+        self, device: SensiDevice, mode: OperatingMode, value: int
     ) -> ActionResponse:
         """Set the target temperature. This updates the device on success."""
 
+        state = device.state
+
+        if state.operating_mode == OperatingMode.OFF:
+            return ActionResponse(
+                f"Cannot set {mode} temperature whern thermostat is OFF.",
+                None,
+            )
+
+        if mode == OperatingMode.HEAT:
+            if value >= state.current_cool_temp:
+                return ActionResponse(
+                    f"Heat temperature should be less than the cool temperature {state.current_cool_temp}.",
+                    None,
+                )
+        if mode == OperatingMode.COOL:
+            if value <= state.current_heat_temp:
+                return ActionResponse(
+                    f"Cool temperature should be more than the heat temperature {state.current_heat_temp}.",
+                    None,
+                )
+
         request = SetTemperatureEvent(
             device.identifier,
-            device.state.display_scale,
-            device.state.operating_mode.value,
+            state.display_scale,
+            mode.value,
             value,
         )
         action_response = await self._async_invoke_setter(
@@ -204,13 +225,13 @@ class SensiClient:
         # {'current_temp': 70, 'mode': 'heat', 'target_temp': 75}
         response = SetTemperatureEventSuccess(**action_response.data)
 
-        state = device.state
         state.display_temp = response.current_temp
-        state.operating_mode = try_parse_enum(OperatingMode, response.mode)
 
-        if state.operating_mode == OperatingMode.HEAT:
+        # Changing cool/min temperature should not change the operating mode
+        # In mobile app, one cannot set the temperatures if the device is OFF.
+        if mode == OperatingMode.HEAT:
             state.current_heat_temp = response.target_temp
-        if state.operating_mode == OperatingMode.COOL:
+        if mode == OperatingMode.COOL:
             state.current_cool_temp = response.target_temp
 
         return ActionResponse(None, response)
@@ -700,6 +721,9 @@ def raise_if_error(response: ActionResponse, property: str, value: any) -> None:
 
     The exception is raised with the message `Unable to set {property} to {value}. {error}`.
     """
+
+    # Potential error codes returned from Sensi end point: ThermostatOffline, OutOfRange, Bad Request
+
     if response.error:
         raise HomeAssistantError(
             f"Unable to set {property} to {value}. {response.error}"
