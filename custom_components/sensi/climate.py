@@ -385,17 +385,36 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def target_humidity(self) -> float | None:
         """Return the humidity we try to reach."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
         humidification = self._device.state.humidity_control.humidification
+        if humidification is None:
+            return None
         return humidification.target_percent if humidification.enabled else None
 
     @property
     def min_humidity(self) -> float:
         """Return the minimum humidity."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
+        humidification = self._device.state.humidity_control.humidification
+        if humidification is None or not humidification.enabled:
+            return None
+
         return self._device.capabilities.humidity_control.humidification.min
 
     @property
     def max_humidity(self) -> float:
         """Return the maximum humidity."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
+        humidification = self._device.state.humidity_control.humidification
+        if humidification is None or not humidification.enabled:
+            return None
+
         return self._device.capabilities.humidity_control.humidification.max
 
     async def async_set_temperature(self, **kwargs) -> None:
