@@ -431,6 +431,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         raise_if_error(response, "temperature", temperature)
         self.async_write_ha_state()
 
+        # Refresh entities relying on temperature
+        self.coordinator.async_update_listeners()
+
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
@@ -444,6 +447,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         )
         raise_if_error(response, "operating mode", operating_mode.value)
         self.async_write_ha_state()
+
+        # Refresh entities relying on operating_mode
+        self.coordinator.async_update_listeners()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
