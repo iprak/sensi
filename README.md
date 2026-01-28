@@ -38,7 +38,10 @@ Add Sensi integration using the `Add integration` button on Integrations page of
 
 On adding the Sensi integration, you should see one device and some related entities.
 
-![image](https://github.com/iprak/sensi/assets/6459774/222a21ac-8d5f-4530-b3d6-ec87ae668b6d)
+
+<img width="376" height="592" alt="image" src="https://github.com/user-attachments/assets/7af560de-96f8-4166-9a0b-b919737e90d4" />
+
+<img width="376" height="972" alt="image" src="https://github.com/user-attachments/assets/d45e65c3-7595-4063-a689-7e6f9f280499" />
 
 
 ## Features
@@ -46,6 +49,7 @@ On adding the Sensi integration, you should see one device and some related enti
 	- Heat, Cool modes support single target temperature
 	- `Auto` requires dual-setpoints to be defined (see `Limitations` below)
 - Fan modes: `Auto, On, Circulate` (10% duty cycle). Circulation mode availability depends on thermostat.
+- Humidification control
 - Data is refreshed every 30 seconds.
 
 
@@ -171,7 +175,7 @@ The entity ids have changed to support multiple thermostats on the same account.
 
 ## Development
 
-The source can be opened in a Dev Container. The user test/test is alredy set in the image.
+The source can be opened in a Dev Container. The user test/test is already set in the image.
 
 * Test execution: `pytest tests`
 * Test coverage: `coverage run -m pytest tests && coverage report -m`
