@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -20,25 +19,35 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_call_later
 from homeassistant.util.unit_conversion import TemperatureConverter
 
-from . import SensiConfigEntry, SensiEntity, get_fan_support
+from . import SensiConfigEntry, get_config_option
+from .client import raise_if_error
 from .const import (
-    COOL_MIN_TEMPERATURE,
+    ATTR_CIRCULATING_FAN,
+    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    CONFIG_FAN_SUPPORT,
+    DEFAULT_CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
-    HEAT_MAX_TEMPERATURE,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
     SENSI_FAN_ON,
-    Capabilities,
+    TEMPERATURE_LOWER_LIMIT,
+    TEMPERATURE_UPPER_LIMIT,
 )
-from .coordinator import SensiDevice
+from .coordinator import SensiUpdateCoordinator
+from .data import (
+    FanMode,
+    OperatingMode,
+    SensiDevice,
+    get_hvac_mode_from_operating_mode,
+    get_operating_mode_from_hvac_mode,
+)
+from .entity import SensiEntity
 
 FORCE_REFRESH_DELAY = 3
 
@@ -48,9 +57,10 @@ async def async_setup_entry(
     entry: SensiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
-    """Set up Sensi thermostat."""
+    """Set up Sensi thermostats."""
     coordinator = entry.runtime_data
-    entities = [SensiThermostat(device, entry) for device in coordinator.get_devices()]
+    devices = coordinator.get_devices()
+    entities = [SensiThermostat(device, entry, coordinator) for device in devices]
     async_add_entities(entities)
 
 
@@ -61,19 +71,16 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     # without setting the proper ClimateEntityFeature' warning
     _enable_turn_on_off_backwards_compatibility = False
 
-    _retry_property_name: str
-    """The property to retry if the value did not update as expected."""
-
-    _retry_expected_value: float | str | HVACMode
-    _retry_callback: Callable[[float | str | HVACMode]]
-
-    def __init__(self, device: SensiDevice, entry: SensiConfigEntry) -> None:
+    def __init__(
+        self,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
+        coordinator: SensiUpdateCoordinator,
+    ) -> None:
         """Initialize the device."""
 
-        hass = device.coordinator.hass
-        super().__init__(device)
-
-        self._retry_property_name = ""
+        hass = coordinator.hass
+        super().__init__(device, coordinator)
 
         self._entry = entry
         self.entity_id = async_generate_entity_id(
@@ -91,7 +98,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
-        return self._device.attributes
+        return {
+            ATTR_CIRCULATING_FAN: self._device.state.circulating_fan.enabled,
+            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._device.state.circulating_fan.duty_cycle,
+        }
 
     @property
     def name(self) -> str:
@@ -113,75 +123,232 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             | ClimateEntityFeature.TURN_OFF
         )
 
-        if get_fan_support(self._device, self._entry):
+        if get_config_option(
+            self._device, self._entry, CONFIG_FAN_SUPPORT, DEFAULT_CONFIG_FAN_SUPPORT
+        ):
             supported = supported | ClimateEntityFeature.FAN_MODE
+
+        # If device is humidification capable (has something in humidification) and humidification is enabled
+        if (
+            self._device.capabilities.humidity_control.humidification
+            and self._device.state.humidity_control.humidification.enabled
+        ):
+            supported = supported | ClimateEntityFeature.TARGET_HUMIDITY
 
         return supported
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
         """Return the list of available hvac operation modes."""
+        capabilities = self._device.capabilities
 
         modes = []
 
-        if self._device.supports(Capabilities.OPERATING_MODE_OFF):
+        if capabilities.operating_mode_settings.off:
             modes.append(HVACMode.OFF)
-        if self._device.supports(Capabilities.OPERATING_MODE_HEAT):
+        if capabilities.operating_mode_settings.heat:
             modes.append(HVACMode.HEAT)
-        if self._device.supports(Capabilities.OPERATING_MODE_COOL):
+        if capabilities.operating_mode_settings.cool:
             modes.append(HVACMode.COOL)
-        if self._device.supports(Capabilities.OPERATING_MODE_AUTO):
+        if capabilities.operating_mode_settings.auto:
             modes.append(HVACMode.AUTO)
 
         return modes
 
     @property
+    def fan_mode(self) -> str | None:
+        """Return the fan setting."""
+
+        # Create a special mode 'circulate' base on 'auto' when 'circulating_fan' contains 'enabled'='on'.
+        if (
+            self._state.fan_mode == FanMode.AUTO
+            and self._device.state.circulating_fan.enabled
+        ):
+            return SENSI_FAN_CIRCULATE
+
+        return self._state.fan_mode.value
+
+    @property
+    def hvac_mode(self) -> HVACMode | None:
+        """Return hvac operation ie. heat, cool mode."""
+        return get_hvac_mode_from_operating_mode(self._state.operating_mode)
+
+    @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current running hvac operation if supported."""
-        return self._device.hvac_action
+
+        # [Aux mode]
+        #     Off
+        #     operating_mode=current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #     Heat
+        #     operating_mode=current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706456258}
+
+        #     Cool
+        #     operating_mode=current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706456358}
+
+        #     Aux
+        #     operating_mode=current_operating_mode=aux
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': 1, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 100, 'last': 'heat', 'last_start': 1706456438}
+
+        # [Off]
+        #     Off
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Heat]
+        #     Heating:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706461614}
+
+        #     Heating (multistage) where heat can be 50:
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 50, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706461614}
+
+        #     idle:
+        #     operating_mode=heat, current_operating_mode=heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        # [Cool]
+        #     Idle:
+        #     operating_mode=off, current_operating_mode=off
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'cool', 'last_start': None}
+
+        #     Cooling:
+        #     operating_mode=cool, current_operating_mode=cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706461689}
+
+        # [Auto]
+        #     cooling:
+        #     operating_mode=auto, current_operating_mode=auto_cool
+        #     demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1706462094}
+
+        #     idle:
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #     heating
+        #     operating_mode=auto, current_operating_mode=auto_heat
+        #     demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1706462635}
+
+        # When thermostat is set to Off, operating_mode and current_operating_mode are both Off. Themostat should not be be demanding heating or cooling.
+
+        operating_mode = self._state.operating_mode
+
+        # AC0/AC1/HP1 state=off
+        # operating_mode=off, current_operating_mode=off, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        if operating_mode == OperatingMode.OFF:
+            return HVACAction.OFF
+
+        # Treat Aux as Heating
+        if operating_mode == OperatingMode.AUX:
+            return HVACAction.HEATING
+
+        # https://sensi.copeland.com/en-us/support/how-do-i-configure-my-thermostat
+        # HP1 = heat pump
+        # AC0 = no cooling
+        # AC1 =  air conditioning uni
+        # HP2/AC2 = more than one stage cooling/heating
+
+        # AC0
+        #   state=heat, target temp higher
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407356}
+
+        #   state=heat, target temp low Thermostat shows "Heat"
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=cool, target temp higher
+        #   operating_mode=cool, current_operating_mode=cool, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'cool', 'last_start': None}
+
+        # AC1
+        #   state=heat, target temp higher
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407536}
+
+        #   state=heat, target temp low Thermostat shows "Heat"
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=heat, target temp lower cooling
+        #   operating_mode=cool, current_operating_mode=cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712407661}
+
+        #   state=auto, current=70 target=68/66
+        #   operating_mode=auto, current_operating_mode=auto_cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712407661}
+
+        #   state=auto, current=70 target=72/70
+        #   operating_mode=auto, current_operating_mode=auto_heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407796}
+
+        # HP1
+        #   state=auto
+        #   operating_mode=auto, current_operating_mode=auto_cool, demand_status={'cool_stage': 1, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 100, 'cool': 100, 'aux': 0, 'last': 'cool', 'last_start': 1712406686}
+        #   operating_mode=auto, current_operating_mode=auto_heat, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=aux
+        #   operating_mode=aux, current_operating_mode=aux, demand_status={'cool_stage': None, 'heat_stage': None, 'aux_stage': None, 'heat': 0, 'fan': 0, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': None}
+
+        #   state=heat
+        #   operating_mode=heat, current_operating_mode=heat, demand_status={'cool_stage': None, 'heat_stage': 1, 'aux_stage': None, 'heat': 100, 'fan': 100, 'cool': 0, 'aux': 0, 'last': 'heat', 'last_start': 1712407116}
+
+        demand_status = self._state.demand_status
+
+        if demand_status.heat > 0:
+            return HVACAction.HEATING
+        if demand_status.cool > 0:
+            return HVACAction.COOLING
+
+        return HVACAction.IDLE
 
     @property
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
 
-        if not get_fan_support(self._device, self._entry):
+        if not get_config_option(
+            self._device, self._entry, CONFIG_FAN_SUPPORT, DEFAULT_CONFIG_FAN_SUPPORT
+        ):
             return None
 
         return (
             [SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE]
-            if self._device.supports(Capabilities.CIRCULATING_FAN)
+            if self._device.capabilities.circulating_fan.capable
             else [SENSI_FAN_AUTO, SENSI_FAN_ON]
         )
 
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
-        return self._device.temperature
+        return self._state.display_temp
 
     @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
-        return self._device.temperature_unit
+        scale = self._state.display_scale
+        return (
+            UnitOfTemperature.CELSIUS
+            if scale.lower() == "c"
+            else UnitOfTemperature.FAHRENHEIT
+        )
 
     @property
     def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        return self._device.target_temperature
 
-    @property
-    def current_humidity(self) -> int | None:
-        """Return the current humidity."""
-        return self._device.humidity
+        state = self._state
 
-    @property
-    def hvac_mode(self) -> HVACMode | str | None:
-        """Return hvac operation ie. heat, cool mode."""
-        return self._device.hvac_mode
+        if state.operating_mode == OperatingMode.OFF:
+            return None
 
-    @property
-    def fan_mode(self) -> str | None:
-        """Return the fan setting."""
-        return self._device.fan_mode
+        cool_target = state.current_cool_temp
+        heat_target = state.current_heat_temp
+
+        if state.operating_mode == OperatingMode.HEAT:
+            return heat_target
+        if state.operating_mode == OperatingMode.COOL:
+            return cool_target
+
+        # For other modes use the last demand_status
+        last_action_heat = state.demand_status.last == "heat"
+        return heat_target if last_action_heat else cool_target
 
     @property
     def min_temp(self) -> float:
@@ -190,11 +357,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # Use the thermostat defined minimum temperature if not heating.
         if self.hvac_mode == HVACMode.HEAT:
             return TemperatureConverter.convert(
-                COOL_MIN_TEMPERATURE,
+                TEMPERATURE_LOWER_LIMIT,
                 UnitOfTemperature.FAHRENHEIT,
                 self.temperature_unit,
             )
-        return self._device.min_temp
+        return self._state.cool_min_temp
 
     @property
     def max_temp(self) -> float:
@@ -203,163 +370,149 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # Use the thermostat defined maximum temperature if not cooling.
         if self.hvac_mode == HVACMode.COOL:
             return TemperatureConverter.convert(
-                HEAT_MAX_TEMPERATURE,
+                TEMPERATURE_UPPER_LIMIT,
                 UnitOfTemperature.FAHRENHEIT,
                 self.temperature_unit,
             )
 
-        return self._device.max_temp
+        return self._state.heat_max_temp
+
+    @property
+    def current_humidity(self) -> float | None:
+        """Return the current humidity."""
+        return self._device.state.humidity
+
+    @property
+    def target_humidity(self) -> float | None:
+        """Return the humidity we try to reach."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
+        humidification = self._device.state.humidity_control.humidification
+        if humidification is None:
+            return None
+        return humidification.target_percent if humidification.enabled else None
+
+    @property
+    def min_humidity(self) -> float:
+        """Return the minimum humidity."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
+        humidification = self._device.state.humidity_control.humidification
+        if humidification is None or not humidification.enabled:
+            return None
+
+        return self._device.capabilities.humidity_control.humidification.min
+
+    @property
+    def max_humidity(self) -> float:
+        """Return the maximum humidity."""
+        if self._device.capabilities.humidity_control.humidification is None:
+            return None
+
+        humidification = self._device.state.humidity_control.humidification
+        if humidification is None or not humidification.enabled:
+            return None
+
+        return self._device.capabilities.humidity_control.humidification.max
 
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
-
-        if self._device.offline:
-            raise HomeAssistantError(f"The device {self._device.name} is offline.")
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
         temperature = kwargs.get(ATTR_TEMPERATURE)
 
         temperature = round(temperature)
-
-        # First invoke the setter operation. If it throws due to invalid value,
-        # then retry doesn't need to be attempted.
-        await self._async_set_temperature(temperature)
-        self._register_retry(
-            "target_temperature", temperature, self._async_set_temperature
+        response = await self.coordinator.client.async_set_temperature(
+            self._device, self._device.state.operating_mode, temperature
         )
+        raise_if_error(response, "temperature", temperature)
+        self.async_write_ha_state()
 
-    async def _async_set_temperature(self, temperature: int) -> None:
-        """Set new target temperature."""
-
-        # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
-        # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
-        if await self._device.async_set_temp(temperature):
-            LOGGER.info("%s: Setting temperature to %d", self._device.name, temperature)
-            self._force_refresh_state()
+        # Refresh entities relying on temperature
+        self.coordinator.async_update_listeners()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new hvac mode."""
 
-        if self._device.offline:
-            raise HomeAssistantError(f"The device {self._device.name} is offline.")
+        operating_mode = get_operating_mode_from_hvac_mode(hvac_mode)
 
-        # First invoke the setter operation. If it throws due to invalid value,
-        # then retry doesn't need to be attempted.
-        await self._async_set_hvac_mode(hvac_mode)
-        self._register_retry("hvac_mode", hvac_mode, self._async_set_hvac_mode)
+        if not operating_mode:
+            raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
 
-    async def _async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        """Set new hvac mode."""
+        response = await self.coordinator.client.async_set_operating_mode(
+            self._device, operating_mode
+        )
+        raise_if_error(response, "operating mode", operating_mode.value)
+        self.async_write_ha_state()
 
-        if await self._device.async_set_hvac_mode(hvac_mode):
-            LOGGER.info("%s: Setting hvac_mode to %s", self._device.name, hvac_mode)
-            self._force_refresh_state()
+        # Refresh entities relying on operating_mode
+        self.coordinator.async_update_listeners()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
 
-        if self._device.offline:
-            raise HomeAssistantError(f"The device {self._device.name} is offline.")
-
+        # Valid fan_modes are  (SENSI_FAN_AUTO, SENSI_FAN_ON, SENSI_FAN_CIRCULATE)
+        # or (SENSI_FAN_AUTO, SENSI_FAN_ON)
         if fan_mode not in self.fan_modes:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
 
-        # First invoke the setter operation. If it throws due to invalid value,
-        # then retry doesn't need to be attempted.
-        await self._async_set_fan_mode(fan_mode)
-        self._register_retry("fan_mode", fan_mode, self._async_set_fan_mode)
-
-    async def _async_set_fan_mode(self, fan_mode: str) -> None:
-        """Set new fan mode.
-
-        First set circulating fan mode state if the thermostat supports it
-        and then update the fan mode.
-        """
-
-        success = False
         if fan_mode == SENSI_FAN_CIRCULATE:
-            if await self._device.async_set_circulating_fan_mode(
-                True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
-            ):
-                success = await self._device.async_set_fan_mode(SENSI_FAN_AUTO)
-        else:
-            # Reset circulating fan mode state
-            success = (
-                await self._device.async_set_circulating_fan_mode(False, 0)
-                if self._device.supports_circulating_fan_mode()
-                else True
+            # First set fan_mode to auto
+            response = await self.coordinator.client.async_set_fan_mode(
+                self._device, SENSI_FAN_AUTO
+            )
+            raise_if_error(response, "fan mode", fan_mode)
+
+            # Next enable the circulating fan state
+            response = await self.coordinator.client.async_set_circulating_fan_mode(
+                self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            )
+            raise_if_error(
+                response.error,
+                "fan mode",
+                f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
             )
 
-            if success:
-                success = await self._device.async_set_fan_mode(fan_mode)  # on or auto
+        else:
+            # First reset circulating fan mode state and then force set fan mode
+            if self._device.capabilities.circulating_fan.capable:
+                response = await self.coordinator.client.async_set_circulating_fan_mode(
+                    self._device, False, 0
+                )
 
-        if success:
-            self.async_write_ha_state()
-            LOGGER.info("%s: Setting fan_mode to %s", self._device.name, fan_mode)
+                raise_if_error(
+                    response.error, "circulating fan mode", "False with duty cycle of 0"
+                )
+
+            response = await self.coordinator.client.async_set_fan_mode(
+                self._device, fan_mode
+            )
+            raise_if_error(response, "fan mode", fan_mode)
+
+        self.async_write_ha_state()
+        LOGGER.info("%s: Setting fan_mode to %s", self._device.name, fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn thermostat on."""
 
-        if self._device.offline:
-            raise HomeAssistantError(f"The device {self._device.name} is offline.")
+        # First call base to set the hvac mode and then set fan mode.
+        # async_turn_off is not implemented. Base sets OFF hvac mode.
+        await super().async_turn_on()
 
-        if await self._device.async_set_fan_mode(HVACMode.AUTO):
-            self._force_refresh_state()
-
-    def _force_refresh_state(self) -> None:
-        """Force refresh after a delay."""
-
-        # Write the current state and then force update
+        response = await self.coordinator.client.async_set_fan_mode(
+            self._device, FanMode.AUTO.value
+        )
+        raise_if_error(response, "fan mode", FanMode.AUTO.value)
         self.async_write_ha_state()
 
-        # Testing showed that update after a event request failed to bring new data.
-        # Scheduing the next refresh after a delay.
-        async_call_later(
-            self.hass, FORCE_REFRESH_DELAY, self._async_force_refresh_state
+    async def async_set_humidity(self, humidity: int) -> None:
+        """Set new target humidity."""
+
+        response = await self.coordinator.client.async_set_humidification(
+            self._device, True, humidity
         )
-
-    async def _async_force_refresh_state(self, *_: Any) -> None:
-        """Refresh the state."""
-        await self.async_update()
-
-    def _register_retry(
-        self,
-        property_name: str,
-        expected_value: float | str | HVACMode,
-        callback: Callable[[float | str | HVACMode]],
-    ) -> None:
-        """Save parameters to attempt retry if value did not update as expected."""
-        self._retry_property_name = property_name
-        self._retry_expected_value = expected_value
-        self._retry_callback = callback
-
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        asyncio.run_coroutine_threadsafe(
-            self._async_on_device_updated(), self.hass.loop
-        )
-        super()._handle_coordinator_update()
-
-    async def _async_on_device_updated(self) -> None:
-        """Device state update callback."""
-
-        if self._retry_property_name:
-            LOGGER.debug(
-                "%s: Device state updated, checking if %s not matching",
-                self._device.name,
-                self._retry_property_name,
-            )
-
-            value = getattr(self, self._retry_property_name)
-            if value != self._retry_expected_value:
-                LOGGER.info(
-                    "Current value for '%s' is '%s' and does not match the value set '%s', retrying",
-                    self._retry_property_name,
-                    value,
-                    self._retry_expected_value,
-                )
-
-                # Reset _retry_property_name to prevent repeated operations
-                self._retry_property_name = ""
-                await self._retry_callback(self._retry_expected_value)
+        raise_if_error(response, "humidity", humidity)
+        self.async_write_ha_state()

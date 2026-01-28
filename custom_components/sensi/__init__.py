@@ -1,29 +1,28 @@
-"""The Sensi thermostat component."""
+"""The Sensi device component."""
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
+from copy import deepcopy
+
+import aiohttp
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.entity import DeviceInfo, EntityDescription
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.typing import StateType
+from homeassistant.util.ssl import get_default_context
 
-from .auth import AuthenticationError, refresh_access_token
-from .const import (
-    CONFIG_FAN_SUPPORT,
-    DEFAULT_FAN_SUPPORT,
-    LOGGER,
-    SENSI_ATTRIBUTION,
-    SENSI_DOMAIN,
-)
-from .coordinator import SensiDevice, SensiUpdateCoordinator
-
-type SensiConfigEntry = ConfigEntry[SensiUpdateCoordinator]
+from .auth import AuthenticationError, SensiConnectionError, get_stored_config
+from .client import SensiClient
+from .const import LOGGER, SENSI_DOMAIN
+from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
+from .data import SensiDevice
 
 SUPPORTED_PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.SENSOR,
+    Platform.NUMBER,
     Platform.SWITCH,
 ]
 
@@ -51,16 +50,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     hass.data.setdefault(SENSI_DOMAIN, {})
 
     try:
-        config = await refresh_access_token(hass)
-        coordinator = SensiUpdateCoordinator(hass, config)
-        await coordinator.async_config_entry_first_refresh()
+        config = await get_stored_config(hass)
+        connector = aiohttp.TCPConnector(force_close=True, ssl=get_default_context())
+        client = SensiClient(hass, config, connector)
+        await client.wait_for_devices()
 
-        entry.runtime_data = coordinator
+        entry.runtime_data = SensiUpdateCoordinator(hass, config, client)
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
     except ConfigEntryAuthFailed:
         # Pass ConfigEntryAuthFailed, this can be raised from the coordinator
         raise
-    except AuthenticationError as err:
+    except (AuthenticationError, SensiConnectionError, TimeoutError) as err:
         # Raising ConfigEntryAuthFailed will automatically put the config entry in a
         # failure state and start a reauth flow.
         # https://developers.home-assistant.io/docs/integration_setup_failures/
@@ -75,77 +75,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: SensiConfigEntry) -> bool:
     """Unload a config entry."""
+    coordinator = entry.runtime_data
+    if coordinator:
+        await coordinator.client.stop()
     return await hass.config_entries.async_unload_platforms(entry, SUPPORTED_PLATFORMS)
 
 
-class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
-    """Representation of a Sensi entity."""
+def get_config_option(
+    device: SensiDevice, entry: SensiConfigEntry, key: str, default: StateType
+) -> StateType:
+    """Get the value of a config option."""
 
-    _attr_has_entity_name = True
-    _attr_attribution = SENSI_ATTRIBUTION
-
-    def __init__(self, device: SensiDevice) -> None:
-        """Initialize the entity."""
-
-        super().__init__(device.coordinator)
-        self._device = device
-        self._attr_unique_id = device.identifier
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(SENSI_DOMAIN, device.identifier)},
-            name=device.name,
-            manufacturer="Sensi",
-            model=device.model,
-        )
-
-    @property
-    def available(self) -> bool:
-        """Return if the entity is available.
-
-        The entity is not available if there is no data or if the device is offline or authentication has succeeded.
-        """
-        return (
-            self._device
-            and not self._device.offline
-            and self._device.authenticated
-            and self.coordinator.data
-            and self.coordinator.data.get(self._device.identifier)
-        )
+    options = entry.options.get(key, {})
+    return options.get(device.identifier, default)
 
 
-class SensiDescriptionEntity(SensiEntity):
-    """Representation of a Sensi description entity."""
-
-    def __init__(self, device: SensiDevice, description: EntityDescription) -> None:
-        """Initialize the entity."""
-
-        super().__init__(device)
-        self.entity_description = description
-
-        # Override the _attr_unique_id to include description.key
-        # description would be passed for sensor and switch domains.
-        # https://developers.home-assistant.io/docs/entity_registry_index/
-        self._attr_unique_id = f"{device.identifier}_{description.key}"
-
-
-def get_fan_support(device: SensiDevice, entry: SensiConfigEntry) -> bool:
-    """Determine if fan is supported."""
-
-    options = entry.options.get(CONFIG_FAN_SUPPORT, {})
-    return options.get(device.identifier, DEFAULT_FAN_SUPPORT)
-
-
-def set_fan_support(
-    hass: HomeAssistant, device: SensiDevice, entry: SensiConfigEntry, value: bool
+def set_config_option(
+    hass: HomeAssistant,
+    device: SensiDevice,
+    entry: SensiConfigEntry,
+    key: str,
+    value: StateType,
 ) -> None:
-    """Update the fan support status in ConfigEntry."""
+    """Set the value of a config option."""
 
-    new_data = entry.data.copy()
-    new_options = entry.options.copy()
-    fan_options = new_options.get(CONFIG_FAN_SUPPORT, {})
-    fan_options[device.identifier] = value
-    new_options[CONFIG_FAN_SUPPORT] = fan_options
+    new_options = deepcopy({**entry.options})
+    options = new_options.get(key, {})
+    options[device.identifier] = value
+    new_options[key] = options
 
-    hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
+    hass.config_entries.async_update_entry(entry, options=new_options)

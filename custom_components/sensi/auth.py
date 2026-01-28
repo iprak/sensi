@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Any, Final
@@ -14,6 +13,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, storage
 
 from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
+from .data import AuthenticationConfig
+from .utils import to_int
 
 DEFAULT_TIMEOUT = 10
 
@@ -36,18 +37,11 @@ CLIENT_SECRET2: Final = (
 OAUTH_URL2: Final = "https://oauth.sensiapi.io/token"
 
 
-@dataclass
-class AuthenticationConfig:
-    """Internal Sensi authentication configuration."""
-
-    user_id: str | None = None
-    access_token: str | None = None
-    expires_at: float | None = None
-    refresh_token: str | None = None
-
-
 async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
-    """Obtain new access_token and refresh_token for the given refresh_token."""
+    """Obtain new access_token and refresh_token for the given refresh_token.
+
+    This can raise SensiConnectionError, AuthenticationError.
+    """
 
     result = {}
     LOGGER.debug("Getting access token using refresh_token=%s", refresh_token)
@@ -89,7 +83,7 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
         KEY_USER_ID
     )  # This is used as unique_id in config flow
 
-    expires_in = int(response_json.get("expires_in"))
+    expires_in = to_int(response_json.get("expires_in"), 0)
     result[KEY_EXPIRES_AT] = (
         datetime.now() + timedelta(seconds=expires_in)
     ).timestamp()
@@ -97,49 +91,33 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
     return result
 
 
-# def get_device_id(persistent_data: any) -> str:
-#     device_id = persistent_data.get(KEY_DEVICE_ID)
-#     if not device_id:
-#         device_id = uuid.uuid4()
-#         persistent_data[KEY_DEVICE_ID] = device_id
+async def get_stored_config(hass: HomeAssistant) -> AuthenticationConfig:
+    """Retrieve stored configuration. This will throw AuthenticationError for missing data."""
 
-#     return device_id
+    store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
+    persistent_data = await store.async_load()
+    if persistent_data is None:
+        persistent_data = {}
 
+    refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
+    if refresh_token is None:
+        raise AuthenticationError("Stored config is missing refresh_token")
 
-# async def get_stored_config(hass: HomeAssistant) -> AuthenticationConfig:
-#     """Retrieve stored configuration. This will throw AuthenticationError for missing data."""
-
-#     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
-#     persistent_data = await store.async_load()
-
-#     # Data can be missing in older installations, use get()
-#     if refresh_token is None:
-#         refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
-#         if refresh_token is None:
-#             raise AuthenticationError("Stored config is missing refresh_token")
-
-#     result = await _get_new_tokens(hass, refresh_token)
-
-#     persistent_data[KEY_ACCESS_TOKEN] = result[KEY_ACCESS_TOKEN]
-#     persistent_data[KEY_REFRESH_TOKEN] = result[KEY_REFRESH_TOKEN]
-#     persistent_data[KEY_EXPIRES_AT] = result[KEY_EXPIRES_AT]
-#     persistent_data[KEY_USER_ID] = result[KEY_USER_ID]
-
-#     # Only dict or simple values can be saved into store
-#     await store.async_save(persistent_data)
-
-#     return AuthenticationConfig(
-#         user_id=persistent_data[KEY_USER_ID],
-#         access_token=persistent_data[KEY_ACCESS_TOKEN],
-#         expires_at=persistent_data[KEY_EXPIRES_AT],
-#         refresh_token=persistent_data[KEY_REFRESH_TOKEN],
-#     )
+    return AuthenticationConfig(
+        user_id=persistent_data.get(KEY_USER_ID),
+        access_token=persistent_data.get(KEY_ACCESS_TOKEN),
+        expires_at=persistent_data.get(KEY_EXPIRES_AT),
+        refresh_token=refresh_token,
+    )
 
 
 async def refresh_access_token(
     hass: HomeAssistant, refresh_token: str | None = None
 ) -> AuthenticationConfig:
-    """Obtain new access_token and refresh_token for the given/stored refresh_token."""
+    """Obtain new access_token and refresh_token for the given/stored refresh_token.
+
+    This can raise SensiConnectionError, AuthenticationError.
+    """
 
     store = storage.Store[dict[str, Any]](hass, STORAGE_VERSION, STORAGE_KEY)
     persistent_data = await store.async_load()

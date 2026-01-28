@@ -1,0 +1,242 @@
+{
+  "icd_id": "36-6f-92-ff-fe-0c-0b-07",
+  "registration": {
+    "city": "Madison",
+    "name": "Living Room",
+    "state": "Wisconsin",
+    "country": "US",
+    "address1": "Somewhere",
+    "address2": null,
+    "timezone": "America/Chicago",
+    "postal_code": "53719",
+    "product_type": "Sensi Classic with HomeKit",
+    "contractor_id": null,
+    "fleet_enabled": false,
+    "fleet_enabled_date": null
+  },
+  "capabilities": {
+    "last_changed_timestamp": 1765284266,
+    "early_start": "yes",
+    "boost": {
+      "aux": "no",
+      "cool": "no",
+      "heat": "no"
+    },
+    "aux_cycle_rate": "no",
+    "cool_cycle_rate": "yes",
+    "heat_cycle_rate": "yes",
+    "dual_fuel_outdoor_temperature_setpoint": "no",
+    "compressor_lockout": "yes",
+    "aux_cycle_rate_steps": [
+      "slow",
+      "medium",
+      "fast"
+    ],
+    "cool_cycle_rate_steps": [
+      "slow",
+      "medium",
+      "fast"
+    ],
+    "heat_cycle_rate_steps": [
+      "slow",
+      "medium",
+      "fast"
+    ],
+    "keypad_lockout": "yes",
+    "continuous_backlight": "yes",
+    "degrees_fc": "yes",
+    "temp_offset": "yes",
+    "humidity_offset": "yes",
+    "display_humidity": "yes",
+    "display_outdoor_temp": "yes",
+    "display_time": "yes",
+    "temp_offset_lower_bound": -5,
+    "temp_offset_upper_bound": 5,
+    "humidity_offset_lower_bound": -25,
+    "humidity_offset_upper_bound": 25,
+    "min_heat_setpoint": 45,
+    "min_cool_setpoint": 45,
+    "max_heat_setpoint": 99,
+    "max_cool_setpoint": 99,
+    "heat_setpoint_ceiling": "yes",
+    "cool_setpoint_floor": "yes",
+    "lowest_heat_setpoint_ceiling": 60,
+    "highest_cool_setpoint_floor": 85,
+    "scheduling": "yes",
+    "max_steps_per_day": 8,
+    "days_per_schedule": 7,
+    "hold_modes": {
+      "temporary": "yes",
+      "permanent": "no",
+      "curtailment": "no"
+    },
+    "circulating_fan": {
+      "capable": "yes",
+      "max_duty_cycle": 100,
+      "min_duty_cycle": 10,
+      "step": 5
+    },
+    "partial_keypad_lockout": {
+      "setpoint": "yes",
+      "system_mode": "yes",
+      "fan_mode": "yes",
+      "schedule_mode": "yes",
+      "settings_menu": "yes"
+    },
+    "indoor_equipment": "gas",
+    "outdoor_equipment": "ac",
+    "indoor_stages": 1,
+    "outdoor_stages": 1,
+    "fan_stages": 0,
+    "out_of_box_configuration": "yes",
+    "reversing_valve_mode": "O",
+    "operating_mode_settings": {
+      "off": "yes",
+      "heat": "yes",
+      "cool": "yes",
+      "aux": "no",
+      "auto": "yes"
+    },
+    "fan_mode_settings": {
+      "auto": "yes",
+      "on": "yes",
+      "smart": "no"
+    },
+    "eim_control_capable": "no",
+    "contractor_info": "no",
+    "humidity_control": {
+      "deadband": 10,
+      "humidification": {
+        "step": 5,
+        "min": 5,
+        "max": 50,
+        "types": [
+          "humidifier"
+        ]
+      },
+      "dehumidification": {
+        "step": 5,
+        "min": 40,
+        "max": 95,
+        "types": [
+          "overcooling"
+        ]
+      }
+    },
+    "open_adr": {
+      "demand_response": "yes",
+      "direct_load_controls": "no",
+      "use_of_pricing": "yes"
+    }
+  },
+  "state": {
+    "status": "online",
+    "current_cool_temp": 76,
+    "current_heat_temp": 68,
+    "display_temp": 68.5,
+    "current_operating_mode": "heat",
+    "humidity": 62,
+    "battery_voltage": 2.981,
+    "power_status": "c_wire",
+    "wifi_connection_quality": 46,
+    "periodicity": 0,
+    "comfort_alert": null,
+    "other_error_bitfield": {
+      "bad_temperature_sensor": "off",
+      "bad_humidity_sensor": "off",
+      "stuck_key": "off",
+      "high_voltage": "off",
+      "e5_alert": "off",
+      "error_32": "off",
+      "error_64": "off"
+    },
+    "current_humidification_percent": 5,
+    "current_dehumidification_percent": 40,
+    "relay_status": {
+      "w": "off",
+      "w2": "off",
+      "g": "off",
+      "y": "off",
+      "y2": "off",
+      "o_b": "off"
+    },
+    "demand_status": {
+      "heat": 0,
+      "fan": 0,
+      "cool": 0,
+      "aux": 0,
+      "last": "heat",
+      "last_start": null,
+      "cool_stage": null,
+      "heat_stage": null,
+      "aux_stage": null,
+      "humidification": 0,
+      "dehumidification": 0,
+      "overcooling": "no"
+    },
+    "hashedSchedule": "e1207cd23f7cedd8e53bfd4ce0e8881388efb0c0",
+    "current_off_temp": 60,
+    "display_scale": "f",
+    "heat_max_temp": 72,
+    "cool_min_temp": 68,
+    "hold_mode": "off",
+    "operating_mode": "heat",
+    "scheduling": "off",
+    "fan_mode": "on",
+    "display_humidity": "on",
+    "continuous_backlight": "off",
+    "compressor_lockout": "on",
+    "early_start": "off",
+    "keypad_lockout": "off",
+    "temp_offset": 0,
+    "aux_cycle_rate": "medium",
+    "cool_cycle_rate": "medium",
+    "heat_cycle_rate": "medium",
+    "aux_boost": "on",
+    "heat_boost": "off",
+    "cool_boost": "off",
+    "dst_offset": 60,
+    "dst_observed": "yes",
+    "tz_offset": -360,
+    "hold_end": null,
+    "deadband": 2,
+    "display_time": "on",
+    "circulating_fan": {
+      "enabled": "on",
+      "duty_cycle": 10
+    },
+    "humidity_offset": 0,
+    "partial_keypad_lockout": {
+      "setpoint": "on",
+      "system_mode": "on",
+      "fan_mode": "on",
+      "schedule_mode": "on",
+      "settings_menu": "on"
+    },
+    "humidity_control": {
+      "humidification": {
+        "target_percent": 45,
+        "enabled": "on",
+        "mode": "humidifier"
+      },
+      "dehumidification": {
+        "target_percent": 40,
+        "enabled": "off",
+        "mode": "overcooling"
+      },
+      "status": "none"
+    },
+    "lcd_sleep_mode": null,
+    "night_light": null,
+    "outdoor_weather_display": "ff:00:00:ff:ff:ff:00:00:ff:00:00:ff:00:00:ff:00:00:ff:00",
+    "geofencing": null,
+    "remote_sensor_status": "00",
+    "target_off_temp": 60,
+    "control": {
+      "mode": "off",
+      "devices": null,
+      "geo_state": null,
+      "device_data": null
+    }
+  }
+}
