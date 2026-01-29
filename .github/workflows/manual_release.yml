@@ -7,47 +7,73 @@ on:
         description: 'Release version'
         required: true
 
+# Need write permission to push commits/tags and create releases
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
-      - name: Create next tag
-        id: next_tag
+      - name: Set git user
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git fetch origin --tags --quiet
-          echo "Next tag: ${release_version}";
 
-          sed -i "s/\"version\": \".*\"/\"version\": \"${{release_version}}\"/g" custom_components/sensi/manifest.json
-          git add -A
-          git commit -m "chore: bumping version to ${release_version}"
-
-          git tag ${release_version} -f
-          git push --tags -f
-
-          echo "next_tag=$release_version" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          tag_name: ${{ release_version }}
-          release_name: ${{ release_version }}
-          draft: false
-          prerelease: false
-
-      - name: "ZIP the integration directory"
-        shell: "bash"
+      - name: Update version in manifest.json
+        # jq is available on ubuntu-latest and is safer for JSON edits than sed
         run: |
-          cd "${{ github.workspace }}/custom_components/sensi"
-          zip sensi.zip -r ./
+          manifest="custom_components/sensi/manifest.json"
+          if command -v jq >/dev/null 2>&1; then
+            jq --arg v "${{ github.event.inputs.release_version }}" '.version = $v' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+          else
+            # fallback to sed if jq is not present
+            sed -i "s/\"version\"\s*:\s*\"[^\"]*\"/\"version\": \"${{ github.event.inputs.release_version }}\"/g" "$manifest"
+          fi
 
-      - name: "Upload the ZIP file to the release"
-        uses: "softprops/action-gh-release@v2.0.8"
+      - name: Commit changes (if any) and create tag
+        run: |
+          TAG="${{ github.event.inputs.release_version }}"
+
+          # Commit only if there are changes
+          if git status --porcelain | grep . >/dev/null 2>&1; then
+            git add -A
+            git commit -m "chore: bumping version to $TAG"
+          else
+            echo "No changes to commit"
+          fi
+
+          # Create annotated tag if it does not already exist
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; skipping tag creation"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+          fi
+
+      - name: Push commit and tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Push current branch and tags
+          git push origin HEAD
+          git push origin --tags
+
+      - name: Create ZIP of integration (outside of the directory to avoid embedding the zip)
+        run: |
+          mkdir -p "${{ github.workspace }}/release"
+          # Create sensi.zip in the release directory so it is not inside the directory being zipped
+          (cd "${{ github.workspace }}/custom_components/sensi" && zip -r "${{ github.workspace }}/release/sensi.zip" .)
+
+      - name: Create GitHub Release and upload ZIP
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ release_version }}
-          files: ${{ github.workspace }}/custom_components/sensi/sensi.zip
+          tag_name: ${{ github.event.inputs.release_version }}
+          files: release/sensi.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
