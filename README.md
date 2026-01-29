@@ -63,6 +63,14 @@ Available settings (support varies by thermostat):
 - Fan
 - Humidification
 - Keypad Lockout
+- Offsets
+
+
+### Auto
+
+These number entities define the setpoints for auto mode. In other modes, one of them will be disabled.
+- Cool setpoint
+- Heat setpoint
 
 
 ### Auxiliary Heating
@@ -78,6 +86,10 @@ Available on thermostats with humidification enabled. This is configured in the 
 - When enabled, the climate entity gains: `min_humidity`, `max_humidity`, `humidity` (target), and `current_humidity` attributes.
 - Dehumidification is not supported.
 
+
+### Offsets
+You can use the Temperature and Humidity offset number entities to alter displayed values.
+
 ### Sensors
 
 **Enabled by default:**
@@ -90,14 +102,8 @@ Available on thermostats with humidification enabled. This is configured in the 
 - Fan speed
 - WiFi strength
 
-### Numbers
 
-These number entities define the setpoints for auto mode. In other modes, one of them will be disabled.
-- Cool setpoint
-- Heat setpoint
-
-
-### Attributes
+## Attributes
 Sample attributes on the climate entity. Some of these attributes are provided by HomeAssistant itself.
 
 ```
@@ -120,6 +126,7 @@ min_humidity: 5
 max_humidity: 50
 humidity: 5
 ```
+
 
 ## Limitations
 
@@ -177,5 +184,6 @@ The entity ids have changed to support multiple thermostats on the same account.
 
 The source can be opened in a Dev Container. The user test/test is already set in the image.
 
+* Site address: `localhost:9123`
 * Test execution: `pytest tests`
 * Test coverage: `coverage run -m pytest tests && coverage report -m`
