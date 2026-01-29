@@ -1,6 +1,11 @@
 name: Manual release
+
 on:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version'
+        required: true
 
 jobs:
   build:
@@ -8,41 +13,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create next minor tag
-        id: next_minor_tag
+      - name: Create next tag
+        id: next_tag
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git fetch origin --tags --quiet
+          echo "Next tag: ${release_version}";
 
-          last_tag=`git describe --tags $(git rev-list --tags --max-count=1)`
-          echo "Last tag: ${last_tag}";
-
-          if [ -z "${last_tag}" ];then
-              last_tag="${INPUT_PREV_TAG}0.1.0";
-              echo "Last defaulted to ${last_tag}";
-          fi
-
-          next_tag="${last_tag%.*}.$((${last_tag##*.}+1))"
-          echo "Next tag: ${next_tag}";
-
-          echo "Version: ${{steps.semantic_release_info.outputs.version}}"
-          sed -i "s/\"version\": \".*\"/\"version\": \"${{steps.semantic_release_info.outputs.version}}\"/g" custom_components/sensi/manifest.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{release_version}}\"/g" custom_components/sensi/manifest.json
           git add -A
-          git commit -m "chore: bumping version to ${next_tag}"
+          git commit -m "chore: bumping version to ${release_version}"
 
-          git tag ${next_tag} -f
+          git tag ${release_version} -f
           git push --tags -f
 
-          echo "next_tag=$next_tag" >> $GITHUB_OUTPUT
+          echo "next_tag=$release_version" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          tag_name: ${{ steps.next_minor_tag.outputs.next_tag }}
-          release_name: ${{ steps.next_minor_tag.outputs.next_tag }}
+          tag_name: ${{ release_version }}
+          release_name: ${{ release_version }}
           draft: false
           prerelease: false
 
@@ -55,5 +49,5 @@ jobs:
       - name: "Upload the ZIP file to the release"
         uses: "softprops/action-gh-release@v2.0.8"
         with:
-          tag_name: ${{ steps.next_minor_tag.outputs.next_tag }}
+          tag_name: ${{ release_version }}
           files: ${{ github.workspace }}/custom_components/sensi/sensi.zip
