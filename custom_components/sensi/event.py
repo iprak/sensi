@@ -102,6 +102,14 @@ class BoolEventData:
 
 
 @dataclass
+class NumberEventData:
+    """Data for number setting event."""
+
+    icd_id: str
+    value: int
+
+
+@dataclass
 class SetHumidityEventValue:
     """Data for set_temperature event."""
 
