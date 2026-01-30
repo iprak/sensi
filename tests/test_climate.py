@@ -6,6 +6,7 @@ from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    ATTR_POWER_STATUS,
     SENSI_FAN_CIRCULATE,
 )
 from custom_components.sensi.data import FanMode, OperatingMode
@@ -254,6 +255,7 @@ class TestSensiThermostatExtraStateAttributes:
         assert attrs is not None
         assert ATTR_CIRCULATING_FAN in attrs
         assert ATTR_CIRCULATING_FAN_DUTY_CYCLE in attrs
+        assert ATTR_POWER_STATUS in attrs
 
     def test_extra_state_attributes_fan_enabled(self, mock_device, mock_thermostat):
         """Test extra_state_attributes shows fan enabled state."""

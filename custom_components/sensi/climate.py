@@ -28,6 +28,7 @@ from .client import raise_if_error
 from .const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
@@ -101,6 +102,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return {
             ATTR_CIRCULATING_FAN: self._device.state.circulating_fan.enabled,
             ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._device.state.circulating_fan.duty_cycle,
+            ATTR_POWER_STATUS: self._device.state.power_status,
         }
 
     @property
