@@ -473,7 +473,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
                 self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             )
             raise_if_error(
-                response.error,
+                response,
                 "fan mode",
                 f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
             )
@@ -486,7 +486,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
                 )
 
                 raise_if_error(
-                    response.error, "circulating fan mode", "False with duty cycle of 0"
+                    response, "circulating fan mode", "False with duty cycle of 0"
                 )
 
             response = await self.coordinator.client.async_set_fan_mode(
