@@ -398,3 +398,59 @@ async def test_set_circulating_fan_mode(
 
         assert mock_device.state.circulating_fan.enabled == enabled
         assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
+
+
+@pytest.mark.parametrize(
+    ("value", "should_succeed"),
+    [(0, True), (5, True), (-5, True)],
+)
+async def test_async_set_temperature_offset_range(
+    mock_device, mock_coordinator, value, should_succeed
+) -> None:
+    """Test async_set_temperature_offset value range validation."""
+
+    with patch.object(
+        mock_coordinator.client, "_async_invoke_setter"
+    ) as mock_async_invoke_setter:
+        mock_async_invoke_setter.return_value = ActionResponse(None, {})
+
+        response = await mock_coordinator.client.async_set_temperature_offset(
+            mock_device, value
+        )
+
+        if should_succeed:
+            mock_async_invoke_setter.assert_called_once()
+            assert response.error is None
+            assert mock_device.state.temp_offset == value
+        else:
+            mock_async_invoke_setter.assert_not_called()
+            assert response.error is not None
+            assert "must be between" in response.error
+
+
+@pytest.mark.parametrize(
+    ("value", "should_succeed"),
+    [(0, True), (25, True), (-25, True)],
+)
+async def test_async_set_humidity_offset_range(
+    mock_device, mock_coordinator, value, should_succeed
+) -> None:
+    """Test async_set_humidity_offset value range validation."""
+
+    with patch.object(
+        mock_coordinator.client, "_async_invoke_setter"
+    ) as mock_async_invoke_setter:
+        mock_async_invoke_setter.return_value = ActionResponse(None, {})
+
+        response = await mock_coordinator.client.async_set_humidity_offset(
+            mock_device, value
+        )
+
+        if should_succeed:
+            mock_async_invoke_setter.assert_called_once()
+            assert response.error is None
+            assert mock_device.state.humidity_offset == value
+        else:
+            mock_async_invoke_setter.assert_not_called()
+            assert response.error is not None
+            assert "must be between" in response.error
