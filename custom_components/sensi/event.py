@@ -59,6 +59,7 @@ class SetOperatingModeEventSuccess:
     mode: str
 
 
+@dataclass
 class SetCirculatingFanEventValue:
     """Data for set_circulating_fan event."""
 

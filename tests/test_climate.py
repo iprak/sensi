@@ -1,12 +1,16 @@
 """Tests for Sensi climate component."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from custom_components.sensi.client import ActionResponse
 from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
+    SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
 from custom_components.sensi.data import FanMode, OperatingMode
@@ -33,6 +37,36 @@ async def test_setup_platform(
 
     assert async_add_entities.called
     assert len(async_add_entities.call_args[0][0]) == 2
+
+
+async def test_set_fan_mode(hass: HomeAssistant, mock_device, mock_thermostat) -> None:
+    """Test async_set_fan_mode."""
+
+    with (
+        patch.object(mock_thermostat, "async_write_ha_state"),
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_circulating_fan_mode"
+        ) as mock_set_circulating_fan_mode,
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_fan_mode"
+        ) as mock_set_fan_mode,
+    ):
+        mock_set_circulating_fan_mode.return_value = ActionResponse(None, "")
+        mock_set_fan_mode.return_value = ActionResponse(None, "")
+
+        await mock_thermostat.async_set_fan_mode(SENSI_FAN_AUTO)
+
+        mock_set_circulating_fan_mode.assert_called()
+        mock_set_fan_mode.assert_called_with(mock_device, SENSI_FAN_AUTO)
+
+
+async def test_set_fan_mode_invalid(
+    hass: HomeAssistant, mock_device, mock_thermostat
+) -> None:
+    """Test invalid mode for async_set_fan_mode."""
+
+    with pytest.raises(ValueError):
+        await mock_thermostat.async_set_fan_mode("INVALID")
 
 
 class TestSensiThermostatInitialization:

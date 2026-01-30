@@ -473,20 +473,21 @@ class SensiThermostat(SensiEntity, ClimateEntity):
                 self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
             )
             raise_if_error(
-                response.error,
+                response,
                 "fan mode",
                 f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
             )
 
         else:
             # First reset circulating fan mode state and then force set fan mode
+            # The min duty cycle is 10. Otherwise the error "Attempted to set /circulating_fan/min_duty_cycle:0 below allowable value 10" is returned.
             if self._device.capabilities.circulating_fan.capable:
                 response = await self.coordinator.client.async_set_circulating_fan_mode(
-                    self._device, False, 0
+                    self._device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
                 )
 
                 raise_if_error(
-                    response.error, "circulating fan mode", "False with duty cycle of 0"
+                    response, "circulating fan mode", "False with duty cycle of 0"
                 )
 
             response = await self.coordinator.client.async_set_fan_mode(
