@@ -45,3 +45,4 @@ COORDINATOR_UPDATE_INTERVAL: Final = 30
 ATTR_CIRCULATING_FAN: Final = "circulating_fan"
 ATTR_CIRCULATING_FAN_DUTY_CYCLE: Final = "circulating_fan_duty_cycle"
 ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
+ATTR_POWER_STATUS: Final = "power_status"
