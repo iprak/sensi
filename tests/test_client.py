@@ -8,6 +8,8 @@ import pytest
 from custom_components.sensi.client import ActionResponse, round_humidity
 from custom_components.sensi.data import OperatingMode
 from custom_components.sensi.event import (
+    SetCirculatingFanEvent,
+    SetCirculatingFanEventValue,
     SetHumidityEvent,
     SetHumidityEventValue,
     SetTemperatureEvent,
@@ -307,7 +309,7 @@ class TestSetTemperature:
 async def test_async_set_humidification(
     mock_device_with_humidification, mock_coordinator, enabled, humidity, expected_error
 ) -> None:
-    """Placeholder for async test of set_humidification method."""
+    """Test of set_humidification method."""
 
     mock_response = None if expected_error else {}
     expected_request = asdict(
@@ -347,7 +349,7 @@ async def test_async_set_humidification(
 async def test_async_enable_humidification(
     mock_device_with_humidification, mock_coordinator, enabled
 ) -> None:
-    """Placeholder for async test of enable_humidification method."""
+    """Test of enable_humidification method."""
 
     with patch.object(
         mock_coordinator.client, "async_set_humidification"
@@ -361,3 +363,38 @@ async def test_async_enable_humidification(
             enabled,
             mock_device_with_humidification.state.humidity_control.humidification.target_percent,
         )
+
+
+@pytest.mark.parametrize(
+    ("enabled", "duty_cycle"),
+    [(True, 35), (False, 10)],
+)
+async def test_set_circulating_fan_mode(
+    mock_device, mock_coordinator, enabled, duty_cycle
+) -> None:
+    """Test async_set_circulating_fan_mode."""
+
+    enabled = True
+    duty_cycle = 30
+
+    with patch.object(
+        mock_coordinator.client, "_async_invoke_setter"
+    ) as mock_async_invoke_setter:
+        mock_async_invoke_setter.return_value = ActionResponse(None, "")
+
+        expected_request = asdict(
+            SetCirculatingFanEvent(
+                mock_device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
+            )
+        )
+
+        await mock_coordinator.client.async_set_circulating_fan_mode(
+            mock_device, enabled, duty_cycle
+        )
+
+        mock_async_invoke_setter.assert_called_once_with(
+            "set_circulating_fan", expected_request
+        )
+
+        assert mock_device.state.circulating_fan.enabled == enabled
+        assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
