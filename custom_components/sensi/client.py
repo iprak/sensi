@@ -287,7 +287,7 @@ class SensiClient:
             device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
         )
         action_response = await self._async_invoke_setter(
-            SettingEventName.CIRCULATING_FAN, asdict(request)
+            SettingEventName.CIRCULATING_FAN.value, asdict(request)
         )
 
         if not action_response.error:
@@ -323,9 +323,9 @@ class SensiClient:
             "icd_id": device.identifier,
         }
         action_response = await self._async_invoke_setter(
-            SettingEventName.COOL_MIN_TEMP
+            SettingEventName.COOL_MIN_TEMP.value
             if min_temp
-            else SettingEventName.HEAT_MAX_TEMP,
+            else SettingEventName.HEAT_MAX_TEMP.value,
             request,
         )
 
