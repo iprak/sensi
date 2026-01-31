@@ -35,6 +35,14 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
     def _state(self) -> State:
         return self._device.state
 
+    @property
+    def available(self) -> bool:
+        """Return if the entity is available.
+
+        The entity is not available if the fetch failed or if the device is offline.
+        """
+        return super().available and self._state.is_online
+
 
 class SensiDescriptionEntity(SensiEntity):
     """Representation of a Sensi description entity."""

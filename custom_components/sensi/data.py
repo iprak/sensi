@@ -222,6 +222,11 @@ class State:
             else UnitOfTemperature.FAHRENHEIT
         )
 
+    @property
+    def is_online(self) -> bool | None:
+        """Return true if the device is online."""
+        return self.status.lower() == "online"
+
     def __str__(self):
         """Return string representation of State."""
         return (

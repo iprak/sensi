@@ -204,11 +204,11 @@ class TestOnlineBinarySensorEntity:
 
         # Test "Online" with capital O - should be False
         mock_device.state.status = "Online"
-        assert entity.is_on is False
+        assert entity.is_on is True
 
         # Test "ONLINE" - should be False
         mock_device.state.status = "ONLINE"
-        assert entity.is_on is False
+        assert entity.is_on is True
 
         # Test "online" - should be True
         mock_device.state.status = "online"
