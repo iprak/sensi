@@ -12,6 +12,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
@@ -67,4 +68,11 @@ class OnlineBinarySensorEntity(SensiDescriptionEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
-        return self._device and self._device.state.status == "online"
+        return self._device and self._device.state.is_online
+
+    @property
+    def available(self) -> bool:
+        """Return if the data is available."""
+
+        # The super class checks device online status so we directly access CoordinatorEntity
+        return super(CoordinatorEntity, self).available

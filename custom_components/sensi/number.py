@@ -18,11 +18,7 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .client import ActionResponse, SensiClient, raise_if_error
-from .const import (
-    SENSI_DOMAIN,
-    TEMPERATURE_LOWER_LIMIT,
-    TEMPERATURE_UPPER_LIMIT,
-)
+from .const import SENSI_DOMAIN, TEMPERATURE_LOWER_LIMIT, TEMPERATURE_UPPER_LIMIT
 from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
 from .data import OperatingMode, State
 from .entity import SensiDescriptionEntity
