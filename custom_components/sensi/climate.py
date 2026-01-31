@@ -368,28 +368,29 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def min_temp(self) -> float:
         """Return the minimum temperature. This gets used as the lower bounds in UI."""
 
-        # Use the thermostat defined minimum temperature if not heating.
-        if self.hvac_mode == HVACMode.HEAT:
-            return TemperatureConverter.convert(
-                TEMPERATURE_LOWER_LIMIT,
-                UnitOfTemperature.FAHRENHEIT,
-                self.temperature_unit,
-            )
-        return self._state.cool_min_temp
+        # Use the thermostat defined minimum temperature if not heating. This is in temperature_unit.
+        if self.hvac_mode == HVACMode.COOL:
+            return self._state.cool_min_temp
+
+        return TemperatureConverter.convert(
+            TEMPERATURE_LOWER_LIMIT,
+            UnitOfTemperature.FAHRENHEIT,
+            self.temperature_unit,
+        )
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature. This gets used as the upper bounds in UI."""
 
-        # Use the thermostat defined maximum temperature if not cooling.
-        if self.hvac_mode == HVACMode.COOL:
-            return TemperatureConverter.convert(
-                TEMPERATURE_UPPER_LIMIT,
-                UnitOfTemperature.FAHRENHEIT,
-                self.temperature_unit,
-            )
+        # Use the thermostat defined maximum temperature if not cooling. This is in temperature_unit.
+        if self.hvac_mode == HVACMode.HEAT:
+            return self._state.heat_max_temp
 
-        return self._state.heat_max_temp
+        return TemperatureConverter.convert(
+            TEMPERATURE_UPPER_LIMIT,
+            UnitOfTemperature.FAHRENHEIT,
+            self.temperature_unit,
+        )
 
     @property
     def current_humidity(self) -> float | None:
