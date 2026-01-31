@@ -326,12 +326,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
-        scale = self._state.display_scale
-        return (
-            UnitOfTemperature.CELSIUS
-            if scale.lower() == "c"
-            else UnitOfTemperature.FAHRENHEIT
-        )
+        return self._state.temperature_unit.value
 
     @property
     def target_temperature(self) -> float | None:
