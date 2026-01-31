@@ -32,7 +32,6 @@ async def async_setup_entry(
         name="Online",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
     )
 
     entities = [
