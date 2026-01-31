@@ -93,8 +93,9 @@ You can use the Temperature and Humidity offset number entities to alter display
 ### Sensors
 
 **Enabled by default:**
-- Temperature
 - Humidity
+- Online
+- Temperature
 
 **Disabled by default:**
 - Battery
@@ -130,16 +131,14 @@ humidity: 5
 
 ## Limitations
 
-* Simultaneous logins from the mobile app and integration typically work without issues. However, thermostat property changes may occasionally fail to apply, potentially due to Sensi backend issues or the thermostat temporarily going offline.
+* **Simultaneous login**- Simultaneous logins from the mobile app and integration typically work without issues. However, thermostat property changes may occasionally fail to apply, potentially due to Sensi backend issues or the thermostat temporarily going offline.
 
-Testing revealed that the incoming device data still marks a device as `online` even after it has been powered down. Because the `Online` binary sensor relies on that status, it cannot be considered dependable.
+* **Online** - Testing revealed that the incoming device data continues to indicate a device as `online` even after it has been disconnected from wifi for around 10 minutes. It is unclear what happens to operations during this period.
 
-* The temperature unit displayed for the thermostat is controlled by the HomeAssistant's `unit_system` setting. Make sure it matches the thermostat. [Issue](https://github.com/iprak/sensi/issues/113)
+* **Temperature unit** - The temperature unit displayed for the thermostat is controlled by the HomeAssistant's `unit_system` setting. Make sure it matches the thermostat. [Issue](https://github.com/iprak/sensi/issues/113)
 
 
-### Auto
-
-The default climate card in HomeAssistant only support single target temperature. Auto mode requires cool and heat setpoints to be defined. You will have to use custom cards like `simple-thermostat` instead.
+* **Auto** - The default climate card in HomeAssistant only support single target temperature. Auto mode requires cool and heat setpoints to be defined. You will have to use custom cards like `simple-thermostat` instead.
 
 
 ## Installation
