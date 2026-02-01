@@ -4,17 +4,24 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from custom_components.sensi import set_config_option
 from custom_components.sensi.client import ActionResponse
 from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
+    CONFIG_FAN_SUPPORT,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
 from custom_components.sensi.data import FanMode, OperatingMode, SensiDevice
-from homeassistant.components.climate import ClimateEntity, HVACAction, HVACMode
+from homeassistant.components.climate import (
+    ClimateEntity,
+    ClimateEntityFeature,
+    HVACAction,
+    HVACMode,
+)
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 
@@ -354,21 +361,69 @@ class TestSensiThermostatExtraStateAttributes:
         assert attrs[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == 50
 
 
-class TestSensiThermostatSupportedFeatures:
-    """Test cases for supported features."""
+def test_supported_features(mock_device, mock_thermostat) -> None:
+    """Test supported features."""
 
-    def test_supported_features_has_temperature(self, mock_device, mock_thermostat):
-        """Test supported features includes TARGET_TEMPERATURE."""
+    mock_device.state.operating_mode = OperatingMode.HEAT
+    features = mock_thermostat.supported_features
 
-        # supported_features will call get_config_option which needs entry.options
-        # We can at least verify the method doesn't raise an error
-        try:
-            features = mock_thermostat.supported_features
-            # If it succeeds, check for basic features
-            assert features is not None
-        except AttributeError:
-            # Expected due to mock entry not having options attribute
-            pass
+    assert ClimateEntityFeature.TURN_ON in features
+    assert ClimateEntityFeature.TURN_OFF in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE_RANGE not in features
+    assert ClimateEntityFeature.TARGET_HUMIDITY not in features
+    assert ClimateEntityFeature.FAN_MODE in features
+
+
+def test_supported_features_auto(mock_device, mock_thermostat) -> None:
+    """Test supported features in auto mode."""
+
+    mock_device.state.operating_mode = OperatingMode.HEAT
+    features = mock_thermostat.supported_features
+
+    assert ClimateEntityFeature.TURN_ON in features
+    assert ClimateEntityFeature.TURN_OFF in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE_RANGE not in features
+    assert ClimateEntityFeature.TARGET_HUMIDITY not in features
+    assert ClimateEntityFeature.FAN_MODE in features
+
+
+def test_supported_features_fan_disabled(
+    hass: HomeAssistant, mock_entry, mock_device, mock_thermostat
+) -> None:
+    """Test supported features when fan is disabled."""
+
+    mock_device.state.operating_mode = OperatingMode.HEAT
+
+    set_config_option(hass, mock_device, mock_entry, CONFIG_FAN_SUPPORT, False)
+
+    features = mock_thermostat.supported_features
+
+    assert ClimateEntityFeature.TURN_ON in features
+    assert ClimateEntityFeature.TURN_OFF in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE_RANGE not in features
+    assert ClimateEntityFeature.TARGET_HUMIDITY not in features
+    assert ClimateEntityFeature.FAN_MODE not in features
+
+
+def test_supported_features_humidification(
+    mock_device_with_humidification, mock_thermostat_with_humidification
+) -> None:
+    """Test supported features."""
+
+    mock_device_with_humidification.state.operating_mode = OperatingMode.HEAT
+    mock_device_with_humidification.state.humidity_control.humidification.enabled = True
+
+    features = mock_thermostat_with_humidification.supported_features
+
+    assert ClimateEntityFeature.TURN_ON in features
+    assert ClimateEntityFeature.TURN_OFF in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE in features
+    assert ClimateEntityFeature.TARGET_TEMPERATURE_RANGE not in features
+    assert ClimateEntityFeature.TARGET_HUMIDITY in features
+    assert ClimateEntityFeature.FAN_MODE in features
 
 
 class TestSensiThermostatHumidity:
