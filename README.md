@@ -36,10 +36,9 @@ Add Sensi integration using the `Add integration` button on Integrations page of
 <img width="517" height="320" alt="image" src="https://github.com/user-attachments/assets/0a496b08-fe08-4dd6-8764-ecc4d7b692c1" />
 
 
-On adding the Sensi integration, you should see one device and some related entities.
+On adding the Sensi integration, you should see one device and related entities.
 
-
-<img width="376" height="592" alt="image" src="https://github.com/user-attachments/assets/7af560de-96f8-4166-9a0b-b919737e90d4" />
+<img width="378" height="492" alt="image" src="https://github.com/user-attachments/assets/0b8bd8a9-7c6d-4569-b3ef-cf08c828cfca" />
 
 <img width="376" height="972" alt="image" src="https://github.com/user-attachments/assets/d45e65c3-7595-4063-a689-7e6f9f280499" />
 
@@ -47,7 +46,8 @@ On adding the Sensi integration, you should see one device and some related enti
 ## Features
 - Operating modes: `Auto, Heat, Cool, Off` (available modes depend on thermostat configuration).
 	- Heat, Cool modes support single target temperature
-	- `Auto` requires dual-setpoints to be defined (see `Limitations` below)
+    - Auto uses heat and cool set points
+	
 - Fan modes: `Auto, On, Circulate` (10% duty cycle). Circulation mode availability depends on thermostat.
 - Humidification control
 - Data is refreshed every 30 seconds.
@@ -64,13 +64,6 @@ Available settings (support varies by thermostat):
 - Humidification
 - Keypad Lockout
 - Offsets
-
-
-### Auto
-
-These number entities define the setpoints for auto mode. In other modes, one of them will be disabled.
-- Cool setpoint
-- Heat setpoint
 
 
 ### Auxiliary Heating
@@ -136,9 +129,6 @@ humidity: 5
 * **Online** - Testing revealed that the incoming device data continues to indicate a device as `online` even after it has been disconnected from wifi for around 10 minutes. It is unclear what happens to operations during this period.
 
 * **Temperature unit** - The temperature unit displayed for the thermostat is controlled by the HomeAssistant's `unit_system` setting. Make sure it matches the thermostat. [Issue](https://github.com/iprak/sensi/issues/113)
-
-
-* **Auto** - The default climate card in HomeAssistant only support single target temperature. Auto mode requires cool and heat setpoints to be defined. You will have to use custom cards like `simple-thermostat` instead.
 
 
 ## Installation
