@@ -6,18 +6,15 @@ from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.components.climate import (
+    ATTR_TARGET_TEMP_HIGH,
+    ATTR_TARGET_TEMP_LOW,
     ENTITY_ID_FORMAT,
     ClimateEntity,
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import (
-    ATTR_TEMPERATURE,
-    PRECISION_HALVES,
-    PRECISION_WHOLE,
-    UnitOfTemperature,
-)
+from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -90,11 +87,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             hass=hass,
         )
 
-        self._attr_target_temperature_step = (
-            PRECISION_HALVES
-            if hass.config.units.temperature_unit == UnitOfTemperature.CELSIUS
-            else PRECISION_WHOLE
-        )
+        # The mobile device always uses whole numbers for C and F unit
+        self._attr_target_temperature_step = PRECISION_WHOLE
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
@@ -119,11 +113,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def supported_features(self) -> ClimateEntityFeature:
         """Return the list of supported features."""
 
-        supported = (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.TURN_ON
-            | ClimateEntityFeature.TURN_OFF
-        )
+        supported = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
 
         if get_config_option(
             self._device, self._entry, CONFIG_FAN_SUPPORT, DEFAULT_CONFIG_FAN_SUPPORT
@@ -137,7 +127,11 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         ):
             supported = supported | ClimateEntityFeature.TARGET_HUMIDITY
 
-        return supported
+        return (
+            supported | ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
+            if self._device.state.operating_mode == OperatingMode.AUTO
+            else ClimateEntityFeature.TARGET_TEMPERATURE
+        )
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -324,12 +318,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
-        scale = self._state.display_scale
-        return (
-            UnitOfTemperature.CELSIUS
-            if scale.lower() == "c"
-            else UnitOfTemperature.FAHRENHEIT
-        )
+        return self._state.temperature_unit.value
 
     @property
     def target_temperature(self) -> float | None:
@@ -353,31 +342,42 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         return heat_target if last_action_heat else cool_target
 
     @property
-    def min_temp(self) -> float:
-        """Return the minimum temperature. This gets used as the lower bounds in UI."""
+    def target_temperature_high(self) -> float:
+        """Return the highbound target temperature we try to reach."""
+        return self._state.current_cool_temp
 
-        # Use the thermostat defined minimum temperature if not heating.
-        if self.hvac_mode == HVACMode.HEAT:
-            return TemperatureConverter.convert(
-                TEMPERATURE_LOWER_LIMIT,
-                UnitOfTemperature.FAHRENHEIT,
-                self.temperature_unit,
-            )
-        return self._state.cool_min_temp
+    @property
+    def target_temperature_low(self) -> float:
+        """Return the lowbound target temperature we try to reach."""
+        return self._state.current_heat_temp
+
+    @property
+    def min_temp(self) -> float:
+        """Return the minimum temperature for single mode. This gets used as the lower bounds in UI."""
+
+        # Use the thermostat defined minimum temperature if not heating. This is in temperature_unit.
+        if self._device.state.operating_mode == OperatingMode.COOL:
+            return self._state.cool_min_temp
+
+        return TemperatureConverter.convert(
+            TEMPERATURE_LOWER_LIMIT,
+            UnitOfTemperature.FAHRENHEIT,
+            self.temperature_unit,
+        )
 
     @property
     def max_temp(self) -> float:
-        """Return the maximum temperature. This gets used as the upper bounds in UI."""
+        """Return the maximum temperature for single mode. This gets used as the upper bounds in UI."""
 
-        # Use the thermostat defined maximum temperature if not cooling.
-        if self.hvac_mode == HVACMode.COOL:
-            return TemperatureConverter.convert(
-                TEMPERATURE_UPPER_LIMIT,
-                UnitOfTemperature.FAHRENHEIT,
-                self.temperature_unit,
-            )
+        # Use the thermostat defined maximum temperature if not cooling. This is in temperature_unit.
+        if self._device.state.operating_mode == OperatingMode.HEAT:
+            return self._state.heat_max_temp
 
-        return self._state.heat_max_temp
+        return TemperatureConverter.convert(
+            TEMPERATURE_UPPER_LIMIT,
+            UnitOfTemperature.FAHRENHEIT,
+            self.temperature_unit,
+        )
 
     @property
     def current_humidity(self) -> float | None:
@@ -422,18 +422,36 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
 
+        state = self._device.state
+
+        # The framework ensures that the temperatures are within min_temp and max_temp.
+
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
-        temperature = kwargs.get(ATTR_TEMPERATURE)
+        if state.operating_mode == OperatingMode.AUTO:
+            temperature_low = kwargs.get(ATTR_TARGET_TEMP_LOW)
+            temperature_high = kwargs.get(ATTR_TARGET_TEMP_HIGH)
 
-        temperature = round(temperature)
-        response = await self.coordinator.client.async_set_temperature(
-            self._device, self._device.state.operating_mode, temperature
-        )
-        raise_if_error(response, "temperature", temperature)
+            response = await self.coordinator.client.async_set_temperature(
+                self._device, OperatingMode.HEAT, temperature_low
+            )
+            raise_if_error(response, "Heat setpoint", temperature_low)
+
+            response = await self.coordinator.client.async_set_temperature(
+                self._device, OperatingMode.COOL, temperature_high
+            )
+            raise_if_error(response, "Cool setpoint", temperature_high)
+        else:
+            temperature = kwargs.get(ATTR_TEMPERATURE)
+            response = await self.coordinator.client.async_set_temperature(
+                self._device, state.operating_mode, temperature
+            )
+
+            raise_if_error(response, "temperature", temperature)
+
         self.async_write_ha_state()
 
-        # Refresh entities relying on temperature
+        # Refresh entities relying on temperatures
         self.coordinator.async_update_listeners()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

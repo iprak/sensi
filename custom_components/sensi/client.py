@@ -197,19 +197,6 @@ class SensiClient:
                 None,
             )
 
-        if mode == OperatingMode.HEAT:
-            if value >= state.current_cool_temp:
-                return ActionResponse(
-                    f"Heat temperature should be less than the cool temperature {state.current_cool_temp}.",
-                    None,
-                )
-        if mode == OperatingMode.COOL:
-            if value <= state.current_heat_temp:
-                return ActionResponse(
-                    f"Cool temperature should be more than the heat temperature {state.current_heat_temp}.",
-                    None,
-                )
-
         request = SetTemperatureEvent(
             device.identifier,
             state.display_scale,

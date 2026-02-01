@@ -277,30 +277,6 @@ class TestSetTemperature:
             assert response.error
             assert response.data is None
 
-    async def test_set_temperature_bounds(self, mock_device, mock_coordinator) -> None:
-        """Test cool/heat bounds for the set_temperature method."""
-
-        with patch.object(
-            mock_coordinator.client, "_async_invoke_setter"
-        ) as mock_async_invoke_setter:
-            mock_device.state.current_cool_temp = 45  # Fake device cool temperature
-            response = await mock_coordinator.client.async_set_temperature(
-                mock_device, OperatingMode.HEAT, 45
-            )
-
-            mock_async_invoke_setter.assert_not_called()
-            assert response.error
-            assert response.data is None
-
-            mock_device.state.current_heat_temp = 78  # Fake device heat temperature
-            response = await mock_coordinator.client.async_set_temperature(
-                mock_device, OperatingMode.COOL, 78
-            )
-
-            mock_async_invoke_setter.assert_not_called()
-            assert response.error
-            assert response.data is None
-
 
 @pytest.mark.parametrize(
     ("enabled", "humidity", "expected_error"),
