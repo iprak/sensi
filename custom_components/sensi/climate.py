@@ -127,8 +127,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         ):
             supported = supported | ClimateEntityFeature.TARGET_HUMIDITY
 
-        return (
-            supported | ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
+        return supported | (
+            ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
             if self._device.state.operating_mode == OperatingMode.AUTO
             else ClimateEntityFeature.TARGET_TEMPERATURE
         )

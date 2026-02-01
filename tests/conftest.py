@@ -67,11 +67,12 @@ def mock_device_with_humidification(mock_json_with_humidification) -> SensiDevic
 
 
 @pytest.fixture
-def mock_entry(mock_coordinator) -> SensiConfigEntry:
+def mock_entry(hass: HomeAssistant, mock_coordinator) -> MockConfigEntry:
     """Create a mock Config entry."""
     # config_entries.ConfigEntry
     entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
     entry.runtime_data = mock_coordinator
+    entry.add_to_hass(hass)
     return entry
 
 
