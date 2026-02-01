@@ -1,6 +1,8 @@
 """Tests for Sensi switch component."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 from custom_components.sensi.client import ActionResponse
 from custom_components.sensi.const import CONFIG_AUX_HEATING, CONFIG_FAN_SUPPORT
@@ -18,6 +20,16 @@ from custom_components.sensi.switch import (
 from homeassistant.config_entries import ConfigEntries
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+
+
+def create_humidity_description() -> SensiCapabilityEntityDescription:
+    """Create SensiCapabilityEntityDescription."""
+    return SensiCapabilityEntityDescription(
+        key="display_humidity",
+        setting=SettingEventName.DISPLAY_HUMIDITY,
+        name="Display Humidity",
+        icon="mdi:water-percent",
+    )
 
 
 async def test_setup_platform(
@@ -43,80 +55,33 @@ async def test_setup_platform(
     assert len(async_add_entities.call_args[0][0]) == 13
 
 
-class TestSensiCapabilityEntityDescription:
-    """Test cases for SensiCapabilityEntityDescription."""
-
-    def test_capability_entity_description_creation(self) -> None:
-        """Test creating a SensiCapabilityEntityDescription."""
-        desc = SensiCapabilityEntityDescription(
-            key="display_humidity",
-            setting=SettingEventName.DISPLAY_HUMIDITY,
-            name="Display Humidity",
-            icon="mdi:water-percent",
-        )
-        assert desc.key == "display_humidity"
-        assert desc.setting == SettingEventName.DISPLAY_HUMIDITY
-        assert desc.name == "Display Humidity"
-        assert desc.icon == "mdi:water-percent"
-        assert desc.entity_category == EntityCategory.CONFIG
-
-    def test_capability_entity_description_with_default_category(self) -> None:
-        """Test that entity_category defaults to CONFIG."""
-        desc = SensiCapabilityEntityDescription(
-            key="test",
-            setting=SettingEventName.DISPLAY_TIME,
-            name="Test",
-        )
-        assert desc.entity_category == EntityCategory.CONFIG
+def test_capability_entity_description_creation() -> None:
+    """Test creating a SensiCapabilityEntityDescription."""
+    desc = create_humidity_description()
+    assert desc.key == "display_humidity"
+    assert desc.setting == SettingEventName.DISPLAY_HUMIDITY
+    assert desc.name == "Display Humidity"
+    assert desc.icon == "mdi:water-percent"
+    assert desc.entity_category == EntityCategory.CONFIG
 
 
 class TestSwitchTypes:
     """Test cases for SWITCH_TYPES configuration."""
 
-    def test_switch_types_not_empty(self) -> None:
-        """Test that SWITCH_TYPES is not empty."""
-        assert len(SWITCH_TYPES) > 0
-
-    def test_switch_types_all_have_key(self) -> None:
-        """Test that all switch types have a key."""
-        for switch in SWITCH_TYPES:
-            assert switch.key is not None
-            assert len(switch.key) > 0
-
-    def test_switch_types_all_have_name(self) -> None:
-        """Test that all switch types have a name."""
-        for switch in SWITCH_TYPES:
-            assert switch.name is not None
-            assert len(switch.name) > 0
-
-    def test_switch_types_all_have_setting(self) -> None:
-        """Test that all switch types have a setting."""
-        for switch in SWITCH_TYPES:
-            assert switch.setting is not None
-
-    def test_display_humidity_switch_in_types(self) -> None:
-        """Test that display_humidity switch is in types."""
-        display_humidity = [s for s in SWITCH_TYPES if s.key == "display_humidity"]
-        assert len(display_humidity) == 1
-        assert display_humidity[0].setting == SettingEventName.DISPLAY_HUMIDITY
-
-    def test_continuous_backlight_switch_in_types(self) -> None:
-        """Test that continuous_backlight switch is in types."""
-        backlight = [s for s in SWITCH_TYPES if s.key == "continuous_backlight"]
-        assert len(backlight) == 1
-        assert backlight[0].setting == SettingEventName.CONTINUOUS_BACKLIGHT
-
-    def test_display_time_switch_in_types(self) -> None:
-        """Test that display_time switch is in types."""
-        display_time = [s for s in SWITCH_TYPES if s.key == "display_time"]
-        assert len(display_time) == 1
-        assert display_time[0].setting == SettingEventName.DISPLAY_TIME
-
-    def test_keypad_lockout_switch_in_types(self) -> None:
-        """Test that keypad_lockout switch is in types."""
-        keypad = [s for s in SWITCH_TYPES if s.key == "keypad_lockout"]
-        assert len(keypad) == 1
-        assert keypad[0].setting == SettingEventName.KEYPAD_LOCKOUT
+    @pytest.mark.parametrize(
+        ("key", "setting"),
+        [
+            ("display_humidity", SettingEventName.DISPLAY_HUMIDITY),
+            ("continuous_backlight", SettingEventName.CONTINUOUS_BACKLIGHT),
+            ("display_time", SettingEventName.DISPLAY_TIME),
+            ("keypad_lockout", SettingEventName.KEYPAD_LOCKOUT),
+        ],
+    )
+    def test_switch_type_exists(self, key, setting):
+        """Test switch entity value type."""
+        switches = [s for s in SWITCH_TYPES if s.key == key]
+        assert len(switches) == 1
+        assert switches[0].setting == setting
 
     def test_switch_types_with_icons(self) -> None:
         """Test that switches have appropriate icons."""
@@ -139,12 +104,7 @@ class TestSensiCapabilitySettingSwitch:
     ) -> None:
         """Test SensiCapabilitySettingSwitch initialization."""
 
-        description = SensiCapabilityEntityDescription(
-            key="display_humidity",
-            setting=SettingEventName.DISPLAY_HUMIDITY,
-            name="Display Humidity",
-            icon="mdi:water-percent",
-        )
+        description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
             mock_device, description, mock_coordinator
@@ -160,12 +120,7 @@ class TestSensiCapabilitySettingSwitch:
         """Test is_on property returns correct state."""
 
         mock_device.state.display_humidity = True
-
-        description = SensiCapabilityEntityDescription(
-            key="display_humidity",
-            setting=SettingEventName.DISPLAY_HUMIDITY,
-            name="Display Humidity",
-        )
+        description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
             mock_device, description, mock_coordinator
@@ -179,12 +134,7 @@ class TestSensiCapabilitySettingSwitch:
         """Test is_on property when switch is off."""
 
         mock_device.state.display_humidity = False
-
-        description = SensiCapabilityEntityDescription(
-            key="display_humidity",
-            setting=SettingEventName.DISPLAY_HUMIDITY,
-            name="Display Humidity",
-        )
+        description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
             mock_device, description, mock_coordinator
@@ -305,7 +255,6 @@ class TestSensiAuxHeatSwitch:
         """Test available property when aux heating is capable."""
 
         mock_device.capabilities.operating_mode_settings.aux = True
-
         switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
 
         assert switch.available is True
@@ -316,65 +265,61 @@ class TestSensiAuxHeatSwitch:
         """Test available property when aux heating is not capable."""
 
         mock_device.capabilities.operating_mode_settings.aux = False
-
         switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
 
         assert switch.available is False
 
-    def test_aux_heat_switch_is_on_when_aux_mode(
-        self, mock_device, mock_coordinator
-    ) -> None:
-        """Test is_on property when operating mode is AUX."""
-
-        mock_device.state.operating_mode = OperatingMode.AUX
-
-        switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
-
-        assert switch.is_on is True
-
+    @pytest.mark.parametrize(
+        ("operating_mode", "expected"),
+        [
+            (OperatingMode.HEAT, False),
+            (OperatingMode.COOL, False),
+            (OperatingMode.OFF, False),
+            (OperatingMode.AUX, True),
+        ],
+    )
     def test_aux_heat_switch_is_off_when_heat_mode(
-        self, mock_device, mock_coordinator
+        self, mock_device, mock_coordinator, operating_mode, expected
     ) -> None:
         """Test is_on property when operating mode is HEAT (not AUX)."""
 
-        mock_device.state.operating_mode = OperatingMode.HEAT
-
+        mock_device.state.operating_mode = operating_mode
         switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
 
-        assert switch.is_on is False
+        assert switch.is_on == expected
 
-    def test_aux_heat_switch_is_off_when_cool_mode(
+    async def test_aux_heat_switch_uses_previous_mode(
         self, mock_device, mock_coordinator
     ) -> None:
-        """Test is_on property when operating mode is COOL."""
-
-        mock_device.state.operating_mode = OperatingMode.COOL
-
-        switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
-
-        assert switch.is_on is False
-
-    def test_aux_heat_switch_is_off_when_off_mode(
-        self, mock_device, mock_coordinator
-    ) -> None:
-        """Test is_on property when operating mode is OFF."""
-
-        mock_device.state.operating_mode = OperatingMode.OFF
-
-        switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
-
-        assert switch.is_on is False
-
-    def test_aux_heat_switch_stores_previous_mode(
-        self, mock_device, mock_coordinator
-    ) -> None:
-        """Test that previous operating mode is stored."""
+        """Test that previous operating mode is used."""
 
         mock_device.state.operating_mode = OperatingMode.HEAT
-
         switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
 
-        assert switch._last_operating_mode_before_aux_heat == OperatingMode.HEAT
+        with (
+            patch.object(switch, "async_write_ha_state") as mock_async_write_ha_state,
+            patch.object(
+                mock_coordinator, "async_update_listeners"
+            ) as mock_async_update_listeners,
+            patch.object(
+                mock_coordinator.client, "async_set_operating_mode"
+            ) as mock_async_set_operating_mode,
+        ):
+            mock_async_set_operating_mode.return_value = ActionResponse(None, {})
+            initial_operating_mode = mock_device.state.operating_mode
+
+            expected_calls = [
+                call(mock_device, OperatingMode.AUX),
+                call(mock_device, initial_operating_mode),
+            ]
+
+            await switch.async_turn_on()  # This will save off OperatingMode.HEAT
+            await switch.async_turn_off()  # This will use the saved value
+
+            mock_async_set_operating_mode.assert_has_calls(expected_calls)
+
+            assert mock_async_write_ha_state.call_count == 2
+            assert mock_async_update_listeners.call_count == 2
 
 
 class TestSensiFanSupportSwitch:

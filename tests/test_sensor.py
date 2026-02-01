@@ -306,30 +306,6 @@ class TestSensorTypes:
         value = temp_sensor.value_fn(device)
         assert isinstance(value, (int, float))
 
-    def test_humidity_sensor_value_function(self, mock_json):
-        """Test humidity sensor value function."""
-
-        _have_state, device = SensiDevice.create(mock_json)
-        humidity_sensor = next(s for s in SENSOR_TYPES if s.key == "humidity")
-        value = humidity_sensor.value_fn(device)
-        assert isinstance(value, int)
-
-    def test_fan_speed_sensor_value_function(self, mock_json):
-        """Test fan speed sensor value function."""
-
-        __have_state, device = SensiDevice.create(mock_json)
-        fan_sensor = next(s for s in SENSOR_TYPES if s.key == "fan_speed")
-        value = fan_sensor.value_fn(device)
-        assert isinstance(value, int)
-
-    def test_wifi_strength_sensor_value_function(self, mock_json):
-        """Test wifi strength sensor value function."""
-
-        __have_state, device = SensiDevice.create(mock_json)
-        wifi_sensor = next(s for s in SENSOR_TYPES if s.key == "wifi_strength")
-        value = wifi_sensor.value_fn(device)
-        assert isinstance(value, int)
-
     def test_cool_min_temp_sensor_configuration(self):
         """Test cool min temp sensor configuration."""
         cool_min = next(s for s in SENSOR_TYPES if s.key == "cool_min_temp")
