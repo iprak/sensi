@@ -103,76 +103,31 @@ class TestToFloat:
         assert to_float(1e-3, 0.0) == 0.001
 
 
-class TestToBool:
-    """Test cases for to_bool function."""
-
-    def test_to_bool_with_true_string(self):
-        """Test conversion of 'true' string."""
-        assert to_bool("true") is True
-
-    def test_to_bool_with_true_string_uppercase(self):
-        """Test conversion of 'TRUE' string."""
-        assert to_bool("TRUE") is True
-
-    def test_to_bool_with_yes_string(self):
-        """Test conversion of 'yes' string."""
-        assert to_bool("yes") is True
-
-    def test_to_bool_with_yes_string_uppercase(self):
-        """Test conversion of 'YES' string."""
-        assert to_bool("YES") is True
-
-    def test_to_bool_with_on_string(self):
-        """Test conversion of 'on' string."""
-        assert to_bool("on") is True
-
-    def test_to_bool_with_on_string_uppercase(self):
-        """Test conversion of 'ON' string."""
-        assert to_bool("ON") is True
-
-    def test_to_bool_with_false_string(self):
-        """Test conversion of 'false' string."""
-        assert to_bool("false") is False
-
-    def test_to_bool_with_no_string(self):
-        """Test conversion of 'no' string."""
-        assert to_bool("no") is False
-
-    def test_to_bool_with_off_string(self):
-        """Test conversion of 'off' string."""
-        assert to_bool("off") is False
-
-    def test_to_bool_with_bool_true(self):
-        """Test conversion of boolean True."""
-        assert to_bool(True) is True
-
-    def test_to_bool_with_bool_false(self):
-        """Test conversion of boolean False."""
-        assert to_bool(False) is False
-
-    def test_to_bool_with_none(self):
-        """Test conversion of None returns False."""
-        assert to_bool(None) is False
-
-    def test_to_bool_with_arbitrary_string(self):
-        """Test conversion of arbitrary string returns False."""
-        assert to_bool("random") is False
-
-    def test_to_bool_with_empty_string(self):
-        """Test conversion of empty string returns False."""
-        assert to_bool("") is False
-
-    def test_to_bool_mixed_case_yes(self):
-        """Test conversion of mixed case 'Yes'."""
-        assert to_bool("Yes") is True
-
-    def test_to_bool_mixed_case_on(self):
-        """Test conversion of mixed case 'On'."""
-        assert to_bool("On") is True
-
-    def test_to_bool_mixed_case_true(self):
-        """Test conversion of mixed case 'True'."""
-        assert to_bool("True") is True
+@pytest.mark.parametrize(
+    ("input_val", "expected"),
+    [
+        ("true", True),
+        ("TRUE", True),
+        ("True", True),
+        ("yes", True),
+        ("YES", True),
+        ("Yes", True),
+        ("on", True),
+        ("ON", True),
+        ("On", True),
+        ("false", False),
+        ("no", False),
+        ("off", False),
+        ("", False),
+        (None, False),
+        ("random", False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_to_bool(input_val, expected) -> None:
+    """Test to_bool function."""
+    assert to_bool(input_val) == expected
 
 
 class TestBoolToOnoff:

@@ -244,49 +244,22 @@ class TestSensiThermostatHvacModes:
         assert HVACMode.OFF in mock_thermostat.hvac_modes
 
 
-class TestSensiThermostatHvacAction:
+@pytest.mark.parametrize(
+    ("mode", "heat", "cool", "expected"),
+    [
+        (OperatingMode.OFF, 0, 0, HVACAction.OFF),
+        (OperatingMode.HEAT, 100, 0, HVACAction.HEATING),
+        (OperatingMode.COOL, 0, 100, HVACAction.COOLING),
+        (OperatingMode.HEAT, 0, 0, HVACAction.IDLE),
+        (OperatingMode.AUX, 0, 0, HVACAction.HEATING),
+    ],
+)
+def test_hvac_action(mock_device, mock_thermostat, mode, heat, cool, expected) -> None:
     """Test cases for HVAC action determination."""
-
-    def test_hvac_action_off(self, mock_device, mock_thermostat):
-        """Test hvac_action when operating mode is OFF."""
-
-        mock_device.state.operating_mode = OperatingMode.OFF
-
-        assert mock_thermostat.hvac_action == HVACAction.OFF
-
-    def test_hvac_action_heating(self, mock_device, mock_thermostat):
-        """Test hvac_action when heating."""
-
-        mock_device.state.operating_mode = OperatingMode.HEAT
-        mock_device.state.demand_status.heat = 100
-        mock_device.state.demand_status.cool = 0
-
-        assert mock_thermostat.hvac_action == HVACAction.HEATING
-
-    def test_hvac_action_cooling(self, mock_device, mock_thermostat):
-        """Test hvac_action when cooling."""
-
-        mock_device.state.operating_mode = OperatingMode.COOL
-        mock_device.state.demand_status.heat = 0
-        mock_device.state.demand_status.cool = 100
-
-        assert mock_thermostat.hvac_action == HVACAction.COOLING
-
-    def test_hvac_action_idle(self, mock_device, mock_thermostat):
-        """Test hvac_action when idle."""
-
-        mock_device.state.operating_mode = OperatingMode.HEAT
-        mock_device.state.demand_status.heat = 0
-        mock_device.state.demand_status.cool = 0
-
-        assert mock_thermostat.hvac_action == HVACAction.IDLE
-
-    def test_hvac_action_aux_treated_as_heating(self, mock_device, mock_thermostat):
-        """Test that AUX mode is treated as heating."""
-
-        mock_device.state.operating_mode = OperatingMode.AUX
-
-        assert mock_thermostat.hvac_action == HVACAction.HEATING
+    mock_device.state.operating_mode = mode
+    mock_device.state.demand_status.heat = heat
+    mock_device.state.demand_status.cool = cool
+    assert mock_thermostat.hvac_action == expected
 
 
 class TestSensiThermostatFanModes:

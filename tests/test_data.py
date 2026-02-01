@@ -1,5 +1,7 @@
 """Tests for Sensi data component."""
 
+import pytest
+
 from custom_components.sensi.coordinator import SensiDevice
 from custom_components.sensi.data import (
     CirculatingFan,
@@ -30,67 +32,38 @@ class TestOperatingMode:
         assert OperatingMode.UNKNOWN == "unknown"
 
 
-class TestGetHvacModeFromOperatingMode:
-    """Test cases for get_hvac_mode_from_operating_mode function."""
-
-    def test_operating_mode_heat_to_hvac(self):
-        """Test converting OperatingMode.HEAT to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.HEAT)
-        assert result == HVACMode.HEAT
-
-    def test_operating_mode_aux_to_hvac(self):
-        """Test converting OperatingMode.AUX to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.AUX)
-        assert result == HVACMode.HEAT
-
-    def test_operating_mode_cool_to_hvac(self):
-        """Test converting OperatingMode.COOL to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.COOL)
-        assert result == HVACMode.COOL
-
-    def test_operating_mode_auto_to_hvac(self):
-        """Test converting OperatingMode.AUTO to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.AUTO)
-        assert result == HVACMode.AUTO
-
-    def test_operating_mode_off_to_hvac(self):
-        """Test converting OperatingMode.OFF to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.OFF)
-        assert result == HVACMode.OFF
-
-    def test_operating_mode_unknown_to_hvac(self):
-        """Test converting OperatingMode.UNKNOWN to HVACMode."""
-        result = get_hvac_mode_from_operating_mode(OperatingMode.UNKNOWN)
-        assert result is None
+@pytest.mark.parametrize(
+    ("operating_mode", "expected_hvac"),
+    [
+        (OperatingMode.HEAT, HVACMode.HEAT),
+        (OperatingMode.AUX, HVACMode.HEAT),
+        (OperatingMode.COOL, HVACMode.COOL),
+        (OperatingMode.AUTO, HVACMode.AUTO),
+        (OperatingMode.OFF, HVACMode.OFF),
+        (OperatingMode.UNKNOWN, None),
+    ],
+)
+def test_hvac_mode_from_operating_mode(operating_mode, expected_hvac) -> None:
+    """Test converting OperatingMode.HEAT to HVACMode."""
+    assert get_hvac_mode_from_operating_mode(operating_mode) == expected_hvac
 
 
-class TestGetOperatingModeFromHvacMode:
-    """Test cases for get_operating_mode_from_hvac_mode function."""
-
-    def test_hvac_mode_heat_to_operating(self):
-        """Test converting HVACMode.HEAT to OperatingMode."""
-        result = get_operating_mode_from_hvac_mode(HVACMode.HEAT)
-        assert result == OperatingMode.HEAT
-
-    def test_hvac_mode_cool_to_operating(self):
-        """Test converting HVACMode.COOL to OperatingMode."""
-        result = get_operating_mode_from_hvac_mode(HVACMode.COOL)
-        assert result == OperatingMode.COOL
-
-    def test_hvac_mode_auto_to_operating(self):
-        """Test converting HVACMode.AUTO to OperatingMode."""
-        result = get_operating_mode_from_hvac_mode(HVACMode.AUTO)
-        assert result == OperatingMode.AUTO
-
-    def test_hvac_mode_off_to_operating(self):
-        """Test converting HVACMode.OFF to OperatingMode."""
-        result = get_operating_mode_from_hvac_mode(HVACMode.OFF)
-        assert result == OperatingMode.OFF
-
-    def test_hvac_mode_dry_to_operating(self):
-        """Test converting unsupported HVACMode.DRY returns None."""
-        result = get_operating_mode_from_hvac_mode(HVACMode.DRY)
-        assert result is None
+@pytest.mark.parametrize(
+    ("hvac", "expected_operating_mode"),
+    [
+        (HVACMode.HEAT, OperatingMode.HEAT),
+        (HVACMode.COOL, OperatingMode.COOL),
+        (HVACMode.AUTO, OperatingMode.AUTO),
+        (
+            HVACMode.OFF,
+            OperatingMode.OFF,
+        ),
+        (HVACMode.DRY, None),
+    ],
+)
+def test_hvac_mode_heat_to_operating(hvac, expected_operating_mode) -> None:
+    """Test converting HVACMode.HEAT to OperatingMode."""
+    assert get_operating_mode_from_hvac_mode(hvac) == expected_operating_mode
 
 
 class TestCirculatingFan:
