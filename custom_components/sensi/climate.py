@@ -361,10 +361,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def min_temp(self) -> float:
-        """Return the minimum temperature. This gets used as the lower bounds in UI."""
+        """Return the minimum temperature for single mode. This gets used as the lower bounds in UI."""
 
         # Use the thermostat defined minimum temperature if not heating. This is in temperature_unit.
-        if self.hvac_mode == HVACMode.COOL:
+        if self._device.state.operating_mode == OperatingMode.COOL:
             return self._state.cool_min_temp
 
         return TemperatureConverter.convert(
@@ -375,10 +375,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     @property
     def max_temp(self) -> float:
-        """Return the maximum temperature. This gets used as the upper bounds in UI."""
+        """Return the maximum temperature for single mode. This gets used as the upper bounds in UI."""
 
         # Use the thermostat defined maximum temperature if not cooling. This is in temperature_unit.
-        if self.hvac_mode == HVACMode.HEAT:
+        if self._device.state.operating_mode == OperatingMode.HEAT:
             return self._state.heat_max_temp
 
         return TemperatureConverter.convert(
@@ -431,6 +431,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Set new target temperature."""
 
         state = self._device.state
+
+        # The framework ensures that the temperatures are within min_temp and max_temp.
 
         # ATTR_TEMPERATURE => ClimateEntityFeature.TARGET_TEMPERATURE
         # ATTR_TARGET_TEMP_LOW/ATTR_TARGET_TEMP_HIGH => TARGET_TEMPERATURE_RANGE
