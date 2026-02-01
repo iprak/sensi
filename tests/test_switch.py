@@ -1,6 +1,6 @@
 """Tests for Sensi switch component."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -288,15 +288,38 @@ class TestSensiAuxHeatSwitch:
 
         assert switch.is_on == expected
 
-    def test_aux_heat_switch_stores_previous_mode(
+    async def test_aux_heat_switch_uses_previous_mode(
         self, mock_device, mock_coordinator
     ) -> None:
-        """Test that previous operating mode is stored."""
+        """Test that previous operating mode is used."""
 
         mock_device.state.operating_mode = OperatingMode.HEAT
         switch = SensiAuxHeatSwitch(mock_device, mock_coordinator)
 
-        assert switch._last_operating_mode_before_aux_heat == OperatingMode.HEAT
+        with (
+            patch.object(switch, "async_write_ha_state") as mock_async_write_ha_state,
+            patch.object(
+                mock_coordinator, "async_update_listeners"
+            ) as mock_async_update_listeners,
+            patch.object(
+                mock_coordinator.client, "async_set_operating_mode"
+            ) as mock_async_set_operating_mode,
+        ):
+            mock_async_set_operating_mode.return_value = ActionResponse(None, {})
+            initial_operating_mode = mock_device.state.operating_mode
+
+            expected_calls = [
+                call(mock_device, OperatingMode.AUX),
+                call(mock_device, initial_operating_mode),
+            ]
+
+            await switch.async_turn_on()  # This will save off OperatingMode.HEAT
+            await switch.async_turn_off()  # This will use the saved value
+
+            mock_async_set_operating_mode.assert_has_calls(expected_calls)
+
+            assert mock_async_write_ha_state.call_count == 2
+            assert mock_async_update_listeners.call_count == 2
 
 
 class TestSensiFanSupportSwitch:
