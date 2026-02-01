@@ -1,6 +1,6 @@
 """Tests for Sensi climate component."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -13,7 +13,7 @@ from custom_components.sensi.const import (
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
-from custom_components.sensi.data import FanMode, OperatingMode
+from custom_components.sensi.data import FanMode, OperatingMode, SensiDevice
 from homeassistant.components.climate import ClimateEntity, HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
@@ -58,6 +58,73 @@ async def test_set_fan_mode(hass: HomeAssistant, mock_device, mock_thermostat) -
 
         mock_set_circulating_fan_mode.assert_called()
         mock_set_fan_mode.assert_called_with(mock_device, SENSI_FAN_AUTO)
+
+
+async def test_set_temperature(
+    hass: HomeAssistant, mock_device, mock_thermostat, mock_coordinator
+) -> None:
+    """Test async_set_temperature."""
+
+    temperature = 75
+    with (
+        patch.object(
+            mock_thermostat, "async_write_ha_state"
+        ) as mock_async_write_ha_state,
+        patch.object(
+            mock_coordinator, "async_update_listeners"
+        ) as mock_async_update_listeners,
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_temperature"
+        ) as mock_async_set_temperature,
+    ):
+        mock_async_set_temperature.return_value = ActionResponse(
+            None, {"current_temp": 70, "mode": "heat", "target_temp": 75}
+        )
+
+        await mock_thermostat.async_set_temperature(temperature=temperature)
+
+        mock_async_set_temperature.assert_called_once_with(
+            mock_device, mock_device.state.operating_mode, temperature
+        )
+        mock_async_write_ha_state.assert_called_once()
+        mock_async_update_listeners.assert_called_once()
+
+
+async def test_set_temperature_auto(
+    hass: HomeAssistant, mock_device, mock_thermostat, mock_coordinator
+) -> None:
+    """Test async_set_temperature for auto mode."""
+
+    with (
+        patch.object(
+            mock_thermostat, "async_write_ha_state"
+        ) as mock_async_write_ha_state,
+        patch.object(
+            mock_coordinator, "async_update_listeners"
+        ) as mock_async_update_listeners,
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_temperature"
+        ) as mock_async_set_temperature,
+    ):
+        mock_async_set_temperature.return_value = ActionResponse(
+            None, {"current_temp": 70, "mode": "heat", "target_temp": 75}
+        )
+        mock_device.state.operating_mode = OperatingMode.AUTO
+
+        await mock_thermostat.async_set_temperature(
+            target_temp_low=66, target_temp_high=75
+        )
+
+        expected_calls = [
+            call(mock_device, OperatingMode.HEAT, 66),
+            call(mock_device, OperatingMode.COOL, 75),
+        ]
+
+        assert mock_async_set_temperature.call_count == len(expected_calls)
+        mock_async_set_temperature.assert_has_calls(expected_calls)
+
+        mock_async_write_ha_state.assert_called_once()
+        mock_async_update_listeners.assert_called_once()
 
 
 async def test_set_fan_mode_invalid(
@@ -105,19 +172,25 @@ class TestSensiThermostatProperties:
 
         assert mock_thermostat.current_temperature == mock_device.state.display_temp
 
-    def test_temperature_unit_fahrenheit(self, mock_device, mock_thermostat):
-        """Test temperature_unit property for Fahrenheit."""
-
-        mock_device.state.display_scale = "f"
-
-        assert mock_thermostat.temperature_unit == UnitOfTemperature.FAHRENHEIT
-
-    def test_temperature_unit_celsius(self, mock_device, mock_thermostat):
+    @pytest.mark.parametrize(
+        ("display_scale", "expected"),
+        [
+            ("c", UnitOfTemperature.CELSIUS),
+            ("C", UnitOfTemperature.CELSIUS),
+            ("f", UnitOfTemperature.FAHRENHEIT),
+            ("F", UnitOfTemperature.FAHRENHEIT),
+        ],
+    )
+    def test_temperature_unit(
+        self, mock_json, mock_entry, mock_coordinator, display_scale, expected
+    ):
         """Test temperature_unit property for Celsius."""
 
-        mock_device.state.display_scale = "c"
+        mock_json["state"]["display_scale"] = display_scale
+        _, device = SensiDevice.create(mock_json)
+        thermostat = SensiThermostat(device, mock_entry, mock_coordinator)
 
-        assert mock_thermostat.temperature_unit == UnitOfTemperature.CELSIUS
+        assert thermostat.temperature_unit == expected
 
     def test_current_humidity(self, mock_device, mock_thermostat):
         """Test current_humidity property."""
