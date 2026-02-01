@@ -14,12 +14,7 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import (
-    ATTR_TEMPERATURE,
-    PRECISION_HALVES,
-    PRECISION_WHOLE,
-    UnitOfTemperature,
-)
+from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -92,11 +87,8 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             hass=hass,
         )
 
-        self._attr_target_temperature_step = (
-            PRECISION_HALVES
-            if hass.config.units.temperature_unit == UnitOfTemperature.CELSIUS
-            else PRECISION_WHOLE
-        )
+        # The mobile device always uses whole numbers for C and F unit
+        self._attr_target_temperature_step = PRECISION_WHOLE
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
@@ -451,8 +443,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise_if_error(response, "Cool setpoint", temperature_high)
         else:
             temperature = kwargs.get(ATTR_TEMPERATURE)
-
-            temperature = round(temperature)
             response = await self.coordinator.client.async_set_temperature(
                 self._device, state.operating_mode, temperature
             )
@@ -461,7 +451,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         self.async_write_ha_state()
 
-        # Refresh entities relying on temperature
+        # Refresh entities relying on temperatures
         self.coordinator.async_update_listeners()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
