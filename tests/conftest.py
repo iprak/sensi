@@ -11,11 +11,7 @@ from custom_components.sensi.auth import AuthenticationConfig
 from custom_components.sensi.client import SensiClient
 from custom_components.sensi.climate import SensiThermostat
 from custom_components.sensi.const import SENSI_DOMAIN
-from custom_components.sensi.coordinator import (
-    SensiConfigEntry,
-    SensiDevice,
-    SensiUpdateCoordinator,
-)
+from custom_components.sensi.coordinator import SensiDevice, SensiUpdateCoordinator
 from homeassistant.core import HomeAssistant
 
 
@@ -37,7 +33,7 @@ def mock_coordinator(hass: HomeAssistant) -> SensiUpdateCoordinator:
         user_id="user_id",
     )
     client = SensiClient(hass, config, MagicMock())
-    return SensiUpdateCoordinator(hass, config, client)
+    return SensiUpdateCoordinator(hass, client)
 
 
 @pytest.fixture
