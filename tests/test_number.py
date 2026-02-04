@@ -8,7 +8,6 @@ from custom_components.sensi.number import (
     SensiNumberEntity,
     async_setup_entry,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 
 

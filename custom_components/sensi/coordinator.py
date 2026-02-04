@@ -46,11 +46,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
         )
 
-        self._setup_headers(config)
         self.client = client
-
-    def _setup_headers(self, config: AuthenticationConfig):
-        self._headers = {"Authorization": "bearer " + config.access_token}
 
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""

@@ -47,8 +47,6 @@ from .data import (
 )
 from .entity import SensiEntity
 
-FORCE_REFRESH_DELAY = 3
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
