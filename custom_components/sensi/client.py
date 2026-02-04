@@ -300,40 +300,6 @@ class SensiClient:
 
         return action_response
 
-    async def async_set_temperature_limits(
-        self, device: SensiDevice, min_temp: bool, value: int
-    ) -> ActionResponse:
-        """Set the minimum/maximum thermostat temperature limits. This updates the device on success."""
-
-        request = {
-            "scale": device.state.display_scale,
-            "value": value,
-            "icd_id": device.identifier,
-        }
-        action_response = await self._async_invoke_setter(
-            SettingEventName.COOL_MIN_TEMP.value
-            if min_temp
-            else SettingEventName.HEAT_MAX_TEMP.value,
-            request,
-        )
-
-        if action_response.error:
-            return action_response
-
-        response = action_response.data
-
-        if isinstance(response, str):
-            if response == "accepted":
-                if min_temp:
-                    device.state.cool_min_temp = value
-                else:
-                    device.state.heat_max_temp = value
-
-                return action_response
-
-        # Treat anything else other than "accepted" as error
-        return ActionResponse(f"Failed to parse `{response}`", None)
-
     async def async_set_temperature_offset(
         self, device: SensiDevice, value: int
     ) -> ActionResponse:
