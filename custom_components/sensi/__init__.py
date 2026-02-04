@@ -55,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
         client = SensiClient(hass, config, connector)
         await client.wait_for_devices()
 
-        entry.runtime_data = SensiUpdateCoordinator(hass, config, client)
+        entry.runtime_data = SensiUpdateCoordinator(hass, client)
         await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
     except ConfigEntryAuthFailed:
         # Pass ConfigEntryAuthFailed, this can be raised from the coordinator
