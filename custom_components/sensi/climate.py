@@ -37,7 +37,6 @@ from .const import (
     TEMPERATURE_LOWER_LIMIT,
     TEMPERATURE_UPPER_LIMIT,
 )
-from .coordinator import SensiUpdateCoordinator
 from .data import (
     FanMode,
     OperatingMode,
@@ -56,7 +55,7 @@ async def async_setup_entry(
     """Set up Sensi thermostats."""
     coordinator = entry.runtime_data
     devices = coordinator.get_devices()
-    entities = [SensiThermostat(device, entry, coordinator) for device in devices]
+    entities = [SensiThermostat(hass, device, entry) for device in devices]
     async_add_entities(entities)
 
 
@@ -69,16 +68,14 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         entry: SensiConfigEntry,
-        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the device."""
 
-        hass = coordinator.hass
-        super().__init__(device, coordinator)
+        super().__init__(device, entry)
 
-        self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}",

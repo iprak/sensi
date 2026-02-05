@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import SENSI_DOMAIN
-from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice
 from .entity import SensiDescriptionEntity
 
 
@@ -35,7 +35,7 @@ async def async_setup_entry(
     )
 
     entities = [
-        OnlineBinarySensorEntity(hass, device, onlineDescription, coordinator)
+        OnlineBinarySensorEntity(hass, device, onlineDescription, entry)
         for device in coordinator.get_devices()
     ]
 
@@ -52,10 +52,10 @@ class OnlineBinarySensorEntity(SensiDescriptionEntity, BinarySensorEntity):
         hass: HomeAssistant,
         device: SensiDevice,
         description: BinarySensorEntityDescription,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
