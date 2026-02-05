@@ -73,16 +73,14 @@ def mock_entry(hass: HomeAssistant, mock_coordinator) -> MockConfigEntry:
 
 
 @pytest.fixture
-def mock_thermostat(mock_device, mock_entry, mock_coordinator) -> SensiThermostat:
+def mock_thermostat(hass: HomeAssistant, mock_device, mock_entry) -> SensiThermostat:
     """Create a mock SensiThermostat."""
-    return SensiThermostat(mock_device, mock_entry, mock_coordinator)
+    return SensiThermostat(hass, mock_device, mock_entry)
 
 
 @pytest.fixture
 def mock_thermostat_with_humidification(
-    mock_device_with_humidification, mock_entry, mock_coordinator
+    hass: HomeAssistant, mock_device_with_humidification, mock_entry
 ) -> SensiThermostat:
     """Create a mock SensiThermostat with humidification."""
-    return SensiThermostat(
-        mock_device_with_humidification, mock_entry, mock_coordinator
-    )
+    return SensiThermostat(hass, mock_device_with_humidification, mock_entry)

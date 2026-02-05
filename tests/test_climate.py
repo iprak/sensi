@@ -146,21 +146,12 @@ async def test_set_fan_mode_invalid(
 class TestSensiThermostatInitialization:
     """Test cases for SensiThermostat initialization."""
 
-    def test_thermostat_initialization(self, mock_device, mock_entry, mock_coordinator):
-        """Test SensiThermostat initialization."""
-
-        thermostat = SensiThermostat(mock_device, mock_entry, mock_coordinator)
-
-        assert thermostat._device == mock_device
-        assert thermostat._entry == mock_entry
-        assert thermostat.coordinator == mock_coordinator
-
-    def test_thermostat_is_climate_entity(self, mock_device, mock_thermostat):
+    def test_thermostat_is_climate_entity(self, mock_thermostat):
         """Test SensiThermostat is a ClimateEntity."""
 
         assert isinstance(mock_thermostat, ClimateEntity)
 
-    def test_thermostat_has_entity_name(self, mock_device, mock_thermostat):
+    def test_thermostat_has_entity_name(self, mock_thermostat):
         """Test that mock_thermostat has entity name enabled."""
 
         assert mock_thermostat.has_entity_name is True
@@ -169,7 +160,7 @@ class TestSensiThermostatInitialization:
 class TestSensiThermostatProperties:
     """Test cases for SensiThermostat properties."""
 
-    def test_name_property(self, mock_device, mock_thermostat):
+    def test_name_property(self, mock_thermostat):
         """Test name property returns None for primary entity."""
 
         assert mock_thermostat.name is None
@@ -189,13 +180,13 @@ class TestSensiThermostatProperties:
         ],
     )
     def test_temperature_unit(
-        self, mock_json, mock_entry, mock_coordinator, display_scale, expected
+        self, hass: HomeAssistant, mock_json, mock_entry, display_scale, expected
     ):
         """Test temperature_unit property for Celsius."""
 
         mock_json["state"]["display_scale"] = display_scale
         _, device = SensiDevice.create(mock_json)
-        thermostat = SensiThermostat(device, mock_entry, mock_coordinator)
+        thermostat = SensiThermostat(hass, device, mock_entry)
 
         assert thermostat.temperature_unit == expected
 

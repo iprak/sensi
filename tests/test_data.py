@@ -419,3 +419,21 @@ class TestSensiDevice:
         """Test SensiDevice has capabilities attribute."""
         _have_state, device = SensiDevice.create(mock_json)
         assert device.capabilities is not None
+
+    def test_sensi_device_update_capabilities(self, mock_json):
+        """Test SensiDevice capabilities update."""
+        _have_state, device = SensiDevice.create(mock_json)
+        current_capabilities = device.capabilities
+        device.update_capabilities({"last_changed_timestamp": 1756195713})
+
+        assert device.capabilities is not None
+        assert device.capabilities != current_capabilities
+
+    def test_sensi_device_update_info(self, mock_json):
+        """Test SensiDevice info update."""
+        _have_state, device = SensiDevice.create(mock_json)
+        current_info = device.info
+        device.update_info({"test_date": "11/14/2018"})
+
+        assert device.info is not None
+        assert device.info != current_info
