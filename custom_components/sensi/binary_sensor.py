@@ -67,7 +67,7 @@ class OnlineBinarySensorEntity(SensiDescriptionEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
-        return self._device and self._device.state.is_online
+        return self._state.is_online
 
     @property
     def available(self) -> bool:

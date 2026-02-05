@@ -181,7 +181,7 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the sensor, if any."""
         return (
-            self._device.state.temperature_unit
+            self._state.temperature_unit
             if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
             else self.entity_description.native_unit_of_measurement
         )

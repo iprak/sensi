@@ -128,7 +128,7 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        return getattr(self._device.state, self.entity_description.key)
+        return getattr(self._state, self.entity_description.key)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
@@ -246,12 +246,12 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if aux heating is on."""
-        return self._device.state.operating_mode == OperatingMode.AUX
+        return self._state.operating_mode == OperatingMode.AUX
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""
 
-        self._last_operating_mode_before_aux_heat = self._device.state.operating_mode
+        self._last_operating_mode_before_aux_heat = self._state.operating_mode
 
         response = await self.coordinator.client.async_set_operating_mode(
             self._device, OperatingMode.AUX
@@ -308,7 +308,7 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        return self._device.state.humidity_control.humidification.enabled
+        return self._state.humidity_control.humidification.enabled
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""

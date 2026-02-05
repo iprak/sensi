@@ -36,6 +36,7 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
 
     @property
     def _state(self) -> State:
+        """Current device state."""
         return self._device.state
 
     @property
