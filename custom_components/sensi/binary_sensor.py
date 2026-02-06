@@ -12,7 +12,6 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiDevice
@@ -73,5 +72,5 @@ class OnlineBinarySensorEntity(SensiDescriptionEntity, BinarySensorEntity):
     def available(self) -> bool:
         """Return if the data is available."""
 
-        # The super class checks device online status so we directly access CoordinatorEntity
-        return super(CoordinatorEntity, self).available
+        # The super class checks device online status so we directly return coordinator status
+        return self.coordinator.last_update_success
