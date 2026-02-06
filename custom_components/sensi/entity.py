@@ -4,7 +4,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import SENSI_ATTRIBUTION, SENSI_DOMAIN
-from .coordinator import SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
 from .data import SensiDevice, State
 
 
@@ -15,12 +15,15 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
     _attr_attribution = SENSI_ATTRIBUTION
 
     def __init__(
-        self, device: SensiDevice, coordinator: SensiUpdateCoordinator
+        self,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the entity."""
 
-        super().__init__(coordinator)
+        super().__init__(entry.runtime_data)
         self._device = device
+        self._entry = entry
         self._attr_unique_id = device.identifier
 
         self._attr_device_info = DeviceInfo(
@@ -33,6 +36,7 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
 
     @property
     def _state(self) -> State:
+        """Current device state."""
         return self._device.state
 
     @property
@@ -51,11 +55,11 @@ class SensiDescriptionEntity(SensiEntity):
         self,
         device: SensiDevice,
         description: EntityDescription,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the entity."""
 
-        super().__init__(device, coordinator)
+        super().__init__(device, entry)
         self.entity_description = description
 
         # Override the _attr_unique_id to include description.key

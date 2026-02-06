@@ -24,7 +24,7 @@ from .const import (
     DEFAULT_CONFIG_FAN_SUPPORT,
     SENSI_DOMAIN,
 )
-from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice
 from .data import OperatingMode
 from .entity import SensiDescriptionEntity
 from .event import SettingEventName
@@ -90,16 +90,16 @@ async def async_setup_entry(
 
         # A device might not support a setting e.g. Continuous Backlight
         entities.extend(
-            SensiCapabilitySettingSwitch(device, description, coordinator)
+            SensiCapabilitySettingSwitch(hass, device, description, entry)
             for description in SWITCH_TYPES
             if getattr(capabilities, description.key)
         )
 
-        entities.append(SensiFanSupportSwitch(device, entry, coordinator))
-        entities.append(SensiAuxHeatSwitch(device, coordinator))
+        entities.append(SensiFanSupportSwitch(hass, device, entry))
+        entities.append(SensiAuxHeatSwitch(hass, device, entry))
 
         if device.capabilities.humidity_control.humidification:
-            entities.append(SensiHumidificationSwitch(device, entry, coordinator))
+            entities.append(SensiHumidificationSwitch(hass, device, entry))
 
     async_add_entities(entities)
 
@@ -111,23 +111,24 @@ class SensiCapabilitySettingSwitch(SensiDescriptionEntity, SwitchEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         description: SensiCapabilityEntityDescription,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the setting."""
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",  # Use same key as before
-            hass=coordinator.hass,
+            hass=hass,
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        return getattr(self._device.state, self.entity_description.key)
+        return getattr(self._state, self.entity_description.key)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
@@ -152,9 +153,9 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         entry: SensiConfigEntry,
-        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the setting."""
 
@@ -165,16 +166,15 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
             entity_category=EntityCategory.CONFIG,
         )
 
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         # Cache status to avoid querying ConfigEntry
         self._status: bool | None = None
 
-        self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=coordinator.hass,
+            hass=hass,
         )
 
     @property
@@ -215,8 +215,9 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the setting."""
 
@@ -227,12 +228,12 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
             entity_category=EntityCategory.CONFIG,
         )
 
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=coordinator.hass,
+            hass=hass,
         )
 
         self._last_operating_mode_before_aux_heat = device.state.operating_mode
@@ -245,12 +246,12 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if aux heating is on."""
-        return self._device.state.operating_mode == OperatingMode.AUX
+        return self._state.operating_mode == OperatingMode.AUX
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""
 
-        self._last_operating_mode_before_aux_heat = self._device.state.operating_mode
+        self._last_operating_mode_before_aux_heat = self._state.operating_mode
 
         response = await self.coordinator.client.async_set_operating_mode(
             self._device, OperatingMode.AUX
@@ -283,9 +284,9 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         entry: SensiConfigEntry,
-        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the setting."""
 
@@ -296,18 +297,18 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
             entity_category=EntityCategory.CONFIG,
         )
 
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}_{description.key}",
-            hass=coordinator.hass,
+            hass=hass,
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        return self._device.state.humidity_control.humidification.enabled
+        return self._state.humidity_control.humidification.enabled
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""

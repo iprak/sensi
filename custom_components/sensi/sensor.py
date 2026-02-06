@@ -25,7 +25,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN
-from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice
 from .entity import SensiDescriptionEntity
 
 
@@ -138,7 +138,7 @@ async def async_setup_entry(
     """Set up Sensi thermostat sensors."""
     coordinator = entry.runtime_data
     entities = [
-        SensiSensorEntity(hass, device, description, coordinator)
+        SensiSensorEntity(hass, device, description, entry)
         for device in coordinator.get_devices()
         for description in SENSOR_TYPES
     ]
@@ -156,10 +156,10 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
         hass: HomeAssistant,
         device: SensiDevice,
         description: SensiSensorEntityDescription,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
@@ -181,7 +181,7 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the sensor, if any."""
         return (
-            self._device.state.temperature_unit
+            self._state.temperature_unit
             if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
             else self.entity_description.native_unit_of_measurement
         )

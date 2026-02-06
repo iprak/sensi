@@ -31,11 +31,11 @@ async def test_setup_platform(
     assert len(async_add_entities.call_args[0][0]) == 4
 
 
-async def test_get_value(hass: HomeAssistant, mock_device, mock_coordinator) -> None:
+async def test_get_value(hass: HomeAssistant, mock_device, mock_entry) -> None:
     """Test native_value for humidity entity."""
 
     humidity_desc = next((s for s in NUMBER_TYPES if s.key == "humidity_offset"), None)
-    entity = SensiNumberEntity(hass, mock_device, humidity_desc, mock_coordinator)
+    entity = SensiNumberEntity(hass, mock_device, humidity_desc, mock_entry)
 
     value = 35
     mock_device.state.humidity_offset = value
@@ -44,26 +44,28 @@ async def test_get_value(hass: HomeAssistant, mock_device, mock_coordinator) -> 
 
 
 async def test_native_unit_of_measurement(
-    hass: HomeAssistant, mock_device, mock_coordinator
+    hass: HomeAssistant, mock_device, mock_entry
 ) -> None:
     """Test native_unit_of_measurement."""
 
     humidity_desc = next((s for s in NUMBER_TYPES if s.key == "humidity_offset"), None)
-    entity1 = SensiNumberEntity(hass, mock_device, humidity_desc, mock_coordinator)
+    entity1 = SensiNumberEntity(hass, mock_device, humidity_desc, mock_entry)
     assert (
         entity1.native_unit_of_measurement == humidity_desc.native_unit_of_measurement
     )
 
     temp_desc = next((s for s in NUMBER_TYPES if s.key == "temperature_offset"), None)
-    entity2 = SensiNumberEntity(hass, mock_device, temp_desc, mock_coordinator)
+    entity2 = SensiNumberEntity(hass, mock_device, temp_desc, mock_entry)
     assert entity2.native_unit_of_measurement == mock_device.state.temperature_unit
 
 
-async def test_set_value(hass: HomeAssistant, mock_device, mock_coordinator) -> None:
+async def test_set_value(
+    hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+) -> None:
     """Test async_set_native_value for humidity entity."""
 
     humidity_desc = next((s for s in NUMBER_TYPES if s.key == "humidity_offset"), None)
-    entity = SensiNumberEntity(hass, mock_device, humidity_desc, mock_coordinator)
+    entity = SensiNumberEntity(hass, mock_device, humidity_desc, mock_entry)
 
     with (
         patch.object(entity, "async_write_ha_state") as mock_async_write_ha_state,

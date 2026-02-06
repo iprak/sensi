@@ -1,8 +1,13 @@
 """Tests for Sensi binary_sensor component."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
-from custom_components.sensi.binary_sensor import OnlineBinarySensorEntity
+from custom_components.sensi.binary_sensor import (
+    OnlineBinarySensorEntity,
+    async_setup_entry,
+)
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntityDescription,
@@ -22,6 +27,26 @@ def create_description() -> BinarySensorEntityDescription:
     )
 
 
+async def test_setup_platform(
+    hass: HomeAssistant,
+    mock_entry,
+    mock_coordinator,
+    mock_device,
+    mock_device_with_humidification,
+) -> None:
+    """Test platform setup."""
+
+    mock_coordinator.get_devices = MagicMock(
+        return_value=[mock_device, mock_device_with_humidification]
+    )
+
+    async_add_entities = MagicMock()
+    await async_setup_entry(hass, mock_entry, async_add_entities)
+
+    assert async_add_entities.called
+    assert len(async_add_entities.call_args[0][0]) == 2  # 1 per device
+
+
 class TestOnlineBinarySensorEntity:
     """Test cases for OnlineBinarySensorEntity class."""
 
@@ -30,15 +55,18 @@ class TestOnlineBinarySensorEntity:
         [("online", True), ("ONLINE", True), ("offline", False), ("unknown", False)],
     )
     def test_online_binary_sensor(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, status, expected
+        self,
+        hass: HomeAssistant,
+        mock_device,
+        mock_entry,
+        status,
+        expected,
     ):
         """Test is_on property returns True when device is online."""
 
         mock_device.state.status = status
         description = create_description()
-        entity = OnlineBinarySensorEntity(
-            hass, mock_device, description, mock_coordinator
-        )
+        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
 
         assert entity.is_on == expected
 
@@ -52,15 +80,25 @@ class TestOnlineBinarySensorEntity:
         assert description.entity_category == EntityCategory.DIAGNOSTIC
         assert description.entity_registry_enabled_default is False
 
+    # @patch("homeassistant.helpers.update_coordinator.CoordinatorEntity.available")
+    def test_online_binary_sensor_available(
+        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+    ):
+        """Test OnlineBinarySensorEntity available."""
+
+        description = create_description()
+        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
+        mock_coordinator.last_update_success = False
+
+        assert entity.available is False
+
     def test_online_binary_sensor_entity_description_type(
-        self, hass: HomeAssistant, mock_device, mock_coordinator
+        self, hass: HomeAssistant, mock_device, mock_entry
     ):
         """Test entity_description is properly set."""
 
         description = create_description()
-        entity = OnlineBinarySensorEntity(
-            hass, mock_device, description, mock_coordinator
-        )
+        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
 
         assert entity.entity_description is not None
         assert entity.entity_description.key == "online"

@@ -37,7 +37,6 @@ from .const import (
     TEMPERATURE_LOWER_LIMIT,
     TEMPERATURE_UPPER_LIMIT,
 )
-from .coordinator import SensiUpdateCoordinator
 from .data import (
     FanMode,
     OperatingMode,
@@ -56,7 +55,7 @@ async def async_setup_entry(
     """Set up Sensi thermostats."""
     coordinator = entry.runtime_data
     devices = coordinator.get_devices()
-    entities = [SensiThermostat(device, entry, coordinator) for device in devices]
+    entities = [SensiThermostat(hass, device, entry) for device in devices]
     async_add_entities(entities)
 
 
@@ -69,16 +68,14 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         device: SensiDevice,
         entry: SensiConfigEntry,
-        coordinator: SensiUpdateCoordinator,
     ) -> None:
         """Initialize the device."""
 
-        hass = coordinator.hass
-        super().__init__(device, coordinator)
+        super().__init__(device, entry)
 
-        self._entry = entry
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT,
             f"{SENSI_DOMAIN}_{device.name}",
@@ -92,9 +89,9 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
         return {
-            ATTR_CIRCULATING_FAN: self._device.state.circulating_fan.enabled,
-            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._device.state.circulating_fan.duty_cycle,
-            ATTR_POWER_STATUS: self._device.state.power_status,
+            ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
+            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
+            ATTR_POWER_STATUS: self._state.power_status,
         }
 
     @property
@@ -121,13 +118,13 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # If device is humidification capable (has something in humidification) and humidification is enabled
         if (
             self._device.capabilities.humidity_control.humidification
-            and self._device.state.humidity_control.humidification.enabled
+            and self._state.humidity_control.humidification.enabled
         ):
             supported = supported | ClimateEntityFeature.TARGET_HUMIDITY
 
         return supported | (
             ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
-            if self._device.state.operating_mode == OperatingMode.AUTO
+            if self._state.operating_mode == OperatingMode.AUTO
             else ClimateEntityFeature.TARGET_TEMPERATURE
         )
 
@@ -154,10 +151,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Return the fan setting."""
 
         # Create a special mode 'circulate' base on 'auto' when 'circulating_fan' contains 'enabled'='on'.
-        if (
-            self._state.fan_mode == FanMode.AUTO
-            and self._device.state.circulating_fan.enabled
-        ):
+        if self._state.fan_mode == FanMode.AUTO and self._state.circulating_fan.enabled:
             return SENSI_FAN_CIRCULATE
 
         return self._state.fan_mode.value
@@ -354,7 +348,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Return the minimum temperature for single mode. This gets used as the lower bounds in UI."""
 
         # Use the thermostat defined minimum temperature if not heating. This is in temperature_unit.
-        if self._device.state.operating_mode == OperatingMode.COOL:
+        if self._state.operating_mode == OperatingMode.COOL:
             return self._state.cool_min_temp
 
         return TemperatureConverter.convert(
@@ -368,7 +362,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         """Return the maximum temperature for single mode. This gets used as the upper bounds in UI."""
 
         # Use the thermostat defined maximum temperature if not cooling. This is in temperature_unit.
-        if self._device.state.operating_mode == OperatingMode.HEAT:
+        if self._state.operating_mode == OperatingMode.HEAT:
             return self._state.heat_max_temp
 
         return TemperatureConverter.convert(
@@ -380,7 +374,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def current_humidity(self) -> float | None:
         """Return the current humidity."""
-        return self._device.state.humidity
+        return self._state.humidity
 
     @property
     def target_humidity(self) -> float | None:
@@ -388,7 +382,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if self._device.capabilities.humidity_control.humidification is None:
             return None
 
-        humidification = self._device.state.humidity_control.humidification
+        humidification = self._state.humidity_control.humidification
         if humidification is None:
             return None
         return humidification.target_percent if humidification.enabled else None
@@ -399,7 +393,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if self._device.capabilities.humidity_control.humidification is None:
             return None
 
-        humidification = self._device.state.humidity_control.humidification
+        humidification = self._state.humidity_control.humidification
         if humidification is None or not humidification.enabled:
             return None
 
@@ -411,7 +405,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         if self._device.capabilities.humidity_control.humidification is None:
             return None
 
-        humidification = self._device.state.humidity_control.humidification
+        humidification = self._state.humidity_control.humidification
         if humidification is None or not humidification.enabled:
             return None
 
@@ -420,7 +414,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
 
-        state = self._device.state
+        state = self._state
 
         # The framework ensures that the temperatures are within min_temp and max_temp.
 

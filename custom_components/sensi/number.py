@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .client import ActionResponse, SensiClient, raise_if_error
 from .const import SENSI_DOMAIN
-from .coordinator import SensiConfigEntry, SensiDevice, SensiUpdateCoordinator
+from .coordinator import SensiConfigEntry, SensiDevice
 from .data import State
 from .entity import SensiDescriptionEntity
 
@@ -88,7 +88,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
 
     entities = [
-        SensiNumberEntity(hass, device, description, coordinator)
+        SensiNumberEntity(hass, device, description, entry)
         for device in coordinator.get_devices()
         for description in NUMBER_TYPES
     ]
@@ -106,10 +106,10 @@ class SensiNumberEntity(SensiDescriptionEntity, NumberEntity):
         hass: HomeAssistant,
         device: SensiDevice,
         description: SensiNumberEntityDescription,
-        coordinator: SensiUpdateCoordinator,
+        entry: SensiConfigEntry,
     ) -> None:
         """Initialize the entity."""
-        super().__init__(device, description, coordinator)
+        super().__init__(device, description, entry)
 
         # Note: self.hass is not set at this point
         self.entity_id = async_generate_entity_id(
@@ -127,7 +127,7 @@ class SensiNumberEntity(SensiDescriptionEntity, NumberEntity):
     def native_unit_of_measurement(self) -> str:
         """Return the unit of measurement of the entity, if any."""
         return (
-            self._device.state.temperature_unit
+            self._state.temperature_unit
             if self.entity_description.device_class == NumberDeviceClass.TEMPERATURE
             else self.entity_description.native_unit_of_measurement
         )
