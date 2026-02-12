@@ -12,6 +12,7 @@ from custom_components.sensi.const import (
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
+    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
@@ -46,8 +47,41 @@ async def test_setup_platform(
     assert len(async_add_entities.call_args[0][0]) == 2
 
 
-async def test_set_fan_mode(hass: HomeAssistant, mock_device, mock_thermostat) -> None:
-    """Test async_set_fan_mode."""
+async def test_set_hvac_mode(
+    hass: HomeAssistant, mock_device, mock_thermostat, mock_coordinator
+) -> None:
+    """Test async_set_hvac_mode."""
+
+    with (
+        patch.object(mock_thermostat, "async_write_ha_state"),
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_operating_mode"
+        ) as mock_set_operating_mode,
+        patch.object(
+            mock_coordinator, "async_update_listeners"
+        ) as mock_async_update_listeners,
+    ):
+        mock_set_operating_mode.return_value = ActionResponse(None, "")
+
+        await mock_thermostat.async_set_hvac_mode(HVACMode.HEAT)
+
+        mock_set_operating_mode.assert_called_once_with(mock_device, OperatingMode.HEAT)
+        mock_async_update_listeners.assert_called_once()
+
+
+async def test_set_hvac_mode_invalid(hass: HomeAssistant, mock_thermostat) -> None:
+    """Test async_set_hvac_mode with invalid value."""
+
+    with pytest.raises(ValueError):
+        await mock_thermostat.async_set_hvac_mode(
+            HVACMode.HEAT_COOL
+        )  # HEAT_COOL is not supported and evaluated to None OperatingMode
+
+
+async def test_set_fan_mode_auto(
+    hass: HomeAssistant, mock_device, mock_thermostat
+) -> None:
+    """Test async_set_fan_mode auto."""
 
     with (
         patch.object(mock_thermostat, "async_write_ha_state"),
@@ -63,8 +97,35 @@ async def test_set_fan_mode(hass: HomeAssistant, mock_device, mock_thermostat) -
 
         await mock_thermostat.async_set_fan_mode(SENSI_FAN_AUTO)
 
-        mock_set_circulating_fan_mode.assert_called()
-        mock_set_fan_mode.assert_called_with(mock_device, SENSI_FAN_AUTO)
+        mock_set_circulating_fan_mode.assert_called_once_with(
+            mock_device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+        )
+        mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
+
+
+async def test_set_fan_mode_circulate(
+    hass: HomeAssistant, mock_device, mock_thermostat
+) -> None:
+    """Test async_set_fan_mode circulate."""
+
+    with (
+        patch.object(mock_thermostat, "async_write_ha_state"),
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_circulating_fan_mode"
+        ) as mock_set_circulating_fan_mode,
+        patch.object(
+            mock_thermostat.coordinator.client, "async_set_fan_mode"
+        ) as mock_set_fan_mode,
+    ):
+        mock_set_circulating_fan_mode.return_value = ActionResponse(None, "")
+        mock_set_fan_mode.return_value = ActionResponse(None, "")
+
+        await mock_thermostat.async_set_fan_mode(SENSI_FAN_CIRCULATE)
+
+        mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
+        mock_set_circulating_fan_mode.assert_called_once_with(
+            mock_device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+        )
 
 
 async def test_set_temperature(
