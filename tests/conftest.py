@@ -7,7 +7,13 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sensi.auth import AuthenticationConfig
+from custom_components.sensi.auth import (
+    KEY_ACCESS_TOKEN,
+    KEY_EXPIRES_AT,
+    KEY_REFRESH_TOKEN,
+    KEY_USER_ID,
+    AuthenticationConfig,
+)
 from custom_components.sensi.client import SensiClient
 from custom_components.sensi.climate import SensiThermostat
 from custom_components.sensi.const import SENSI_DOMAIN
@@ -24,15 +30,21 @@ def load_json(filename):
 
 
 @pytest.fixture
-def mock_coordinator(hass: HomeAssistant) -> SensiUpdateCoordinator:
+def mock_auth_data() -> any:
+    """Fixture to provide a mocked authentication configuration."""
+    return {
+        KEY_REFRESH_TOKEN: "mock_refresh_token",
+        KEY_ACCESS_TOKEN: "mock_access_token",
+        KEY_EXPIRES_AT: 1234567890,
+        KEY_USER_ID: "mock_user_id",
+    }
+
+
+@pytest.fixture
+def mock_coordinator(hass: HomeAssistant, mock_auth_data) -> SensiUpdateCoordinator:
     """Fixture to provide a test instance of CrumbCoordinator."""
-    config = AuthenticationConfig(
-        refresh_token="refresh_token",
-        access_token="access_token",
-        expires_at=12345,
-        user_id="user_id",
-    )
-    client = SensiClient(hass, config, MagicMock())
+    auth_config = AuthenticationConfig(mock_auth_data)
+    client = SensiClient(hass, auth_config, MagicMock())
     return SensiUpdateCoordinator(hass, client)
 
 

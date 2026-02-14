@@ -6,10 +6,11 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.sensi.client import ActionResponse, round_humidity
-from custom_components.sensi.data import OperatingMode
+from custom_components.sensi.data import FanMode, OperatingMode
 from custom_components.sensi.event import (
     SetCirculatingFanEvent,
     SetCirculatingFanEventValue,
+    SetFanModeEvent,
     SetHumidityEvent,
     SetHumidityEventValue,
     SetOperatingModeEvent,
@@ -375,6 +376,29 @@ async def test_set_circulating_fan_mode(
 
         assert mock_device.state.circulating_fan.enabled == enabled
         assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
+
+
+async def test_set_fan_mode(mock_device, mock_coordinator) -> None:
+    """Test async_set_fan_mode."""
+
+    mode = FanMode.ON.value
+
+    with patch.object(
+        mock_coordinator.client, "_async_invoke_setter"
+    ) as mock_async_invoke_setter:
+        mock_async_invoke_setter.return_value = ActionResponse(None, "")
+
+        expected_request = asdict(SetFanModeEvent(mock_device.identifier, mode))
+        mock_device.state.fan_mode = None  # Reset fan mode to ensure it gets updated
+
+        response = await mock_coordinator.client.async_set_fan_mode(mock_device, mode)
+
+        mock_async_invoke_setter.assert_called_once_with(
+            "set_fan_mode", expected_request
+        )
+
+        assert response.error is None
+        assert mock_device.state.fan_mode == FanMode.ON
 
 
 @pytest.mark.parametrize(
