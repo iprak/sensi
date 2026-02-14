@@ -8,6 +8,7 @@ from custom_components.sensi.binary_sensor import (
     OnlineBinarySensorEntity,
     async_setup_entry,
 )
+from custom_components.sensi.coordinator import SensiUpdateCoordinator
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntityDescription,
@@ -27,10 +28,10 @@ def create_description() -> BinarySensorEntityDescription:
     )
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_setup_platform(
     hass: HomeAssistant,
-    mock_entry,
-    mock_coordinator,
+    mock_coordinator: SensiUpdateCoordinator,
     mock_device,
     mock_device_with_humidification,
 ) -> None:
@@ -41,7 +42,7 @@ async def test_setup_platform(
     )
 
     async_add_entities = MagicMock()
-    await async_setup_entry(hass, mock_entry, async_add_entities)
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     assert async_add_entities.called
     assert len(async_add_entities.call_args[0][0]) == 2  # 1 per device
@@ -58,7 +59,7 @@ class TestOnlineBinarySensorEntity:
         self,
         hass: HomeAssistant,
         mock_device,
-        mock_entry,
+        mock_coordinator: SensiUpdateCoordinator,
         status,
         expected,
     ):
@@ -66,7 +67,9 @@ class TestOnlineBinarySensorEntity:
 
         mock_device.state.status = status
         description = create_description()
-        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
+        entity = OnlineBinarySensorEntity(
+            hass, mock_device, description, mock_coordinator.config_entry
+        )
 
         assert entity.is_on == expected
 
@@ -80,25 +83,28 @@ class TestOnlineBinarySensorEntity:
         assert description.entity_category == EntityCategory.DIAGNOSTIC
         assert description.entity_registry_enabled_default is False
 
-    # @patch("homeassistant.helpers.update_coordinator.CoordinatorEntity.available")
     def test_online_binary_sensor_available(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator: SensiUpdateCoordinator
     ):
         """Test OnlineBinarySensorEntity available."""
 
         description = create_description()
-        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
+        entity = OnlineBinarySensorEntity(
+            hass, mock_device, description, mock_coordinator.config_entry
+        )
         mock_coordinator.last_update_success = False
 
         assert entity.available is False
 
     def test_online_binary_sensor_entity_description_type(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator: SensiUpdateCoordinator
     ):
         """Test entity_description is properly set."""
 
         description = create_description()
-        entity = OnlineBinarySensorEntity(hass, mock_device, description, mock_entry)
+        entity = OnlineBinarySensorEntity(
+            hass, mock_device, description, mock_coordinator.config_entry
+        )
 
         assert entity.entity_description is not None
         assert entity.entity_description.key == "online"

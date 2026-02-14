@@ -19,7 +19,6 @@ from homeassistant.core import HomeAssistant
 
 async def test_setup_platform(
     hass: HomeAssistant,
-    mock_entry,
     mock_coordinator,
     mock_device,
     mock_device_with_humidification,
@@ -31,7 +30,7 @@ async def test_setup_platform(
     )
 
     async_add_entities = MagicMock()
-    await async_setup_entry(hass, mock_entry, async_add_entities)
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     assert async_add_entities.called
     assert len(async_add_entities.call_args[0][0]) == 7 * 2  # 7 = from SENSOR_TYPES
@@ -39,7 +38,6 @@ async def test_setup_platform(
 
 async def test_sensor_native_value(
     hass: HomeAssistant,
-    mock_entry,
     mock_coordinator,
     mock_device,
 ) -> None:
@@ -48,7 +46,7 @@ async def test_sensor_native_value(
     mock_coordinator.get_devices = MagicMock(return_value=[mock_device])
 
     async_add_entities = MagicMock()
-    await async_setup_entry(hass, mock_entry, async_add_entities)
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     entities = async_add_entities.call_args[0][0]
 

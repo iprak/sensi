@@ -29,7 +29,6 @@ from homeassistant.core import HomeAssistant
 
 async def test_setup_platform(
     hass: HomeAssistant,
-    mock_entry,
     mock_coordinator,
     mock_device,
     mock_device_with_humidification,
@@ -41,7 +40,7 @@ async def test_setup_platform(
     )
 
     async_add_entities = MagicMock()
-    await async_setup_entry(hass, mock_entry, async_add_entities)
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     assert async_add_entities.called
     assert len(async_add_entities.call_args[0][0]) == 2
@@ -241,13 +240,13 @@ class TestSensiThermostatProperties:
         ],
     )
     def test_temperature_unit(
-        self, hass: HomeAssistant, mock_json, mock_entry, display_scale, expected
+        self, hass: HomeAssistant, mock_json, mock_coordinator, display_scale, expected
     ):
         """Test temperature_unit property for Celsius."""
 
         mock_json["state"]["display_scale"] = display_scale
         _, device = SensiDevice.create(mock_json)
-        thermostat = SensiThermostat(hass, device, mock_entry)
+        thermostat = SensiThermostat(hass, device, mock_coordinator.config_entry)
 
         assert thermostat.temperature_unit == expected
 
@@ -385,9 +384,7 @@ class TestSensiThermostatTargetTemperature:
 class TestSensiThermostatExtraStateAttributes:
     """Test cases for extra state attributes."""
 
-    def test_extra_state_attributes_contains_fan_info(
-        self, mock_device, mock_thermostat
-    ):
+    def test_extra_state_attributes_contains_fan_info(self, mock_thermostat):
         """Test extra_state_attributes contains fan information."""
 
         attrs = mock_thermostat.extra_state_attributes
@@ -442,13 +439,15 @@ def test_supported_features_auto(mock_device, mock_thermostat) -> None:
 
 
 def test_supported_features_fan_disabled(
-    hass: HomeAssistant, mock_entry, mock_device, mock_thermostat
+    hass: HomeAssistant, mock_device, mock_thermostat, mock_coordinator
 ) -> None:
     """Test supported features when fan is disabled."""
 
     mock_device.state.operating_mode = OperatingMode.HEAT
 
-    set_config_option(hass, mock_device, mock_entry, CONFIG_FAN_SUPPORT, False)
+    set_config_option(
+        hass, mock_device, mock_coordinator.config_entry, CONFIG_FAN_SUPPORT, False
+    )
 
     features = mock_thermostat.supported_features
 

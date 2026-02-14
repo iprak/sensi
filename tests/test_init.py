@@ -11,11 +11,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_failed_missing_refresh_token(
-    hass: HomeAssistant, mock_entry
+    hass: HomeAssistant, mock_coordinator
 ) -> None:
     """Test AuthenticationConfig initialization with all fields."""
 
     mock_config = {}
+    mock_entry = mock_coordinator.config_entry
 
     with patch(
         "homeassistant.helpers.storage.Store.async_load", return_value=mock_config
@@ -28,9 +29,11 @@ async def test_init_failed_missing_refresh_token(
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_auth_failed(
-    hass: HomeAssistant, mock_entry, mock_auth_data
+    hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
     """Test AuthenticationConfig initialization with authentication failure."""
+
+    mock_entry = mock_coordinator.config_entry
 
     with (
         patch(
@@ -50,9 +53,11 @@ async def test_init_auth_failed(
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_exception_retry(
-    hass: HomeAssistant, mock_entry, mock_auth_data
+    hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
     """Test AuthenticationConfig initialization with exception."""
+
+    mock_entry = mock_coordinator.config_entry
 
     with (
         patch(
@@ -71,8 +76,12 @@ async def test_init_exception_retry(
 
 
 @pytest.mark.usefixtures("enable_custom_integrations")
-async def test_init_success(hass: HomeAssistant, mock_entry, mock_auth_data) -> None:
+async def test_init_success(
+    hass: HomeAssistant, mock_coordinator, mock_auth_data
+) -> None:
     """Test AuthenticationConfig initialization with all fields."""
+
+    mock_entry = mock_coordinator.config_entry
 
     with (
         patch(

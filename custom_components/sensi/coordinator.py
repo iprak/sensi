@@ -23,6 +23,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         self,
         hass: HomeAssistant,
         client: SensiClient,
+        config_entry: SensiConfigEntry,
     ) -> None:
         """Initialize Sensi coordinator."""
 
@@ -39,6 +40,7 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             LOGGER,
+            config_entry=config_entry,
             name="SensiUpdateCoordinator",
             update_method=async_update_devices,
             update_interval=timedelta(seconds=COORDINATOR_UPDATE_INTERVAL),
