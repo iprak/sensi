@@ -10,9 +10,21 @@ This integration allows displaying and controlling [Sensi](https://sensi.emerson
 It was developed by reverse engineering the mobile app and original work done by https://github.com/w1ll1am23/pysensi, so the integration could fail at some point.
 
 
-## Setup
+## Installation
 
-You need the refresh_token to setup the integration.
+### Manual
+- Download and copy all the files from `custom_components/sensi/` to `<config directory>/custom_components/sensi/`.
+- Restart HomeAssistant.
+
+### HACS
+
+- Install [HACS](https://hacs.xyz/) and then download the integration from it.
+
+
+## Configuration
+
+- Add the integration using the `Add Integration` button in Integrations page on your Home Assistant instance.
+- Create an account on the Sensi mobile app.
 
 ### Refresh Token
 
@@ -47,7 +59,7 @@ On adding the Sensi integration, you should see one device and related entities.
 - Operating modes: `Auto, Heat, Cool, Off` (available modes depend on thermostat configuration).
 	- Heat, Cool modes support single target temperature
     - Auto uses heat and cool set points
-	
+
 - Fan modes: `Auto, On, Circulate` (10% duty cycle). Circulation mode availability depends on thermostat.
 - Humidification control
 - Data is refreshed every 30 seconds.
@@ -131,12 +143,7 @@ humidity: 5
 * **Temperature unit** - The temperature unit displayed for the thermostat is controlled by the HomeAssistant's `unit_system` setting. Make sure it matches the thermostat. [Issue](https://github.com/iprak/sensi/issues/113)
 
 
-## Installation
 
-- Download and copy all the files from `custom_components/sensi/` to `<config directory>/custom_components/sensi/`.
-- Restart HomeAssistant.
-- Create an account on the Sensi mobile app.
-- Add the integration using the `Add Integration` button in Integrations page on your Home Assistant instance.
 
 
 
