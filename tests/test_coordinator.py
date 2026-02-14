@@ -3,33 +3,28 @@
 from datetime import timedelta
 from unittest.mock import MagicMock
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.sensi.client import SensiClient
-from custom_components.sensi.const import COORDINATOR_UPDATE_INTERVAL
+from custom_components.sensi.const import COORDINATOR_UPDATE_INTERVAL, SENSI_DOMAIN
 from custom_components.sensi.coordinator import SensiUpdateCoordinator
 from custom_components.sensi.data import SensiDevice
 from homeassistant.core import HomeAssistant
 
 
-class TestSensiUpdateCoordinatorInitialization:
-    """Test cases for SensiUpdateCoordinator initialization."""
+def test_coordinator_initialization(hass: HomeAssistant) -> None:
+    """Test SensiUpdateCoordinator initialization."""
 
-    def test_coordinator_initialization(self, hass: HomeAssistant):
-        """Test SensiUpdateCoordinator initialization."""
+    client = MagicMock(spec=SensiClient)
+    mock_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
+    coordinator = SensiUpdateCoordinator(hass, client, mock_entry)
 
-        client = MagicMock(spec=SensiClient)
-        coordinator = SensiUpdateCoordinator(hass, client)
+    assert coordinator.hass == hass
+    assert coordinator.client == client
+    assert coordinator.name == "SensiUpdateCoordinator"
 
-        assert coordinator.hass == hass
-        assert coordinator.client == client
-        assert coordinator.name == "SensiUpdateCoordinator"
-
-    def test_coordinator_update_interval(self, hass: HomeAssistant):
-        """Test coordinator has correct update interval."""
-        client = MagicMock(spec=SensiClient)
-        coordinator = SensiUpdateCoordinator(hass, client)
-
-        expected_interval = timedelta(seconds=COORDINATOR_UPDATE_INTERVAL)
-        assert coordinator.update_interval == expected_interval
+    expected_interval = timedelta(seconds=COORDINATOR_UPDATE_INTERVAL)
+    assert coordinator.update_interval == expected_interval
 
 
 class TestSensiUpdateCoordinatorGetDevices:
@@ -42,8 +37,9 @@ class TestSensiUpdateCoordinatorGetDevices:
 
         client = MagicMock(spec=SensiClient)
         client.get_devices.return_value = [device1, device2]
+        mock_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
 
-        coordinator = SensiUpdateCoordinator(hass, client)
+        coordinator = SensiUpdateCoordinator(hass, client, mock_entry)
         devices = coordinator.get_devices()
 
         assert len(devices) == 2
@@ -54,8 +50,9 @@ class TestSensiUpdateCoordinatorGetDevices:
         """Test that get_devices returns empty list when no devices."""
         client = MagicMock(spec=SensiClient)
         client.get_devices.return_value = []
+        mock_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
 
-        coordinator = SensiUpdateCoordinator(hass, client)
+        coordinator = SensiUpdateCoordinator(hass, client, mock_entry)
         devices = coordinator.get_devices()
 
         assert devices == []
@@ -66,8 +63,10 @@ class TestSensiUpdateCoordinatorIntegration:
 
     def test_coordinator_properties_are_immutable(self, hass: HomeAssistant):
         """Test that coordinator properties persist correctly."""
+
         client = MagicMock(spec=SensiClient)
-        coordinator = SensiUpdateCoordinator(hass, client)
+        mock_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
+        coordinator = SensiUpdateCoordinator(hass, client, mock_entry)
 
         # Store references
         original_client = coordinator.client

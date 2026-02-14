@@ -38,7 +38,6 @@ def create_humidity_description() -> SensiCapabilityEntityDescription:
 
 async def test_setup_platform(
     hass: HomeAssistant,
-    mock_entry,
     mock_coordinator,
     mock_device,
     mock_device_with_humidification,
@@ -50,7 +49,7 @@ async def test_setup_platform(
     )
 
     async_add_entities = MagicMock()
-    await async_setup_entry(hass, mock_entry, async_add_entities)
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     assert async_add_entities.called
 
@@ -104,14 +103,14 @@ class TestSensiCapabilitySettingSwitch:
     """Test cases for SensiCapabilitySettingSwitch."""
 
     def test_capability_setting_switch_initialization(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test SensiCapabilitySettingSwitch initialization."""
 
         description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch._device == mock_device
@@ -119,7 +118,7 @@ class TestSensiCapabilitySettingSwitch:
         assert switch.coordinator == mock_coordinator
 
     def test_capability_setting_switch_is_on(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test is_on property returns correct state."""
 
@@ -127,13 +126,13 @@ class TestSensiCapabilitySettingSwitch:
         description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch.is_on is True
 
     def test_capability_setting_switch_is_off(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test is_on property when switch is off."""
 
@@ -141,13 +140,13 @@ class TestSensiCapabilitySettingSwitch:
         description = create_humidity_description()
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch.is_on is False
 
     def test_capability_setting_switch_display_time(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test display_time switch."""
 
@@ -160,13 +159,13 @@ class TestSensiCapabilitySettingSwitch:
         )
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch.is_on is True
 
     def test_capability_setting_switch_keypad_lockout(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test keypad_lockout switch."""
 
@@ -179,13 +178,13 @@ class TestSensiCapabilitySettingSwitch:
         )
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch.is_on is False
 
     def test_capability_setting_switch_continuous_backlight(
-        self, hass: HomeAssistant, mock_device, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test continuous_backlight switch."""
 
@@ -198,13 +197,13 @@ class TestSensiCapabilitySettingSwitch:
         )
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         assert switch.is_on is True
 
     async def test_capability_setting_switch_continuous_backlight_update(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test update of continuous_backlight switch."""
 
@@ -217,7 +216,7 @@ class TestSensiCapabilitySettingSwitch:
         )
 
         switch = SensiCapabilitySettingSwitch(
-            hass, mock_device, description, mock_entry
+            hass, mock_device, description, mock_coordinator.config_entry
         )
 
         with (
@@ -243,11 +242,11 @@ class TestSensiAuxHeatSwitch:
     """Test cases for SensiAuxHeatSwitch."""
 
     def test_aux_heat_switch_initialization(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test SensiAuxHeatSwitch initialization."""
 
-        switch = SensiAuxHeatSwitch(hass, mock_device, mock_entry)
+        switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
@@ -255,12 +254,12 @@ class TestSensiAuxHeatSwitch:
 
     @pytest.mark.parametrize(("expected"), [(False), (True)])
     def test_aux_heat_switch_available_when_capable(
-        self, hass: HomeAssistant, mock_device, mock_entry, expected
+        self, hass: HomeAssistant, mock_device, mock_coordinator, expected
     ) -> None:
         """Test available property when aux heating is capable."""
 
         mock_device.capabilities.operating_mode_settings.aux = expected
-        switch = SensiAuxHeatSwitch(hass, mock_device, mock_entry)
+        switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         assert switch.available is expected
 
@@ -274,22 +273,27 @@ class TestSensiAuxHeatSwitch:
         ],
     )
     def test_aux_heat_switch_is_off_when_heat_mode(
-        self, hass: HomeAssistant, mock_device, operating_mode, mock_entry, expected
+        self,
+        hass: HomeAssistant,
+        mock_device,
+        operating_mode,
+        mock_coordinator,
+        expected,
     ) -> None:
         """Test is_on property when operating mode is HEAT (not AUX)."""
 
         mock_device.state.operating_mode = operating_mode
-        switch = SensiAuxHeatSwitch(hass, mock_device, mock_entry)
+        switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         assert switch.is_on == expected
 
     async def test_aux_heat_switch_uses_previous_mode(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test that previous operating mode is used."""
 
         mock_device.state.operating_mode = OperatingMode.HEAT
-        switch = SensiAuxHeatSwitch(hass, mock_device, mock_entry)
+        switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         with (
             patch.object(switch, "async_write_ha_state") as mock_async_write_ha_state,
@@ -321,11 +325,11 @@ class TestSensiFanSupportSwitch:
     """Test cases for SensiFanSupportSwitch."""
 
     def test_fan_support_switch_initialization(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test SensiFanSupportSwitch initialization."""
 
-        switch = SensiFanSupportSwitch(hass, mock_device, mock_entry)
+        switch = SensiFanSupportSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
@@ -335,11 +339,11 @@ class TestSensiFanSupportSwitch:
         assert switch.is_on is DEFAULT_CONFIG_FAN_SUPPORT
 
     async def test_fan_support_switch_update(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test update of fan support switch."""
 
-        switch = SensiFanSupportSwitch(hass, mock_device, mock_entry)
+        switch = SensiFanSupportSwitch(hass, mock_device, mock_coordinator.config_entry)
 
         # Update hass to support set_config_option() calls
         hass.config_entries = ConfigEntries(hass, {})
@@ -364,11 +368,13 @@ class TestSensiHumidificationSwitch:
     """Test cases for SensiHumidificationSwitch."""
 
     def test_humidification_switch_initialization(
-        self, hass: HomeAssistant, mock_device, mock_coordinator, mock_entry
+        self, hass: HomeAssistant, mock_device, mock_coordinator
     ) -> None:
         """Test SensiHumidificationSwitch initialization."""
 
-        switch = SensiHumidificationSwitch(hass, mock_device, mock_entry)
+        switch = SensiHumidificationSwitch(
+            hass, mock_device, mock_coordinator.config_entry
+        )
 
         assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
@@ -381,26 +387,24 @@ class TestSensiHumidificationSwitch:
         [(True), (False)],
     )
     def test_humidification_switch_when_disabled(
-        self, hass: HomeAssistant, mock_device, mock_entry, expected
+        self, hass: HomeAssistant, mock_device, mock_coordinator, expected
     ) -> None:
         """Test is_on property when humidification is disabled."""
 
         mock_device.state.humidity_control.humidification.enabled = expected
-        switch = SensiHumidificationSwitch(hass, mock_device, mock_entry)
+        switch = SensiHumidificationSwitch(
+            hass, mock_device, mock_coordinator.config_entry
+        )
 
         assert switch.is_on is expected
 
     async def test_humidification_switch_update(
-        self,
-        hass: HomeAssistant,
-        mock_device_with_humidification,
-        mock_coordinator,
-        mock_entry,
+        self, hass: HomeAssistant, mock_device_with_humidification, mock_coordinator
     ) -> None:
         """Test update of humidification switch."""
 
         switch = SensiHumidificationSwitch(
-            hass, mock_device_with_humidification, mock_entry
+            hass, mock_device_with_humidification, mock_coordinator.config_entry
         )
         with (
             patch.object(

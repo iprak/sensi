@@ -42,10 +42,16 @@ def mock_auth_data() -> any:
 
 @pytest.fixture
 def mock_coordinator(hass: HomeAssistant, mock_auth_data) -> SensiUpdateCoordinator:
-    """Fixture to provide a test instance of CrumbCoordinator."""
+    """Fixture to provide an instance of SensiUpdateCoordinator linked to the mock entry."""
     auth_config = AuthenticationConfig(mock_auth_data)
     client = SensiClient(hass, auth_config, MagicMock())
-    return SensiUpdateCoordinator(hass, client)
+
+    config_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
+    config_entry.add_to_hass(hass)
+
+    coordinator = SensiUpdateCoordinator(hass, client, config_entry)
+    config_entry.runtime_data = coordinator
+    return coordinator
 
 
 @pytest.fixture
@@ -75,24 +81,18 @@ def mock_device_with_humidification(mock_json_with_humidification) -> SensiDevic
 
 
 @pytest.fixture
-def mock_entry(hass: HomeAssistant, mock_coordinator) -> MockConfigEntry:
-    """Create a mock Config entry."""
-    # config_entries.ConfigEntry
-    entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
-    entry.runtime_data = mock_coordinator
-    entry.add_to_hass(hass)
-    return entry
-
-
-@pytest.fixture
-def mock_thermostat(hass: HomeAssistant, mock_device, mock_entry) -> SensiThermostat:
+def mock_thermostat(
+    hass: HomeAssistant, mock_device, mock_coordinator
+) -> SensiThermostat:
     """Create a mock SensiThermostat."""
-    return SensiThermostat(hass, mock_device, mock_entry)
+    return SensiThermostat(hass, mock_device, mock_coordinator.config_entry)
 
 
 @pytest.fixture
 def mock_thermostat_with_humidification(
-    hass: HomeAssistant, mock_device_with_humidification, mock_entry
+    hass: HomeAssistant, mock_device_with_humidification, mock_coordinator
 ) -> SensiThermostat:
     """Create a mock SensiThermostat with humidification."""
-    return SensiThermostat(hass, mock_device_with_humidification, mock_entry)
+    return SensiThermostat(
+        hass, mock_device_with_humidification, mock_coordinator.config_entry
+    )
