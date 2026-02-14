@@ -12,6 +12,7 @@ from custom_components.sensi.event import (
     SetCirculatingFanEventValue,
     SetHumidityEvent,
     SetHumidityEventValue,
+    SetOperatingModeEvent,
     SetTemperatureEvent,
     SetTemperatureEventSuccess,
 )
@@ -374,6 +375,49 @@ async def test_set_circulating_fan_mode(
 
         assert mock_device.state.circulating_fan.enabled == enabled
         assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
+
+
+@pytest.mark.parametrize(
+    ("response_error", "response_data", "expect_error"),
+    [
+        (None, None, True),
+        ("Failed", None, True),
+        (None, "not_accepted", True),
+        (None, {"invalid_property": "cool"}, True),
+        (None, "accepted", False),
+        (None, {"mode": "heat"}, False),
+    ],
+)
+async def test_async_set_operating_mode(
+    mock_device, mock_coordinator, response_error, response_data, expect_error
+) -> None:
+    """Test async_set_operating_mode."""
+
+    with patch.object(
+        mock_coordinator.client, "_async_invoke_setter"
+    ) as mock_async_invoke_setter:
+        mock_async_invoke_setter.return_value = ActionResponse(
+            response_error, response_data
+        )
+
+        mode = OperatingMode.HEAT
+        expected_request = asdict(
+            SetOperatingModeEvent(mock_device.identifier, mode.value)
+        )
+        mock_device.state.operating_mode = None  # Reset to ensure it gets updated
+
+        response = await mock_coordinator.client.async_set_operating_mode(
+            mock_device, mode
+        )
+
+        mock_async_invoke_setter.assert_called_once_with(
+            "set_operating_mode", expected_request
+        )
+        if expect_error:
+            assert response.error is not None
+        else:
+            assert response.error is None
+            assert mock_device.state.operating_mode == OperatingMode.HEAT
 
 
 @pytest.mark.parametrize(
