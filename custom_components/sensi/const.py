@@ -46,3 +46,8 @@ ATTR_CIRCULATING_FAN: Final = "circulating_fan"
 ATTR_CIRCULATING_FAN_DUTY_CYCLE: Final = "circulating_fan_duty_cycle"
 ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
 ATTR_POWER_STATUS: Final = "power_status"
+
+ATTR_HEAT_STAGE = "hvac_heat_stage"
+ATTR_AUX_STAGE = "hvac_aux_stage"
+ATTR_COOL_STAGE = "hvac_cool_stage"
+ATTR_FAN_STATE = "hvac_fan_state"
