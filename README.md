@@ -125,6 +125,9 @@ fan_mode: Circulate
 hvac_action: heating
 circulating_fan: true
 circulating_fan_duty_cycle: 10
+hvac_heat_stage: 100
+hvac_cool_stage: 0
+hvac_aux_stage: 100
 attribution: Data provided by Sensi
 friendly_name: Living Room
 supported_features: 397
@@ -132,6 +135,11 @@ min_humidity: 5
 max_humidity: 50
 humidity: 5
 ```
+### Staging and Demand Status
+For thermostats configured with multiple stages (e.g., 2-stage Heat Pumps or multi-stage Auxiliary heat), the integration exposes the raw demand percentages as attributes. 
+
+* **Value 50**: Indicates Stage 1 is active (2-stage system).
+* **Value 100**: Indicates Stage 2 (or single-stage) is active.
 
 
 ## Limitations
