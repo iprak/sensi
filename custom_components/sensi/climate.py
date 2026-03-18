@@ -92,24 +92,25 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
-        status = self._device.state.demand_status if self._device.state else None
+        demand_status = self._state.demand_status
 
-        if not status:
-            return {
-                ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
-                ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
-                ATTR_POWER_STATUS: self._state.power_status,
-            }
-
-        return {
+        # Standard attributes that are always present
+        attrs = {
             ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
             ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
             ATTR_POWER_STATUS: self._state.power_status,
-            ATTR_HEAT_STAGE: status.heat,
-            ATTR_AUX_STAGE: status.aux,
-            ATTR_FAN_STATE: status.fan,
         }
-        
+
+        # If demand_status exists, add staging data
+        if demand_status:
+            attrs.update({
+                ATTR_HEAT_STAGE: demand_status.heat,
+                ATTR_AUX_STAGE: demand_status.aux,
+                ATTR_COOL_STAGE: demand_status.cool,
+            })
+
+        return attrs        
+
     @property
     def name(self) -> str:
         """Return the name of the entity.
