@@ -23,8 +23,11 @@ from homeassistant.util.unit_conversion import TemperatureConverter
 from . import SensiConfigEntry, get_config_option
 from .client import raise_if_error
 from .const import (
+    ATTR_AUX_STAGE,
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
+    ATTR_COOL_STAGE,
+    ATTR_HEAT_STAGE,
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
@@ -88,11 +91,24 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
-        return {
+        demand_status = self._state.demand_status
+
+        # Standard attributes that are always present
+        attrs = {
             ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
             ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
             ATTR_POWER_STATUS: self._state.power_status,
         }
+
+        # If demand_status exists, add staging data
+        if demand_status:
+            attrs.update({
+                ATTR_AUX_STAGE: demand_status.aux,
+                ATTR_COOL_STAGE: demand_status.cool,
+                ATTR_HEAT_STAGE: demand_status.heat,
+            })
+
+        return attrs
 
     @property
     def name(self) -> str:
