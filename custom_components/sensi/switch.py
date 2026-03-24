@@ -59,7 +59,7 @@ SWITCH_TYPES: Final = [
         key="continuous_backlight",
         setting=SettingEventName.CONTINUOUS_BACKLIGHT,
         name="Continuous Backlight",
-        icon="mdi:wall-sconce-flat",
+        icon="mdi:wall-sconce-round",
     ),
     SensiCapabilityEntityDescription(
         key="display_time",
@@ -162,7 +162,7 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         description = SwitchEntityDescription(
             key=CONFIG_FAN_SUPPORT,
             name="Fan",
-            icon="mdi:fan-off",
+            icon="mdi:fan",
             entity_category=EntityCategory.CONFIG,
         )
 
