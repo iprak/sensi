@@ -1,0 +1,45 @@
+{
+  "active_control_group_id": 1,
+  "sensors": [
+    {
+      "id": "thermostat",
+      "name": "Thermostat",
+      "type": "thermostat",
+      "temperature": 70.8,
+      "humidity": 38,
+      "active": true,
+      "state": "connected",
+      "battery": 100,
+      "signal_strength": "good",
+      "firmware_version": "1.0.0"
+    },
+    {
+      "id": "room-1",
+      "name": "Bedroom",
+      "type": "room_sensor",
+      "temperature": 68.2,
+      "humidity": 41,
+      "active": true,
+      "state": "connected",
+      "battery_voltage": 3060,
+      "battery_voltage_enum": "good",
+      "signal_strength": 43,
+      "signal_strength_enum": "good",
+      "firmware_version": "1.0.1"
+    },
+    {
+      "id": "room-2",
+      "name": "Office",
+      "type": "room_sensor",
+      "temperature": 72.9,
+      "humidity": 35,
+      "active": false,
+      "state": "connected",
+      "battery_voltage": 2870,
+      "battery_voltage_enum": "ok",
+      "signal_strength": 21,
+      "signal_strength_enum": "weak",
+      "firmware_version": "1.0.2"
+    }
+  ]
+}

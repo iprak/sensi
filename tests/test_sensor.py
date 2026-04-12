@@ -66,6 +66,40 @@ async def test_sensor_native_value(
     assert entities[3].icon == "mdi:thermometer-low"
 
 
+async def test_setup_platform_with_room_sensors(
+    hass: HomeAssistant,
+    mock_coordinator,
+    mock_device,
+    mock_room_sensor_summary,
+) -> None:
+    """Test sensor setup includes dynamic room sensor entities."""
+    mock_device.update_room_sensor_summary(mock_room_sensor_summary)
+    mock_coordinator.get_devices = MagicMock(return_value=[mock_device])
+
+    async_add_entities = MagicMock()
+    await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
+
+    entities = async_add_entities.call_args[0][0]
+
+    assert len(entities) == 13
+
+    room_temperature_entities = [
+        entity
+        for entity in entities
+        if getattr(entity, "_sensor_id", None) in {"thermostat", "room-1", "room-2"}
+        and entity.entity_description.key == "temperature"
+    ]
+    assert len(room_temperature_entities) == 3
+
+    bedroom_sensor = next(
+        entity
+        for entity in room_temperature_entities
+        if entity.extra_state_attributes["name"] == "Bedroom"
+    )
+    assert bedroom_sensor.native_value == 68.2
+    assert bedroom_sensor.extra_state_attributes["active"] is True
+
+
 class TestCalculateBatteryLevel:
     """Test cases for calculate_battery_level function."""
 

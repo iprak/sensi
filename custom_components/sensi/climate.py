@@ -29,6 +29,12 @@ from .const import (
     ATTR_COOL_STAGE,
     ATTR_HEAT_STAGE,
     ATTR_POWER_STATUS,
+    ATTR_REMOTE_SENSOR_STATUS,
+    ATTR_ROOM_SENSOR_ACTIVE_GROUP,
+    ATTR_ROOM_SENSOR_COUNT,
+    ATTR_ROOM_SENSOR_ERRORS,
+    ATTR_ROOM_SENSOR_PARTICIPATING_COUNT,
+    ATTR_ROOM_SENSORS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
@@ -92,21 +98,46 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
         demand_status = self._state.demand_status
+        room_sensor_stats = self._device.room_sensor_stats
 
         # Standard attributes that are always present
         attrs = {
             ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
             ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
             ATTR_POWER_STATUS: self._state.power_status,
+            ATTR_REMOTE_SENSOR_STATUS: self._state.remote_sensor_status,
         }
 
         # If demand_status exists, add staging data
         if demand_status:
-            attrs.update({
-                ATTR_AUX_STAGE: demand_status.aux,
-                ATTR_COOL_STAGE: demand_status.cool,
-                ATTR_HEAT_STAGE: demand_status.heat,
-            })
+            attrs.update(
+                {
+                    ATTR_AUX_STAGE: demand_status.aux,
+                    ATTR_COOL_STAGE: demand_status.cool,
+                    ATTR_HEAT_STAGE: demand_status.heat,
+                }
+            )
+
+        if room_sensor_stats.active_control_group_id is not None:
+            attrs[ATTR_ROOM_SENSOR_ACTIVE_GROUP] = (
+                room_sensor_stats.active_control_group_id
+            )
+
+        if room_sensor_stats.num_sensors is not None:
+            attrs[ATTR_ROOM_SENSOR_COUNT] = room_sensor_stats.num_sensors
+
+        if room_sensor_stats.num_participating_sensors is not None:
+            attrs[ATTR_ROOM_SENSOR_PARTICIPATING_COUNT] = (
+                room_sensor_stats.num_participating_sensors
+            )
+
+        if room_sensor_stats.sensor_errors:
+            attrs[ATTR_ROOM_SENSOR_ERRORS] = room_sensor_stats.sensor_errors
+
+        if self._device.room_sensors:
+            attrs[ATTR_ROOM_SENSORS] = [
+                sensor.as_attributes() for sensor in self._device.room_sensors
+            ]
 
         return attrs
 

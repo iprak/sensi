@@ -101,6 +101,7 @@ You can use the Temperature and Humidity offset number entities to alter display
 - Humidity
 - Online
 - Temperature
+- Experimental room sensor temperature/humidity entities when supported by the thermostat account
 
 **Disabled by default:**
 - Battery
@@ -149,6 +150,57 @@ For thermostats configured with multiple stages (e.g., 2-stage Heat Pumps or mul
 * **Online** - Testing revealed that the incoming device data continues to indicate a device as `online` even after it has been disconnected from wifi for around 10 minutes. It is unclear what happens to operations during this period.
 
 * **Temperature unit** - The temperature unit displayed for the thermostat is controlled by the HomeAssistant's `unit_system` setting. Make sure it matches the thermostat. [Issue](https://github.com/iprak/sensi/issues/113)
+
+
+## Experimental Room Sensors
+
+This branch includes experimental support for Sensi room sensors by calling the same `sensor-summary` endpoint used by the official Sensi Manager web app.
+
+What you should expect after installing this build:
+- The existing thermostat temperature entity still shows Sensi's display/average temperature.
+- The climate entity gains room sensor attributes including `room_sensor_count`, `room_sensor_participating_count`, `room_sensor_active_group_id`, and `room_sensors`.
+- Additional room sensor entities are created when the API returns per-sensor data, for example separate temperature and humidity sensors for `Thermostat`, `Bedroom`, `Office`, etc.
+
+### Local Testing
+
+1. Copy `custom_components/sensi/` from this branch into your Home Assistant config directory on the server.
+1. Restart Home Assistant or reload the integration.
+1. Open the Sensi device in Home Assistant and inspect:
+   - the climate entity attributes
+   - any new `sensor.sensi_*_<room>_temperature` entities
+   - any new `sensor.sensi_*_<room>_humidity` entities
+
+If you want extra diagnostics while testing, add:
+
+```yaml
+logger:
+  logs:
+    custom_components.sensi: debug
+```
+
+If no room sensor entities appear, check the climate entity's `room_sensors` attribute first. That tells you whether the thermostat account is returning room sensor data to the integration even when separate entities were not created.
+
+### API Probe
+
+For a quick local check outside Home Assistant, this branch also includes [scripts/sensi_probe.py](/Users/bbenway/Desktop/Codex/HomeAutomation/sensi/scripts/sensi_probe.py).
+
+Example usage:
+
+```bash
+export SENSI_REFRESH_TOKEN='your_refresh_token'
+python3 scripts/sensi_probe.py --raw
+```
+
+What it does:
+- exchanges the refresh token for an access token
+- optionally discovers thermostat ids through the websocket used by the integration
+- fetches the `sensor-summary` payload for a thermostat
+
+If websocket discovery is unavailable in your shell, pass the thermostat id directly:
+
+```bash
+python3 scripts/sensi_probe.py --icd-id '36-6f-92-ff-fe-0c-0b-07' --raw
+```
 
 
 

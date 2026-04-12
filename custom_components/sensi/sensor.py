@@ -26,7 +26,8 @@ from homeassistant.helpers.typing import StateType
 
 from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiDevice
-from .entity import SensiDescriptionEntity
+from .data import RoomSensor
+from .entity import SensiDescriptionEntity, SensiEntity
 
 
 def calculate_battery_level(voltage: float) -> int | None:
@@ -57,6 +58,13 @@ class SensiSensorEntityDescription(SensorEntityDescription):
 
     extra_state_attributes_fn: Callable[[Any], dict[str, str]] | None = None
     value_fn: Callable[[SensiDevice], StateType] = None
+
+
+@dataclass(frozen=True)
+class SensiRoomSensorEntityDescription(SensorEntityDescription):
+    """Representation of a dynamic room sensor metric."""
+
+    value_fn: Callable[[RoomSensor], StateType] = None
 
 
 SENSOR_TYPES: Final = [
@@ -129,6 +137,25 @@ SENSOR_TYPES: Final = [
     ),
 ]
 
+ROOM_SENSOR_TYPES: Final = [
+    SensiRoomSensorEntityDescription(
+        device_class=SensorDeviceClass.TEMPERATURE,
+        key="temperature",
+        name="Temperature",
+        native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda sensor: sensor.temperature,
+    ),
+    SensiRoomSensorEntityDescription(
+        device_class=SensorDeviceClass.HUMIDITY,
+        key="humidity",
+        name="Humidity",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda sensor: sensor.humidity,
+    ),
+]
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -142,6 +169,15 @@ async def async_setup_entry(
         for device in coordinator.get_devices()
         for description in SENSOR_TYPES
     ]
+    entities.extend(
+        SensiRoomSensorEntity(
+            hass, device, room_sensor.identifier, description, entry
+        )
+        for device in coordinator.get_devices()
+        for room_sensor in device.room_sensors
+        for description in ROOM_SENSOR_TYPES
+        if room_sensor.identifier and description.value_fn(room_sensor) is not None
+    )
 
     async_add_entities(entities)
 
@@ -199,3 +235,69 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     def icon(self) -> str | None:
         """Return icon for sensor."""
         return self.entity_description.icon
+
+
+class SensiRoomSensorEntity(SensiEntity, SensorEntity):
+    """Representation of a thermostat or remote room sensor."""
+
+    entity_description: SensiRoomSensorEntityDescription
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        device: SensiDevice,
+        sensor_id: str,
+        description: SensiRoomSensorEntityDescription,
+        entry: SensiConfigEntry,
+    ) -> None:
+        """Initialize the room sensor entity."""
+        super().__init__(device, entry)
+        self.entity_description = description
+        self._sensor_id = sensor_id
+
+        room_sensor = self._room_sensor
+        sensor_name = room_sensor.name if room_sensor else sensor_id
+
+        self._attr_name = f"{sensor_name} {description.name}"
+        self._attr_unique_id = (
+            f"{device.identifier}_room_sensor_{sensor_id}_{description.key}"
+        )
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.name}_{sensor_name}_{description.key}",
+            hass=hass,
+        )
+
+    @property
+    def _room_sensor(self) -> RoomSensor | None:
+        """Return the current room sensor model."""
+        return self._device.get_room_sensor(self._sensor_id)
+
+    @property
+    def available(self) -> bool:
+        """Return if the room sensor entity is available."""
+        return super().available and self._room_sensor is not None
+
+    @property
+    def native_value(self) -> StateType:
+        """Return the room sensor value."""
+        room_sensor = self._room_sensor
+        if not room_sensor:
+            return None
+
+        return self.entity_description.value_fn(room_sensor)
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the unit of measurement of the room sensor."""
+        return (
+            self._state.temperature_unit
+            if self.entity_description.device_class == SensorDeviceClass.TEMPERATURE
+            else self.entity_description.native_unit_of_measurement
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra room sensor details."""
+        room_sensor = self._room_sensor
+        return room_sensor.as_attributes() if room_sensor else None

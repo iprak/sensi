@@ -10,6 +10,8 @@ from custom_components.sensi.data import (
     Firmware,
     HumidityControl,
     OperatingMode,
+    RoomSensor,
+    RoomSensorStats,
     State,
     ThermostatInfo,
     get_hvac_mode_from_operating_mode,
@@ -345,6 +347,33 @@ class TestState:
         assert isinstance(state.wifi_connection_quality, int)
 
 
+class TestRoomSensors:
+    """Test cases for room sensor parsing."""
+
+    def test_room_sensor_stats_from_summary(self, mock_room_sensor_summary):
+        """Test room sensor summary parsing."""
+        stats = RoomSensorStats(mock_room_sensor_summary)
+
+        assert stats.active_control_group_id == 1
+        assert stats.num_sensors == 3
+        assert stats.num_participating_sensors == 2
+
+    def test_room_sensor_attributes(self, mock_room_sensor_summary):
+        """Test individual room sensor parsing."""
+        room_sensor = RoomSensor(mock_room_sensor_summary["sensors"][1])
+
+        assert room_sensor.identifier == "room-1"
+        assert room_sensor.name == "Bedroom"
+        assert room_sensor.sensor_type == "room_sensor"
+        assert room_sensor.temperature == 68.2
+        assert room_sensor.humidity == 41
+        assert room_sensor.active is True
+        assert room_sensor.battery == 3060
+        assert room_sensor.battery_status == "good"
+        assert room_sensor.signal_strength == 43
+        assert room_sensor.signal_strength_status == "good"
+
+
 def test_sensi_device_create_with_state(mock_json) -> None:
     """Test SensiDevice.create with valid state data."""
     have_state, device = SensiDevice.create(mock_json)
@@ -437,3 +466,16 @@ class TestSensiDevice:
 
         assert device.info is not None
         assert device.info != current_info
+
+    def test_sensi_device_update_room_sensor_summary(
+        self, mock_json, mock_room_sensor_summary
+    ):
+        """Test room sensor summary updates."""
+        _have_state, device = SensiDevice.create(mock_json)
+
+        device.update_room_sensor_summary(mock_room_sensor_summary)
+
+        assert device.room_sensor_stats.active_control_group_id == 1
+        assert len(device.room_sensors) == 3
+        assert device.get_room_sensor("thermostat") is not None
+        assert device.get_room_sensor("room-1").temperature == 68.2

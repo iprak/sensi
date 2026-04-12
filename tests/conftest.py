@@ -67,6 +67,12 @@ def mock_json_with_humidification():
 
 
 @pytest.fixture
+def mock_room_sensor_summary():
+    """Return sample room sensor summary data."""
+    return json.loads(load_json("sample_room_sensor_summary.json"))
+
+
+@pytest.fixture
 def mock_device(mock_json) -> SensiDevice:
     """Create a mock SensiDevice from sample JSON data."""
     _have_state, device = SensiDevice.create(mock_json)

@@ -11,6 +11,10 @@ from custom_components.sensi.const import (
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
+    ATTR_ROOM_SENSOR_ACTIVE_GROUP,
+    ATTR_ROOM_SENSOR_COUNT,
+    ATTR_ROOM_SENSOR_PARTICIPATING_COUNT,
+    ATTR_ROOM_SENSORS,
     CONFIG_FAN_SUPPORT,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     SENSI_FAN_AUTO,
@@ -408,6 +412,20 @@ class TestSensiThermostatExtraStateAttributes:
 
         attrs = mock_thermostat.extra_state_attributes
         assert attrs[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == 50
+
+    def test_extra_state_attributes_room_sensors(
+        self, mock_device, mock_room_sensor_summary, mock_thermostat
+    ):
+        """Test extra_state_attributes exposes room sensor data."""
+        mock_device.update_room_sensor_summary(mock_room_sensor_summary)
+
+        attrs = mock_thermostat.extra_state_attributes
+
+        assert attrs[ATTR_ROOM_SENSOR_ACTIVE_GROUP] == 1
+        assert attrs[ATTR_ROOM_SENSOR_COUNT] == 3
+        assert attrs[ATTR_ROOM_SENSOR_PARTICIPATING_COUNT] == 2
+        assert len(attrs[ATTR_ROOM_SENSORS]) == 3
+        assert attrs[ATTR_ROOM_SENSORS][1]["name"] == "Bedroom"
 
 
 def test_supported_features(mock_device, mock_thermostat) -> None:

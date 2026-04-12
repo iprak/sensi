@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Callable
 import contextlib
 from dataclasses import asdict, dataclass
+from http import HTTPStatus
 from types import TracebackType
 
 import aiohttp
@@ -12,10 +13,11 @@ from socketio.exceptions import ConnectionError
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.helpers import aiohttp_client
 from homeassistant.util.enum import try_parse_enum
 
 from .auth import SensiConnectionError, refresh_access_token
-from .const import LOGGER, SENSI_DOMAIN
+from .const import LOGGER, SENSI_API_URL, SENSI_DOMAIN
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
     BoolEventData,
@@ -37,6 +39,7 @@ PREPARE_DEVICES_TIMEOUT = 20
 SET_EVENT_TIMEOUT = 5
 EMIT_LOOP_DELAY = 0.5
 EMIT_LOOP_DELAY_WHEN_DISCONNECTED = 1
+ROOM_SENSOR_TIMEOUT = 10
 
 
 @dataclass
@@ -124,6 +127,7 @@ class SensiClient:
         try:
             await self._connect()
             await _wait_for_state_and_device_info()
+            await self._async_update_room_sensor_summaries()
         except SensiConnectionError as err:
             raise ConfigEntryNotReady from err
         except TimeoutError:
@@ -135,6 +139,7 @@ class SensiClient:
 
         try:
             await _wait_for_device_info()
+            await self._async_update_room_sensor_summaries()
         except SensiConnectionError as err:
             raise ConfigEntryNotReady from err
         except TimeoutError as err:
@@ -183,6 +188,65 @@ class SensiClient:
 
         with contextlib.suppress(asyncio.exceptions.TimeoutError):
             await _wait_for_device_states()
+
+        await self._async_update_room_sensor_summaries()
+
+    async def _async_update_room_sensor_summaries(self) -> None:
+        """Populate room sensor data from the official REST endpoint."""
+        if not self._devices:
+            return
+
+        await asyncio.gather(
+            *(
+                self.async_update_room_sensor_summary(device)
+                for device in self._devices.values()
+            )
+        )
+
+    async def async_update_room_sensor_summary(self, device: SensiDevice) -> None:
+        """Update room sensor data for a thermostat."""
+        scale = device.state.display_scale or "f"
+        url = (
+            f"{SENSI_API_URL}/thermostat/v2/{device.identifier}"
+            f"/sensor-summary?scale={scale}"
+        )
+
+        try:
+            session = aiohttp_client.async_get_clientsession(self._hass)
+            async with asyncio.timeout(ROOM_SENSOR_TIMEOUT):
+                response = await session.get(url, headers=self._config.headers)
+        except (TimeoutError, aiohttp.ClientError):
+            LOGGER.debug(
+                "Unable to fetch room sensor summary for %s",
+                device.identifier,
+                exc_info=True,
+            )
+            return
+
+        if response.status == HTTPStatus.UNAUTHORIZED:
+            LOGGER.debug("Room sensor request returned 401 for %s", device.identifier)
+            return
+
+        if response.status != HTTPStatus.OK:
+            LOGGER.debug(
+                "Room sensor request failed for %s with status %s",
+                device.identifier,
+                response.status,
+            )
+            return
+
+        try:
+            payload = await response.json()
+        except (aiohttp.ContentTypeError, ValueError):
+            LOGGER.debug(
+                "Room sensor response was not JSON for %s",
+                device.identifier,
+                exc_info=True,
+            )
+            return
+
+        if isinstance(payload, dict):
+            device.update_room_sensor_summary(payload)
 
     async def async_set_temperature(
         self, device: SensiDevice, mode: OperatingMode, value: int

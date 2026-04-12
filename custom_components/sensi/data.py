@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 from typing import Self
 
 from homeassistant.components.climate import HVACMode
@@ -16,6 +17,187 @@ from .const import (
     TEMPERATURE_UPPER_LIMIT,
 )
 from .utils import to_bool, to_float, to_int
+
+
+def _first_value(source: dict[str, Any] | None, *keys: str) -> Any:
+    """Return the first defined value for the given keys."""
+    if not source:
+        return None
+
+    for key in keys:
+        if key in source and source[key] is not None:
+            return source[key]
+
+    return None
+
+
+def _nested_value(
+    source: dict[str, Any] | None, keys: tuple[str, ...], nested_keys: tuple[str, ...]
+) -> Any:
+    """Return a direct or nested value from the given keys."""
+    value = _first_value(source, *keys)
+    if isinstance(value, dict):
+        nested_value = _first_value(value, *nested_keys)
+        if nested_value is not None:
+            return nested_value
+
+    return value
+
+
+def _extract_optional_bool(source: dict[str, Any] | None, *keys: str) -> bool | None:
+    """Extract an optional bool value."""
+    value = _first_value(source, *keys)
+    if value is None:
+        return None
+
+    return to_bool(value)
+
+
+class RoomSensorStats:
+    """Summary details for thermostat room sensors."""
+
+    def __init__(self, data: dict[str, Any] | None = None) -> None:
+        """Initialize summary details from websocket or REST payloads."""
+        data = data or {}
+
+        self.active_control_group_id = to_int(
+            _first_value(
+                data,
+                "active_control_group_id",
+                "active_group_id",
+                "group_id",
+                "groupId",
+                "selectedGroupId",
+            ),
+            None,
+        )
+        self.num_sensors = to_int(
+            _first_value(data, "num_sensors", "numSensors"), None
+        )
+        self.num_participating_sensors = to_int(
+            _first_value(
+                data, "num_participating_sensors", "numParticipatingSensors"
+            ),
+            None,
+        )
+
+        errors = _first_value(
+            data, "sensor_errors", "sensorErrors", "sensorsWithErrors"
+        )
+        self.sensor_errors = errors if isinstance(errors, list) else []
+        self.raw = data
+
+        sensors = data.get("sensors")
+        if self.num_sensors is None and isinstance(sensors, list):
+            self.num_sensors = len(sensors)
+
+        if self.num_participating_sensors is None and isinstance(sensors, list):
+            self.num_participating_sensors = len(
+                [sensor for sensor in sensors if to_bool(sensor.get("active"))]
+            )
+
+    @property
+    def has_data(self) -> bool:
+        """Return true if any room sensor summary data was captured."""
+        return bool(self.raw)
+
+
+class RoomSensor:
+    """Representation of an individual thermostat or remote room sensor."""
+
+    def __init__(
+        self,
+        data: dict[str, Any],
+        *,
+        default_id: str | None = None,
+        default_name: str | None = None,
+        default_type: str | None = None,
+    ) -> None:
+        """Initialize room sensor details from REST payload data."""
+        self.raw = data
+
+        identifier = _first_value(data, "id", "sensor_id", "sensorId")
+        self.identifier = str(identifier or default_id or "")
+
+        name = _first_value(data, "name", "label", "display_name", "displayName")
+        self.name = str(name or default_name or self.identifier or "Sensor")
+
+        sensor_type = _first_value(data, "type", "sensor_type", "sensorType")
+        self.sensor_type = str(sensor_type or default_type or "")
+
+        self.temperature = to_float(
+            _nested_value(
+                data,
+                ("temperature", "temp", "display_temp"),
+                ("temperature", "temp", "value"),
+            ),
+            None,
+        )
+        self.humidity = to_int(
+            _nested_value(
+                data,
+                ("humidity", "relative_humidity", "relativeHumidity"),
+                ("humidity", "relativeHumidity", "value", "percent", "percentage"),
+            ),
+            None,
+        )
+        self.battery = to_int(
+            _nested_value(
+                data,
+                ("battery", "battery_level", "batteryLevel", "battery_voltage"),
+                ("value", "level", "percent", "percentage"),
+            ),
+            None,
+        )
+        self.battery_status = str(
+            _first_value(data, "battery_voltage_enum", "battery_status", "batteryStatus")
+            or ""
+        )
+        self.signal_strength = _nested_value(
+            data,
+            ("signal_strength", "signalStrength", "rssi"),
+            ("value", "level"),
+        )
+        self.signal_strength_status = str(
+            _first_value(
+                data,
+                "signal_strength_enum",
+                "signalStrengthEnum",
+                "signal_strength_status",
+            )
+            or ""
+        )
+        self.active = _extract_optional_bool(data, "active", "isActive")
+        self.has_error = _extract_optional_bool(
+            data,
+            "has_error",
+            "hasError",
+            "sensor_error",
+            "sensorError",
+        )
+        self.state = str(_first_value(data, "state", "status") or "")
+        self.firmware_version = str(
+            _first_value(data, "firmware_version", "firmwareVersion") or ""
+        )
+
+    def as_attributes(self) -> dict[str, Any]:
+        """Return room sensor data in a Home Assistant friendly shape."""
+        attrs = {
+            "sensor_id": self.identifier,
+            "name": self.name,
+            "type": self.sensor_type,
+            "active": self.active,
+            "temperature": self.temperature,
+            "humidity": self.humidity,
+            "battery": self.battery,
+            "battery_status": self.battery_status or None,
+            "signal_strength": self.signal_strength,
+            "signal_strength_status": self.signal_strength_status or None,
+            "has_error": self.has_error,
+            "state": self.state or None,
+            "firmware_version": self.firmware_version or None,
+        }
+        return {key: value for key, value in attrs.items() if value is not None}
 
 
 class OperatingMode(StrEnum):
@@ -211,6 +393,7 @@ class State:
             OperatingMode, data.get("operating_mode", OperatingMode.UNKNOWN)
         )
         self.power_status = data.get("power_status", "")
+        self.remote_sensor_status = data.get("remote_sensor_status", "")
         self.status = data.get("status", "")
         self.temp_offset = to_int(data.get("temp_offset"), 0)
         self.wifi_connection_quality = to_int(data.get("wifi_connection_quality"), None)
@@ -289,6 +472,9 @@ class SensiDevice:
         self.identifier = identifier
         self.info = ThermostatInfo(info)
         self.name = registration.get("name", "")
+        self.room_sensor_payload: dict[str, Any] = {}
+        self.room_sensor_stats = RoomSensorStats(state.get("sensors"))
+        self.room_sensors: list[RoomSensor] = []
         self.state = State(state)
 
         LOGGER.debug(f"{self.identifier} Capabilities={self.capabilities}")
@@ -319,6 +505,7 @@ class SensiDevice:
         source = data.get("state")
         if source:
             self.state = State(source)
+            self.room_sensor_stats = RoomSensorStats(source.get("sensors"))
             LOGGER.debug(f"{self.identifier} State updated to {self.state}")
             return True
 
@@ -333,3 +520,55 @@ class SensiDevice:
         """Update the thermostat info from data dictionary."""
         if source:
             self.info = ThermostatInfo(source)
+
+    def update_room_sensor_summary(self, source: dict[str, Any] | None) -> None:
+        """Update room sensor data from the REST summary endpoint."""
+        if not source:
+            return
+
+        self.room_sensor_payload = source
+        self.room_sensor_stats = RoomSensorStats(source)
+
+        sensors: list[RoomSensor] = []
+
+        thermostat_sensor = source.get("thermostat")
+        if isinstance(thermostat_sensor, dict):
+            sensors.append(
+                RoomSensor(
+                    thermostat_sensor,
+                    default_id="thermostat",
+                    default_name="Thermostat",
+                    default_type="thermostat",
+                )
+            )
+
+        source_sensors = source.get("sensors", [])
+        if isinstance(source_sensors, list):
+            sensors.extend(
+                RoomSensor(sensor)
+                for sensor in source_sensors
+                if isinstance(sensor, dict)
+            )
+
+        unique_sensors: list[RoomSensor] = []
+        seen_ids: set[str] = set()
+        for sensor in sensors:
+            key = sensor.identifier or sensor.name
+            if not key or key in seen_ids:
+                continue
+
+            seen_ids.add(key)
+            unique_sensors.append(sensor)
+
+        self.room_sensors = unique_sensors
+
+    def get_room_sensor(self, sensor_id: str) -> RoomSensor | None:
+        """Return the current room sensor for a given identifier."""
+        return next(
+            (
+                sensor
+                for sensor in self.room_sensors
+                if sensor.identifier == sensor_id
+            ),
+            None,
+        )
