@@ -38,6 +38,7 @@ PREPARE_DEVICES_TIMEOUT = 20
 SET_EVENT_TIMEOUT = 5
 EMIT_LOOP_DELAY = 0.5
 EMIT_LOOP_DELAY_WHEN_DISCONNECTED = 1
+DISCONNECT_TIMEOUT = 10
 
 
 @dataclass
@@ -155,11 +156,23 @@ class SensiClient:
             self._emit_loop_task = None
 
     async def _async_disconnect(self) -> None:
-        """Disconnect the client."""
-        if self._sio:
+        """Disconnect the client without raising an error.
+
+        Bounded so a wedged socket.io teardown can never hang a coordinator
+        update. With native reconnection disabled (see `_connect`) `wait()`
+        returns promptly; the timeout is defense in depth.
+        """
+        if not self._sio or not self._sio.connected:
+            return
+
+        LOGGER.info("Disconnecting")
+
+        with contextlib.suppress(Exception):
             await self._sio.disconnect()
-            await self._sio.wait()
-            self._sio = None
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(self._sio.wait(), DISCONNECT_TIMEOUT)
+
+        self._sio = None
 
     async def async_update_devices(self) -> list[SensiDevice]:
         """Update the thermostat devices.
