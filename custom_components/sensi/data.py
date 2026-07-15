@@ -1,6 +1,7 @@
 """Data models for Sensi thermostats."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
@@ -16,6 +17,11 @@ from .const import (
     TEMPERATURE_UPPER_LIMIT,
 )
 from .utils import to_bool, to_float, to_int
+
+# Refresh the access token this many seconds before its real expiry so the
+# socket.io namespace handshake is never presented a token that expires
+# mid-connection.
+TOKEN_EXPIRY_SKEW_SECONDS = 60
 
 
 class OperatingMode(StrEnum):
@@ -101,6 +107,15 @@ class AuthenticationConfig:
     def headers(self):
         """Get request headers."""
         return {"Authorization": "bearer " + self.access_token}
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True if the access token is missing or (nearly) expired."""
+        if not self.access_token or self.expires_at is None:
+            return True
+        return datetime.now().timestamp() >= (
+            self.expires_at - TOKEN_EXPIRY_SKEW_SECONDS
+        )
 
 
 class CirculatingFan:

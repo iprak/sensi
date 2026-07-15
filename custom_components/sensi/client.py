@@ -37,6 +37,7 @@ PREPARE_DEVICES_TIMEOUT = 20
 SET_EVENT_TIMEOUT = 5
 EMIT_LOOP_DELAY = 0.5
 EMIT_LOOP_DELAY_WHEN_DISCONNECTED = 1
+DISCONNECT_TIMEOUT = 10
 
 
 @dataclass
@@ -154,10 +155,17 @@ class SensiClient:
             self._emit_loop_task = None
 
     async def _async_disconnect(self) -> None:
-        """Disconnect the client."""
+        """Disconnect the client.
+
+        Bounded so a wedged socket.io teardown can never hang a coordinator
+        update. With native reconnection disabled (see `_connect`) `wait()`
+        returns promptly; the timeout is defense in depth.
+        """
         if self._sio:
-            await self._sio.disconnect()
-            await self._sio.wait()
+            with contextlib.suppress(Exception):
+                await self._sio.disconnect()
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(self._sio.wait(), DISCONNECT_TIMEOUT)
             self._sio = None
 
     async def async_update_devices(self) -> list[SensiDevice]:
@@ -511,14 +519,27 @@ class SensiClient:
             count = count + 1
 
     async def _connect(self) -> None:
-        """Make a connection and wait for `connected` event.
+        """Create a client, connect, and wait for the `connected` event.
 
-        This can raise SensiConnectionError.
+        Reconnection is owned by the coordinator (the client is created with
+        `reconnection=False`) so that every attempt runs this method, and
+        therefore the token-refresh path below. python-socketio's own
+        reconnection loop reuses the headers captured at connect() time and
+        never refreshes them, so leaving it enabled meant a mid-session token
+        expiry could never self-heal and it deadlocked `_async_disconnect`.
+
+        This can raise SensiConnectionError, AuthenticationError.
         """
 
-        sio = self._sio = socketio.AsyncClient(
-            logger=LOGGER
-        )  # , engineio_logger=LOGGER
+        # Proactively refresh an expired/expiring token so the namespace
+        # handshake is never presented a dead bearer token.
+        if self._config.is_expired:
+            LOGGER.debug("Access token missing or expired; refreshing before connect")
+            self._config = await refresh_access_token(
+                self._hass, self._config.refresh_token
+            )
+
+        sio = self._sio = socketio.AsyncClient(logger=LOGGER, reconnection=False)
 
         @sio.event
         async def connect():
@@ -537,29 +558,26 @@ class SensiClient:
         async def any_event(event, data):
             await self._on_event(event, data)
 
-        # raise SensiConnectionError("Fake error, could not connect")   # For testing
-
         try:
             self._connect_error_data = None
             await self._connect_client()
         except TimeoutError as ex:
             raise SensiConnectionError("Timed out making the connection") from ex
-        except ConnectionError as connect_ex:
-            if not is_token_expired(self._connect_error_data):
-                raise SensiConnectionError(
-                    f"Connection failed but token was not expired. ConnectError={self._connect_error_data}"
-                ) from connect_ex
+        except ConnectionError:
+            # The namespace was rejected. The rejection payload shape varies, so
+            # rather than matching a specific message ("jwt expired") we refresh
+            # the token once and retry. If the refresh token itself is invalid,
+            # refresh_access_token raises AuthenticationError, which the
+            # coordinator turns into a reauth flow.
+            LOGGER.info(
+                f"Namespace connection rejected ({self._connect_error_data}); "
+                "refreshing token and retrying"
+            )
+            self._config = await refresh_access_token(
+                self._hass, self._config.refresh_token
+            )
 
-            try:
-                self._config = await refresh_access_token(
-                    self._hass, self._config.refresh_token
-                )
-            except Exception as refresh_ex:
-                raise SensiConnectionError("Error refreshing tokens") from refresh_ex
-
-            # Try connecting again after refreshing tokens. Pass all exceptions.
             self._connect_error_data = None
-
             try:
                 await self._connect_client()
             except TimeoutError as ex:
@@ -570,8 +588,8 @@ class SensiClient:
                 raise SensiConnectionError(
                     "Connection attempt after token refresh failed"
                 ) from connect_ex2
-        except Exception as e:
-            raise SensiConnectionError from e
+        except Exception as err:
+            raise SensiConnectionError("Failed to connect") from err
 
     async def _connect_client(self) -> None:
         """Make a connection.
@@ -658,13 +676,6 @@ def get_error_description_from_event_callback(error: dict) -> str:
     # {'error': {'description': 'Bad Request'}, 'icd_id': '36-6f-92-ff-fe-02-24-b7'}
     # {'error': {'description': 'Forbidden'}}
     return error.get("error", {}).get("description", "")
-
-
-def is_token_expired(error_details):
-    """Determine if the error details indicate an expired token."""
-    if isinstance(error_details, dict):
-        return error_details and error_details.get("message") == "jwt expired"
-    return False
 
 
 def extract_icd_id(data: dict) -> str:

@@ -1,9 +1,13 @@
 """Tests for Sensi data component."""
 
+import time
+
 import pytest
 
 from custom_components.sensi.coordinator import SensiDevice
 from custom_components.sensi.data import (
+    TOKEN_EXPIRY_SKEW_SECONDS,
+    AuthenticationConfig,
     CirculatingFan,
     DemandStatus,
     FanMode,
@@ -437,3 +441,46 @@ class TestSensiDevice:
 
         assert device.info is not None
         assert device.info != current_info
+
+
+class TestAuthenticationConfigIsExpired:
+    """Test cases for AuthenticationConfig.is_expired."""
+
+    def test_missing_access_token(self):
+        """Missing access token is treated as expired."""
+        config = AuthenticationConfig(
+            refresh_token="r", access_token=None, expires_at=time.time() + 100000
+        )
+        assert config.is_expired is True
+
+    def test_missing_expires_at(self):
+        """Missing expiry is treated as expired."""
+        config = AuthenticationConfig(
+            refresh_token="r", access_token="a", expires_at=None
+        )
+        assert config.is_expired is True
+
+    def test_already_expired(self):
+        """A past expiry is expired."""
+        config = AuthenticationConfig(
+            refresh_token="r", access_token="a", expires_at=time.time() - 100
+        )
+        assert config.is_expired is True
+
+    def test_within_skew_window(self):
+        """A token expiring inside the skew window is treated as expired."""
+        config = AuthenticationConfig(
+            refresh_token="r",
+            access_token="a",
+            expires_at=time.time() + (TOKEN_EXPIRY_SKEW_SECONDS / 2),
+        )
+        assert config.is_expired is True
+
+    def test_valid(self):
+        """A comfortably-future token is not expired."""
+        config = AuthenticationConfig(
+            refresh_token="r",
+            access_token="a",
+            expires_at=time.time() + (TOKEN_EXPIRY_SKEW_SECONDS + 3600),
+        )
+        assert config.is_expired is False

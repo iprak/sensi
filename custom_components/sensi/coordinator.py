@@ -6,9 +6,10 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .auth import SensiConnectionError
+from .auth import AuthenticationError, SensiConnectionError
 from .client import SensiClient
 from .const import COORDINATOR_UPDATE_INTERVAL, LOGGER
 from .data import SensiDevice
@@ -34,6 +35,10 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
 
             try:
                 await self.client.async_update_devices()
+            except AuthenticationError as err:
+                # The refresh token itself is invalid, trigger HA's reauth flow
+                # instead of retrying forever.
+                raise ConfigEntryAuthFailed from err
             except SensiConnectionError as err:
                 raise UpdateFailed from err
 
