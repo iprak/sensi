@@ -528,11 +528,12 @@ class SensiClient:
 
         @sio.event
         async def connect_error(data):
+            LOGGER.debug(f"Received connection error ({data})")
             self._connect_error_data = data
 
-        # @sio.event
-        # async def disconnect(reason) -> None:
-        #     print("I'm disconnected! reason:", reason)
+        @sio.event
+        async def disconnect(reason) -> None:
+            LOGGER.debug(f"Disconnected ({reason})")
 
         @sio.on("*")
         async def any_event(event, data):
