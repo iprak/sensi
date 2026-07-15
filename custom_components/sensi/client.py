@@ -401,10 +401,29 @@ class SensiClient:
 
         future = self._hass.loop.create_future()
 
-        def event_callback(error: dict, data: dict | None = None) -> None:
-            if not future.cancelled():
-                with contextlib.suppress(asyncio.exceptions.InvalidStateError):
-                    future.set_result((error, data))
+        def event_callback(*response_args: any) -> None:
+            if future.cancelled():
+                return
+
+            with contextlib.suppress(asyncio.exceptions.InvalidStateError):
+                if not response_args:
+                    future.set_result((None, {}))
+                    return
+
+                if len(response_args) >= 2:
+                    future.set_result((response_args[0], response_args[1]))
+                    return
+
+                response_payload = response_args[0]
+                if response_payload is None:
+                    future.set_result((None, {}))
+                    return
+
+                if isinstance(response_payload, dict) and "error" in response_payload:
+                    future.set_result((response_payload, None))
+                    return
+
+                future.set_result((None, response_payload))
 
         await self._send_event(event, request_data, event_callback)
 
