@@ -64,6 +64,8 @@ class SensiClient:
     ) -> None:
         """Initialize the Sensi Client."""
 
+        self._did_token_expire_midway = False
+
         self._hass = hass
         self._config = config
         self._connector = connector
@@ -551,9 +553,8 @@ class SensiClient:
         This can raise SensiConnectionError.
         """
 
-        sio = self._sio = socketio.AsyncClient(
-            logger=LOGGER
-        )  # , engineio_logger=LOGGER
+        # Create SocketIO client with reconnection limited to 1 attempt. Add engineio_logger=LOGGER for deeper debugging
+        sio = self._sio = socketio.AsyncClient(logger=LOGGER, reconnection_attempts=1)
 
         @sio.event
         async def connect():
@@ -565,9 +566,73 @@ class SensiClient:
             LOGGER.debug(f"Received connection error ({data})")
             self._connect_error_data = data
 
+            # Only the first connection error has useful data i.e. jwt expired in it. The connect_error due to automatic retires
+            # just has "Connection error" in it. So we only check for token expiry in the first connect_error.
+            if is_token_expired(data):
+                self._did_token_expire_midway = True
+
         @sio.event
         async def disconnect(reason) -> None:
             LOGGER.debug(f"Disconnected ({reason})")
+
+            # Log samples
+
+            # 1. Disconnect is recoverable
+
+            # 2026-07-15 13:52:54.133 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
+            # 2026-07-15 13:52:54.134 DEBUG (MainThread) [custom_components.sensi] Disconnected (transport error)
+            # 2026-07-15 13:52:54.134 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 1.03 seconds
+            # 2026-07-15 13:52:55.292 INFO (MainThread) [custom_components.sensi] Engine.IO connection established
+            # 2026-07-15 13:52:55.326 INFO (MainThread) [custom_components.sensi] Namespace / is connected
+            # 2026-07-15 13:52:55.326 INFO (MainThread) [custom_components.sensi] Reconnection successful
+            # 2026-07-15 13:52:55.342 INFO (MainThread) [custom_components.sensi] Received event "state" [/]
+            # 2026-07-15 13:52:55.350 INFO (MainThread) [custom_components.sensi] Received event "state" [/]
+            # 2026-07-15 13:52:55.351 DEBUG (MainThread) [custom_components.sensi] 36-6f-92-ff-fe-0c-0b-07 State updated to State(status=online, operating_mode=cool, display_temp=74.5°F, humidity=98%
+
+            # 2. Disconnect itself doesn't have useful data, the useful reason is in connect_error.
+
+            # 2026-07-15 17:18:10.721 DEBUG (MainThread) [custom_components.sensi] Disconnected (transport error)
+            # 2026-07-15 17:18:10.721 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 0.99 seconds
+            # 2026-07-15 17:18:11.851 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
+            # 2026-07-15 17:18:11.852 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 1.97 seconds
+            # 2026-07-15 17:18:13.854 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
+            # 2026-07-15 17:18:13.854 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 4.37 seconds
+            # 2026-07-15 17:18:14.030 DEBUG (MainThread) [custom_components.sensi] In event emit loop (001C000001QF6aPIAT): 38060
+
+            # 3. If token is identified expired during data update, then it is refreshed
+
+            # 2026-07-15 23:15:02.172 INFO (MainThread) [custom_components.sensi] Updating devices - reconnecting and updating
+            # 2026-07-15 23:15:02.172 INFO (MainThread) [custom_components.sensi] Disconnecting
+            # 2026-07-15 23:15:02.173 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
+            # 2026-07-15 23:15:02.173 DEBUG (MainThread) [custom_components.sensi] client disconnect
+            # 2026-07-15 23:15:03.364 INFO (MainThread) [custom_components.sensi] Engine.IO connection established
+            # 2026-07-15 23:15:03.398 INFO (MainThread) [custom_components.sensi] Connection to namespace / was rejected
+            # 2026-07-15 23:15:03.398 DEBUG (MainThread) [custom_components.sensi] Received connection error ({'message': 'jwt expired', 'data': {'message': 'jwt expired', 'code': 'invalid_token', 'type': 'UnauthorizedError'}})
+            # 2026-07-15 23:15:03.399 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
+            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Using supplied refresh_token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJmbGVldCIsInVzZXJfaWQiOiJsZW9saXRlMUBnbWFpbC5jb20iLCJkZXZpY2UiOiJGTDMzVC1sZW9saXRlMS00NzYxNzEyODE1Iiwic2FsZXNmb3JjZV9pZCI6IjAwMUMwMDAwMDFRRjZhUElBVCIsImZsZWV0X2VuYWJsZWQiOmZhbHNlLCJpYXQiOjE3NTg5NzIzOTAsImV4cCI6MjA3NDU0ODM5MH0.IqE5VrT7WnhEr_suspOo07NU7DpEwXnWkOGmVjSOnDw
+            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Getting access token using refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJmbGVldCIsInVzZXJfaWQiOiJsZW9saXRlMUBnbWFpbC5jb20iLCJkZXZpY2UiOiJGTDMzVC1sZW9saXRlMS00NzYxNzEyODE1Iiwic2FsZXNmb3JjZV9pZCI6IjAwMUMwMDAwMDFRRjZhUElBVCIsImZsZWV0X2VuYWJsZWQiOmZhbHNlLCJpYXQiOjE3NTg5NzIzOTAsImV4cCI6MjA3NDU0ODM5MH0.IqE5VrT7WnhEr_suspOo07NU7DpEwXnWkOGmVjSOnDw
+            # 2026-07-15 23:15:03.756 INFO (MainThread) [custom_components.sensi] Engine.IO connection established
+            # 2026-07-15 23:15:03.790 INFO (MainThread) [custom_components.sensi] Namespace / is connected
+            # 2026-07-15 23:15:03.790 DEBUG (MainThread) [custom_components.sensi] Creating future (state, 36-6f-92-ff-fe-0c-0b-07)
+            # 2026-07-15 23:15:03.839 INFO (MainThread) [custom_components.sensi] Received event "state" [/]
+
+            # But token expiry midway is not intercepted, the connection retires are being done internally in Engine.IO.
+            # The automatic retries give a different reason "Connection error". Only the first reason has jwt_expired in it.
+
+            # 2026-07-16 04:27:39.646 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
+            # 2026-07-16 04:27:39.646 DEBUG (MainThread) [custom_components.sensi] Disconnected (transport error)
+            # 2026-07-16 04:27:39.646 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 1.35 seconds
+            # 2026-07-16 04:27:41.122 INFO (MainThread) [custom_components.sensi] Engine.IO connection established
+            # 2026-07-16 04:27:41.151 INFO (MainThread) [custom_components.sensi] Connection to namespace / was rejected
+            # 2026-07-16 04:27:41.151 DEBUG (MainThread) [custom_components.sensi] Received connection error ({'message': 'jwt expired', 'data': {'message': 'jwt expired', 'code': 'invalid_token', 'type': 'UnauthorizedError'}})
+            # 2026-07-16 04:27:41.152 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
+            # 2026-07-16 04:27:41.183 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 1.73 seconds
+            # 2026-07-16 04:27:43.032 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
+            # 2026-07-16 04:27:43.033 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 4.18 seconds
+            # 2026-07-16 04:27:47.239 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
+            # 2026-07-16 04:27:47.239 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 5.26 seconds
+            # 2026-07-16 04:27:47.679 DEBUG (MainThread) [custom_components.sensi] In event emit loop (001C000001QF6aPIAT): 116000
+            # 2026-07-16 04:27:51.173 INFO (MainThread) [custom_components.sensi] Updating devices - reconnecting and updating
 
         @sio.on("*")
         async def any_event(event, data):
@@ -576,7 +641,14 @@ class SensiClient:
         # raise SensiConnectionError("Fake error, could not connect")   # For testing
 
         try:
-            self._connect_error_data = None
+            # If data retreival failed due to token expiring midway or the token is expired/expiring, then refresh the access token before
+            # trying to connect again. try_refresh_access_token can raise errors, doing within try/catch reset connection state in finally block.
+            if self._did_token_expire_midway or self._config.is_expired:
+                LOGGER.debug(
+                    "Access token missing or expired; refreshing before connect"
+                )
+                await self.try_refresh_access_token()
+
             await self._connect_client()
         except TimeoutError as ex:
             raise SensiConnectionError("Timed out making the connection") from ex
@@ -586,15 +658,9 @@ class SensiClient:
                     f"Connection failed but token was not expired. ConnectError={self._connect_error_data}"
                 ) from connect_ex
 
-            try:
-                self._config = await refresh_access_token(
-                    self._hass, self._config.refresh_token
-                )
-            except Exception as refresh_ex:
-                raise SensiConnectionError("Error refreshing tokens") from refresh_ex
+            await self.try_refresh_access_token()
 
             # Try connecting again after refreshing tokens. Pass all exceptions.
-            self._connect_error_data = None
 
             try:
                 await self._connect_client()
@@ -608,12 +674,25 @@ class SensiClient:
                 ) from connect_ex2
         except Exception as e:
             raise SensiConnectionError from e
+        finally:
+            self._reset_connection_state()
+
+    async def try_refresh_access_token(self) -> None:
+        """Try refreshing the access token."""
+        try:
+            self._config = await refresh_access_token(
+                self._hass, self._config.refresh_token
+            )
+        except Exception as err:
+            raise SensiConnectionError("Error refreshing tokens") from err
 
     async def _connect_client(self) -> None:
         """Make a connection.
 
         This can raise ConnectionError, TimeoutError.
         """
+
+        self._reset_connection_state()
 
         query = "?capabilities=display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,compressor_lockout,boost,heat_cycle_rate,heat_cycle_rate_steps,cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,early_start,min_heat_setpoint,max_heat_setpoint,min_cool_setpoint,max_cool_setpoint,circulating_fan,humidity_control,humidity_offset,humidity_offset_lower_bound,humidity_offset_upper_bound,temp_offset_lower_bound,temp_offset_upper_bound,lowest_heat_setpoint_ceiling,heat_setpoint_ceiling,highest_cool_setpoint_floor,cool_setpoint_floor"
         await self._sio.connect(
@@ -622,6 +701,11 @@ class SensiClient:
             socketio_path="/thermostat",
             transports=["websocket"],
         )
+
+    def _reset_connection_state(self):
+        """Reset the connection state."""
+        self._connect_error_data = None
+        self._did_token_expire_midway = False
 
     def _ensure_emit_loop(self):
         if self._emit_loop_task and not self._emit_loop_task.done():
