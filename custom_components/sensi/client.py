@@ -563,12 +563,22 @@ class SensiClient:
             await self._connect_client()
         except TimeoutError as ex:
             raise SensiConnectionError("Timed out making the connection") from ex
-        except ConnectionError:
-            # The namespace was rejected. The rejection payload shape varies, so
-            # rather than matching a specific message ("jwt expired") we refresh
-            # the token once and retry. If the refresh token itself is invalid,
-            # refresh_access_token raises AuthenticationError, which the
-            # coordinator turns into a reauth flow.
+        except ConnectionError as connect_ex:
+            # A structured (dict) connect_error payload means the server rejected
+            # the namespace connection (e.g. an invalid/expired token). A bare
+            # transport error (e.g. an HTTP 5xx during the websocket handshake)
+            # arrives as a string like "Connection error" and is transient, so it
+            # must not trigger a token refresh or a reauth.
+            if not isinstance(self._connect_error_data, dict):
+                raise SensiConnectionError(
+                    f"Connection failed: {self._connect_error_data}"
+                ) from connect_ex
+
+            # The rejection payload shape varies, so rather than matching a
+            # specific message ("jwt expired") we refresh the token once and
+            # retry. If the refresh token itself is invalid, refresh_access_token
+            # raises AuthenticationError, which the coordinator turns into a
+            # reauth flow.
             LOGGER.info(
                 f"Namespace connection rejected ({self._connect_error_data}); "
                 "refreshing token and retrying"
