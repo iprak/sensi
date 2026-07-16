@@ -5,6 +5,7 @@ from collections.abc import Callable
 import contextlib
 from dataclasses import asdict, dataclass
 from types import TracebackType
+from typing import Self
 
 import aiohttp
 import socketio
@@ -73,7 +74,7 @@ class SensiClient:
         self._connect_error_data = None
         self._devices: dict[str, SensiDevice] = {}
 
-    async def __aenter__(self) -> "SensiClient":
+    async def __aenter__(self) -> Self:
         """Enter context manager."""
         return self
 
@@ -256,7 +257,7 @@ class SensiClient:
                 parsed_response = SetOperatingModeEventSuccess(**response)
                 device.state.operating_mode = parsed_response.mode
                 return ActionResponse(None, None)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return ActionResponse(f"Failed to parse `{response}`", None)
 
         return ActionResponse("No response received", None)
