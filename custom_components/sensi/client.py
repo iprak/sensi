@@ -550,7 +550,7 @@ class SensiClient:
     async def _connect(self) -> None:
         """Make a connection and wait for `connected` event.
 
-        This can raise SensiConnectionError.
+        This can raise SensiConnectionError, AuthenticationError.
         """
 
         # Create SocketIO client with reconnection limited to 1 attempt. Add engineio_logger=LOGGER for deeper debugging
@@ -672,13 +672,16 @@ class SensiClient:
                 raise SensiConnectionError(
                     "Connection attempt after token refresh failed"
                 ) from connect_ex2
-        except Exception as e:
-            raise SensiConnectionError from e
+        except Exception as err:
+            raise SensiConnectionError("Failed to connect") from err
         finally:
             self._reset_connection_state()
 
     async def try_refresh_access_token(self) -> None:
-        """Try refreshing the access token."""
+        """Try refreshing the access token.
+
+        This can raise SensiConnectionError, AuthenticationError.
+        """
         try:
             self._config = await refresh_access_token(
                 self._hass, self._config.refresh_token
