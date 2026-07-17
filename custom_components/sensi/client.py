@@ -490,10 +490,12 @@ class SensiClient:
         count = 0
 
         while True:
-            if self._sio.connected:
+            # self._sio is briefly None while a reconnect refreshes the token,
+            # so guard every access to avoid crashing this background task.
+            if self._sio and self._sio.connected:
                 try:
                     while item := self._event_queue.get_nowait():
-                        if self._sio.connected:
+                        if self._sio and self._sio.connected:
                             await self._sio.emit(
                                 item.name, item.data, None, item.callback
                             )

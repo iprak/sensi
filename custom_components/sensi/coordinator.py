@@ -38,9 +38,9 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
             except AuthenticationError as err:
                 # The refresh token itself is invalid, trigger HA's reauth flow
                 # instead of retrying forever.
-                raise ConfigEntryAuthFailed from err
+                raise ConfigEntryAuthFailed(str(err)) from err
             except SensiConnectionError as err:
-                raise UpdateFailed from err
+                raise UpdateFailed(str(err)) from err
 
         super().__init__(
             hass,
