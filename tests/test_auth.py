@@ -157,13 +157,13 @@ async def test_refresh_access_token(
         assert result is not None
 
 
-async def test_refresh_access_token_post_failure(
+async def test_refresh_access_token_auth_failure(
     hass: HomeAssistant, mock_auth_data, aioclient_mock
 ) -> None:
-    """Test refresh_access_token function."""
+    """A 4xx from the token endpoint means the refresh token is invalid."""
 
     refresh_token = "refresh_token_123"
-    aioclient_mock.post(OAUTH_URL2, status=202)
+    aioclient_mock.post(OAUTH_URL2, status=401)
 
     with (
         patch(
@@ -171,6 +171,24 @@ async def test_refresh_access_token_post_failure(
             return_value=mock_auth_data,
         ),
         pytest.raises(AuthenticationError),
+    ):
+        await refresh_access_token(hass, refresh_token)
+
+
+async def test_refresh_access_token_server_error_is_transient(
+    hass: HomeAssistant, mock_auth_data, aioclient_mock
+) -> None:
+    """A 5xx from the token endpoint is transient, not an auth failure."""
+
+    refresh_token = "refresh_token_123"
+    aioclient_mock.post(OAUTH_URL2, status=503)
+
+    with (
+        patch(
+            "homeassistant.helpers.storage.Store.async_load",
+            return_value=mock_auth_data,
+        ),
+        pytest.raises(SensiConnectionError),
     ):
         await refresh_access_token(hass, refresh_token)
 
