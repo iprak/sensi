@@ -1,15 +1,19 @@
 """Tests for Sensi coordinator."""
 
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.sensi.auth import AuthenticationError, SensiConnectionError
 from custom_components.sensi.client import SensiClient
 from custom_components.sensi.const import COORDINATOR_UPDATE_INTERVAL, SENSI_DOMAIN
 from custom_components.sensi.coordinator import SensiUpdateCoordinator
 from custom_components.sensi.data import SensiDevice
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def test_coordinator_initialization(hass: HomeAssistant) -> None:
@@ -76,3 +80,35 @@ class TestSensiUpdateCoordinatorIntegration:
 
         # Verify references didn't change
         assert coordinator.client is original_client
+
+
+class TestCoordinatorUpdateErrorMapping:
+    """Test how the coordinator maps client errors during an update."""
+
+    async def test_auth_error_maps_to_config_entry_auth_failed(
+        self, mock_coordinator
+    ) -> None:
+        """A bad refresh token surfaces as ConfigEntryAuthFailed (triggers reauth)."""
+        mock_coordinator.client.async_update_devices = AsyncMock(
+            side_effect=AuthenticationError("bad refresh")
+        )
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await mock_coordinator.update_method()
+
+    async def test_connection_error_maps_to_update_failed(
+        self, mock_coordinator
+    ) -> None:
+        """A transient connection error surfaces as UpdateFailed (retry + backoff)."""
+        mock_coordinator.client.async_update_devices = AsyncMock(
+            side_effect=SensiConnectionError("down")
+        )
+
+        with pytest.raises(UpdateFailed):
+            await mock_coordinator.update_method()
+
+    async def test_success_does_not_raise(self, mock_coordinator) -> None:
+        """A successful update does not raise."""
+        mock_coordinator.client.async_update_devices = AsyncMock(return_value=None)
+
+        await mock_coordinator.update_method()

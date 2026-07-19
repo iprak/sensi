@@ -90,7 +90,7 @@ class TestSwitchTypes:
         """Test that switches have appropriate icons."""
         icons_expected = {
             "display_humidity": "mdi:water-percent",
-            "continuous_backlight": "mdi:wall-sconce-flat",
+            "continuous_backlight": "mdi:wall-sconce-round",
             "display_time": "mdi:clock",
             "keypad_lockout": "mdi:lock",
         }
@@ -335,7 +335,7 @@ class TestSensiFanSupportSwitch:
         assert switch.coordinator == mock_coordinator
         assert switch.entity_description.key == CONFIG_FAN_SUPPORT
         assert switch.entity_description.entity_category == EntityCategory.CONFIG
-        assert switch.entity_description.icon == "mdi:fan-off"
+        assert switch.entity_description.icon == "mdi:fan"
         assert switch.is_on is DEFAULT_CONFIG_FAN_SUPPORT
 
     async def test_fan_support_switch_update(
