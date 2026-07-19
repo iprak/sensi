@@ -3,7 +3,7 @@
   "name": "Sensi",
   "documentation": "https://github.com/iprak/sensi",
   "requirements": [
-    "python-socketio==5.15.0"
+    "python-socketio==5.16.3"
   ],
   "dependencies": [],
   "codeowners": [
