@@ -1,7 +1,5 @@
 """Event data models for Sensi thermostats."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import StrEnum
 
