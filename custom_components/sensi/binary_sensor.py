@@ -1,7 +1,5 @@
 """Sensi thermostat binary sensors."""
 
-from __future__ import annotations
-
 from homeassistant.components.binary_sensor import (
     ENTITY_ID_FORMAT,
     BinarySensorDeviceClass,

@@ -1,7 +1,5 @@
 """Sensi Thermostat."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any
 
@@ -102,11 +100,13 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # If demand_status exists, add staging data
         if demand_status:
-            attrs.update({
-                ATTR_AUX_STAGE: demand_status.aux,
-                ATTR_COOL_STAGE: demand_status.cool,
-                ATTR_HEAT_STAGE: demand_status.heat,
-            })
+            attrs.update(
+                {
+                    ATTR_AUX_STAGE: demand_status.aux,
+                    ATTR_COOL_STAGE: demand_status.cool,
+                    ATTR_HEAT_STAGE: demand_status.heat,
+                }
+            )
 
         return attrs
 
