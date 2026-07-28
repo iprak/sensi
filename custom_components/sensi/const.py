@@ -48,3 +48,8 @@ ATTR_POWER_STATUS: Final = "power_status"
 ATTR_HEAT_STAGE = "hvac_heat_stage"
 ATTR_AUX_STAGE = "hvac_aux_stage"
 ATTR_COOL_STAGE = "hvac_cool_stage"
+
+ATTR_ACTIVE_ENERGY_EVENT_ID: Final = "event_id"
+
+ENERGY_SAVINGS_START: Final = "sensi_energy_savings_start"
+ENERGY_SAVINGS_END: Final = "sensi_energy_savings_end"

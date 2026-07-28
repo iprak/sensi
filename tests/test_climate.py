@@ -1,5 +1,6 @@
 """Tests for Sensi climate component."""
 
+from datetime import timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -8,15 +9,22 @@ from custom_components.sensi import set_config_option
 from custom_components.sensi.client import ActionResponse
 from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
+    ATTR_ACTIVE_ENERGY_EVENT_ID,
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
+    ENERGY_SAVINGS_START,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
-from custom_components.sensi.data import FanMode, OperatingMode, SensiDevice
+from custom_components.sensi.data import (
+    DemandResponse,
+    FanMode,
+    OperatingMode,
+    SensiDevice,
+)
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -25,6 +33,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 
 async def test_setup_platform(
@@ -201,6 +210,121 @@ async def test_set_fan_mode_invalid(
 
     with pytest.raises(ValueError):
         await mock_thermostat.async_set_fan_mode("INVALID")
+
+
+async def test_process_energy_saving_event_no_demand_response(
+    hass: HomeAssistant, mock_thermostat
+) -> None:
+    """Test no actions occur when there is no DemandResponse."""
+
+    # mock_thermostat._state.demand_response = None
+    mock_thermostat.hass = hass
+
+    with (
+        patch.object(type(hass.bus), "async_fire") as mock_fire,
+        patch(
+            "custom_components.sensi.climate.async_track_point_in_time"
+        ) as mock_track,
+    ):
+        mock_thermostat._process_energy_saving_event()  # noqa: SLF001
+
+        mock_fire.assert_not_called()
+        mock_track.assert_not_called()
+        assert mock_thermostat._cancel_event_start is None
+        assert mock_thermostat._cancel_event_end is None
+
+
+async def test_process_energy_saving_event_schedules_start_and_end(
+    hass: HomeAssistant, mock_json, mock_coordinator
+) -> None:
+    """Test event scheduling for a future energy-saving event."""
+
+    _, device = SensiDevice.create(mock_json)
+    thermostat = SensiThermostat(hass, device, mock_coordinator.config_entry)
+    thermostat.hass = (
+        hass  # Assign hass manually. This gets assigned when entity is added for real.
+    )
+
+    future_start = dt_util.as_local(dt_util.naive_now()) + timedelta(hours=1)
+    future_end = future_start + timedelta(hours=2)
+    device.state.demand_response = DemandResponse(
+        {
+            "event_id": "event-100",
+            "start_time": future_start.timestamp(),
+            "end_time": future_end.timestamp(),
+            "criticality": "medium",
+            "event_status": "received",
+        }
+    )
+
+    hass.states.async_set(
+        thermostat.entity_id,
+        "on",
+        {ATTR_ACTIVE_ENERGY_EVENT_ID: "other-event"},
+    )
+
+    mock_cancel_start = object()
+    mock_cancel_end = object()
+
+    with (
+        patch(
+            "custom_components.sensi.climate.async_track_point_in_time",
+            side_effect=[mock_cancel_start, mock_cancel_end],
+        ) as mock_track,
+        patch.object(type(hass.bus), "async_fire") as mock_fire,
+    ):
+        thermostat._process_energy_saving_event()  # noqa: SLF001
+
+        mock_fire.assert_not_called()
+        assert thermostat._cancel_event_start is mock_cancel_start
+        assert thermostat._cancel_event_end is mock_cancel_end
+        assert mock_track.call_count == 2
+        assert mock_track.call_args_list[0][0][2] == future_start
+        assert mock_track.call_args_list[1][0][2] == future_end
+
+
+async def test_process_energy_saving_event_fires_start_when_already_started(
+    hass: HomeAssistant, mock_json, mock_coordinator
+) -> None:
+    """Test immediate start notification when the event already started."""
+
+    _, device = SensiDevice.create(mock_json)
+    thermostat = SensiThermostat(hass, device, mock_coordinator.config_entry)
+    thermostat.hass = hass
+
+    past_start = dt_util.utcnow() - timedelta(hours=1)
+    future_end = dt_util.utcnow() + timedelta(hours=1)
+    device.state.demand_response = DemandResponse(
+        {
+            "event_id": "event-200",
+            "start_time": past_start,
+            "end_time": future_end,
+            "criticality": "medium",
+            "event_status": "received",
+        }
+    )
+
+    hass.states.async_set(
+        thermostat.entity_id,
+        "on",
+        {ATTR_ACTIVE_ENERGY_EVENT_ID: "different-event"},
+    )
+
+    mock_cancel_end = object()
+
+    with (
+        patch(
+            "custom_components.sensi.climate.async_track_point_in_time",
+            return_value=mock_cancel_end,
+        ) as mock_track,
+        patch.object(type(hass.bus), "async_fire") as mock_fire,
+    ):
+        thermostat._process_energy_saving_event()  # noqa: SLF001
+
+        mock_fire.assert_called_once_with(ENERGY_SAVINGS_START, {None: None})
+        assert thermostat._cancel_event_end is mock_cancel_end
+        assert mock_track.call_count == 1
+        assert mock_track.call_args_list[0][0][2] == future_end
 
 
 class TestSensiThermostatInitialization:
