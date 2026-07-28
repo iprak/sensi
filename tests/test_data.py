@@ -1,5 +1,6 @@
 """Tests for Sensi data component."""
 
+from datetime import UTC, datetime
 import time
 
 import pytest
@@ -9,6 +10,7 @@ from custom_components.sensi.data import (
     TOKEN_EXPIRY_SKEW_SECONDS,
     AuthenticationConfig,
     CirculatingFan,
+    DemandResponse,
     DemandStatus,
     FanMode,
     Firmware,
@@ -21,6 +23,7 @@ from custom_components.sensi.data import (
 )
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
+from homeassistant.util import dt as dt_util
 
 
 class TestOperatingMode:
@@ -155,6 +158,66 @@ class TestDemandStatus:
         assert isinstance(state_obj.demand_status, DemandStatus)
         assert state_obj.demand_status.fan == 0
         assert state_obj.demand_status.last == "heat"
+
+
+class TestDemandResponse:
+    """Test cases for DemandResponse class."""
+
+    def test_create_returns_none_when_data_is_none(self):
+        """Test DemandResponse.create returns None for missing data."""
+        assert DemandResponse.create(None) is None
+
+    def test_demand_response_with_all_fields(self):
+        """Test DemandResponse with valid data."""
+        start_time = datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
+        end_time = datetime(2024, 1, 1, 14, 0, tzinfo=UTC)
+        data = {
+            "event_id": "event-123",
+            "start_time": start_time,
+            "end_time": end_time,
+            "criticality": "high",
+            "event_status": "started",
+        }
+
+        demand_response = DemandResponse.create(data)
+
+        assert isinstance(demand_response, DemandResponse)
+        assert demand_response.event_id == "event-123"
+        assert demand_response.start_time == dt_util.as_local(start_time)
+        assert demand_response.end_time == dt_util.as_local(end_time)
+<<<<<<< HEAD
+        assert demand_response.criticality == DemandResponseCriticality.HIGH
+        assert demand_response.event_status == DemandResponseEventStatus.STARTED
+        assert demand_response.mode == DemandResponseEventStatus.STARTED
+        assert demand_response.activeSavingsEvent is True
+
+    def test_demand_response_unknown_enum_values(self):
+        """Test DemandResponse falls back to UNKNOWN for invalid enums."""
+        data = {
+            "event_id": "event-999",
+            "criticality": "extreme",
+            "event_status": "pending",
+        }
+
+        demand_response = DemandResponse.create(data)
+
+        assert demand_response.criticality == DemandResponseCriticality.UNKNOWN
+        assert demand_response.event_status == DemandResponseEventStatus.UNKNOWN
+        assert demand_response.mode == DemandResponseEventStatus.UNKNOWN
+=======
+>>>>>>> a190fd5 (fixup! fix: parse demand_reponse data)
+
+    def test_demand_response_repr_contains_fields(self):
+        """Test DemandResponse string representation includes key fields."""
+        data = {
+            "event_id": "event-abc",
+            "event_status": "completed",
+        }
+        demand_response = DemandResponse(data)
+
+        repr_str = repr(demand_response)
+
+        assert "DemandResponse(event_id='event-abc'" in repr_str
 
 
 class TestFirmware:

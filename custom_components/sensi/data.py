@@ -7,6 +7,7 @@ from typing import Self
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
+from homeassistant.util import dt as dt_util
 from homeassistant.util.enum import try_parse_enum
 
 from .capabilities import Capabilities
@@ -230,6 +231,8 @@ class State:
         self.temp_offset = to_int(data.get("temp_offset"), 0)
         self.wifi_connection_quality = to_int(data.get("wifi_connection_quality"), None)
 
+        self.demand_response = DemandResponse.create(data.get("demand_response"))
+
         # Calculated fields
         self.temperature_unit = (
             UnitOfTemperature.CELSIUS
@@ -348,3 +351,39 @@ class SensiDevice:
         """Update the thermostat info from data dictionary."""
         if source:
             self.info = ThermostatInfo(source)
+
+
+class DemandResponse:
+    """Representation of the event saving DemandResponse model."""
+
+    @classmethod
+    def create(cls, data: dict | None) -> DemandResponse | None:
+        """Create an instance of DemandResponse based on data."""
+        return None if data is None else DemandResponse(data)
+
+    def __init__(self, data: dict) -> None:
+        """Initialize DemandResponse from data dictionary."""
+
+        self.event_id = data.get("event_id")
+
+        end_time = data.get("end_time")
+        self.end_time = None if end_time is None else dt_util.as_local(end_time)
+
+        start_time = data.get("start_time")
+        self.start_time = None if start_time is None else dt_util.as_local(start_time)
+
+        self.criticality = (
+            try_parse_enum(DemandResponseCriticality, data.get("criticality"))
+            or DemandResponseCriticality.UNKNOWN
+        )
+
+        self.event_status = self.mode = (
+            try_parse_enum(DemandResponseEventStatus, data.get("event_status"))
+            or DemandResponseEventStatus.UNKNOWN
+        )
+
+        self.activeSavingsEvent = True
+
+    def __repr__(self) -> str:
+        """Return the representation."""
+        return f"DemandResponse(event_id={self.event_id!r}, start_time={self.start_time!r}, end_time={self.end_time!r}"
