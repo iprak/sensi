@@ -1,7 +1,9 @@
 """Sensi Thermostat."""
 
 from collections.abc import Mapping
-from typing import Any
+import datetime
+from functools import partial
+from typing import Any, override
 
 from homeassistant.components.climate import (
     ATTR_TARGET_TEMP_HIGH,
@@ -13,14 +15,17 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_WHOLE, UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import SensiConfigEntry, get_config_option
 from .client import raise_if_error
 from .const import (
+    ATTR_ACTIVE_ENERGY_EVENT_ID,
     ATTR_AUX_STAGE,
     ATTR_CIRCULATING_FAN,
     ATTR_CIRCULATING_FAN_DUTY_CYCLE,
@@ -29,6 +34,8 @@ from .const import (
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
+    ENERGY_SAVINGS_END,
+    ENERGY_SAVINGS_START,
     FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
     LOGGER,
     SENSI_DOMAIN,
@@ -59,6 +66,13 @@ async def async_setup_entry(
     entities = [SensiThermostat(hass, device, entry) for device in devices]
     async_add_entities(entities)
 
+    def cancel_events() -> None:
+        """Cancel scheduled start/end events."""
+        for entity in entities:
+            entity.cancel_events()
+
+    entry.async_on_unload(cancel_events)
+
 
 class SensiThermostat(SensiEntity, ClimateEntity):
     """Representation of a Sensi thermostat."""
@@ -86,6 +100,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         # The mobile device always uses whole numbers for C and F unit
         self._attr_target_temperature_step = PRECISION_WHOLE
 
+        self._cancel_event_start: CALLBACK_TYPE | None = None
+        self._cancel_event_end: CALLBACK_TYPE | None = None
+        self._last_demand_event_id = None
+
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the state attributes."""
@@ -107,6 +125,10 @@ class SensiThermostat(SensiEntity, ClimateEntity):
                     ATTR_HEAT_STAGE: demand_status.heat,
                 }
             )
+
+        demand_response = self._state.demand_response
+        if demand_response:
+            attrs.update({ATTR_ACTIVE_ENERGY_EVENT_ID: demand_response.event_id})
 
         return attrs
 
@@ -545,3 +567,72 @@ class SensiThermostat(SensiEntity, ClimateEntity):
         )
         raise_if_error(response, "humidity", humidity)
         self.async_write_ha_state()
+
+    @callback
+    @override
+    def _handle_coordinator_update(self) -> None:
+        """Update attributes when the coordinator updates."""
+
+        self._process_energy_saving_event()
+        super()._handle_coordinator_update()
+
+    def cancel_events(self) -> None:
+        """Cancel energy saving events."""
+
+        self._last_demand_event_id = None
+
+        if self._cancel_event_start:
+            self._cancel_event_start()
+            self._cancel_event_start = None
+
+        if self._cancel_event_end:
+            self._cancel_event_end()
+            self._cancel_event_end = None
+
+    def _process_energy_saving_event(self) -> None:
+        """Raise energy savings events."""
+
+        demand_response = self._state.demand_response
+
+        if (
+            not demand_response
+            or not demand_response.start_time
+            or not demand_response.end_time
+        ):
+            self.cancel_events()
+            return
+
+        event_id = demand_response.event_id
+
+        # Still the same event, no action needed.
+        if event_id == self._last_demand_event_id:
+            return
+
+        hass = self.hass
+        self.cancel_events()
+
+        def _notify_event_start(event_id: str, entity_id: str, _now: datetime) -> None:
+            event_data = {"event_id": event_id, "entity_id": entity_id}
+            hass.bus.fire(ENERGY_SAVINGS_START, event_data)
+
+        def _notify_event_end(event_id: str, entity_id: str, _now: datetime) -> None:
+            event_data = {"event_id": event_id, "entity_id": entity_id}
+            hass.bus.fire(ENERGY_SAVINGS_END, event_data)
+
+        current_instant = dt_util.naive_now().timestamp()
+        start_time = demand_response.start_time
+        end_time = demand_response.end_time
+
+        if start_time.timestamp() > current_instant:
+            action_start = partial(_notify_event_start, event_id, self.entity_id)
+            self._cancel_event_start = async_track_point_in_time(
+                hass, action_start, start_time
+            )
+
+        if end_time.timestamp() > current_instant:
+            action_end = partial(_notify_event_end, event_id, self.entity_id)
+            self._cancel_event_end = async_track_point_in_time(
+                hass, action_end, end_time
+            )
+
+        self._last_demand_event_id = event_id

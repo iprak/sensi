@@ -233,6 +233,19 @@ class State:
 
         self.demand_response = DemandResponse.create(data.get("demand_response"))
 
+        # Testing
+        future_start = dt_util.parse_datetime("2026-07-29 06:14:20")
+        future_end = future_start + timedelta(minutes=1)
+        self.demand_response = DemandResponse(
+            {
+                "event_id": "event-100",
+                "start_time": future_start,
+                "end_time": future_end,
+                "criticality": "medium",
+                "event_status": "received",
+            }
+        )
+
         # Calculated fields
         self.temperature_unit = (
             UnitOfTemperature.CELSIUS
@@ -371,18 +384,6 @@ class DemandResponse:
 
         start_time = data.get("start_time")
         self.start_time = None if start_time is None else dt_util.as_local(start_time)
-
-        self.criticality = (
-            try_parse_enum(DemandResponseCriticality, data.get("criticality"))
-            or DemandResponseCriticality.UNKNOWN
-        )
-
-        self.event_status = self.mode = (
-            try_parse_enum(DemandResponseEventStatus, data.get("event_status"))
-            or DemandResponseEventStatus.UNKNOWN
-        )
-
-        self.activeSavingsEvent = True
 
     def __repr__(self) -> str:
         """Return the representation."""

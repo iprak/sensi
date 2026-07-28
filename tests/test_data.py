@@ -189,7 +189,6 @@ class TestDemandResponse:
         assert demand_response.criticality == DemandResponseCriticality.HIGH
         assert demand_response.event_status == DemandResponseEventStatus.STARTED
         assert demand_response.mode == DemandResponseEventStatus.STARTED
-        assert demand_response.activeSavingsEvent is True
 
     def test_demand_response_unknown_enum_values(self):
         """Test DemandResponse falls back to UNKNOWN for invalid enums."""
