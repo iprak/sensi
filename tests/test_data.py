@@ -1,5 +1,6 @@
 """Tests for Sensi data component."""
 
+from datetime import datetime
 import time
 
 import pytest
@@ -7,8 +8,10 @@ import pytest
 from custom_components.sensi.coordinator import SensiDevice
 from custom_components.sensi.data import (
     TOKEN_EXPIRY_SKEW_SECONDS,
+    ActiveSavingsEventState,
     AuthenticationConfig,
     CirculatingFan,
+    DemandResponse,
     DemandStatus,
     FanMode,
     Firmware,
@@ -21,6 +24,7 @@ from custom_components.sensi.data import (
 )
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
+from homeassistant.util import dt as dt_util
 
 
 class TestOperatingMode:
@@ -155,6 +159,111 @@ class TestDemandStatus:
         assert isinstance(state_obj.demand_status, DemandStatus)
         assert state_obj.demand_status.fan == 0
         assert state_obj.demand_status.last == "heat"
+
+
+class TestDemandResponse:
+    """Test cases for DemandResponse class."""
+
+    def test_create_returns_none_when_data_is_none(self):
+        """Test DemandResponse.create returns None for missing data."""
+        assert DemandResponse.create(None) is None
+
+    def test_demand_response_with_all_fields(self):
+        """Test DemandResponse with valid data."""
+        start_time = datetime(2024, 1, 1, 12, 0)
+        end_time = datetime(2024, 1, 1, 14, 0)
+        data = {
+            "event_id": "event-123",
+            "start_time": start_time.timestamp(),
+            "end_time": end_time.timestamp(),
+            "criticality": "high",
+            "event_status": "started",
+        }
+
+        demand_response = DemandResponse.create(data)
+
+        assert isinstance(demand_response, DemandResponse)
+        assert demand_response.event_id == "event-123"
+        assert demand_response.start_time == dt_util.as_local(start_time)
+        assert demand_response.end_time == dt_util.as_local(end_time)
+
+    def test_demand_response_repr_contains_fields(self):
+        """Test DemandResponse string representation includes key fields."""
+        data = {
+            "event_id": "event-abc",
+            "event_status": "completed",
+        }
+        demand_response = DemandResponse(data)
+
+        repr_str = repr(demand_response)
+
+        assert "DemandResponse(event_id='event-abc'" in repr_str
+
+    @pytest.mark.parametrize(
+        ("event_status", "now_offset", "expected_state"),
+        [
+            ("started", -43 * 60, ActiveSavingsEventState.UPCOMING),
+            ("started", -1 * 60, ActiveSavingsEventState.CURRENT),
+            ("opt-out", 60, ActiveSavingsEventState.OPTOUT),
+            ("completed", 3 * 60 * 60, ActiveSavingsEventState.NONE),
+        ],
+    )
+    def test_get_active_savings_event_state(
+        self, monkeypatch, event_status, now_offset, expected_state
+    ):
+        """Test the active savings event state for each event window."""
+        start_time = datetime(2024, 1, 1, 12, 0)
+        end_time = datetime(2024, 1, 1, 14, 0)
+        demand_response = DemandResponse(
+            {
+                "start_time": start_time.timestamp(),
+                "end_time": end_time.timestamp(),
+                "event_status": event_status,
+                "pre_duration": 30,
+                "pre_gap": 10,
+                "notification_time": 5,
+            }
+        )
+        fixed_now = type(
+            "FixedNow",
+            (),
+            {
+                "timestamp": lambda _self: (
+                    demand_response.start_time.timestamp() + now_offset
+                )
+            },
+        )()
+        monkeypatch.setattr(
+            dt_util,
+            "naive_now",
+            lambda: fixed_now,
+        )
+
+        state, actual_start, actual_end = (
+            demand_response.get_active_savings_event_state()
+        )
+
+        assert state == expected_state
+        if expected_state in (
+            ActiveSavingsEventState.UPCOMING,
+            ActiveSavingsEventState.CURRENT,
+        ):
+            assert actual_end == demand_response.end_time
+        else:
+            assert actual_start is None
+            assert actual_end is None
+
+    def test_get_active_savings_event_state_unknown_for_incomplete_data(self):
+        """Test incomplete event data returns an unknown state."""
+        demand_response = DemandResponse({"event_status": "started"})
+
+        state, actual_start, actual_end = (
+            demand_response.get_active_savings_event_state()
+        )
+
+        assert state == ActiveSavingsEventState.UNKNOWN
+        assert actual_start is None
+        assert actual_end is None
 
 
 class TestFirmware:
