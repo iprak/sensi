@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, override
 
 from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
@@ -17,14 +17,15 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .const import ATTR_BATTERY_VOLTAGE, SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiDevice
-from .entity import SensiDescriptionEntity
+from .data import ActiveSavingsEventState
+from .entity import SensiDescriptionEntity, SensiEntity
 
 
 def calculate_battery_level(voltage: float) -> int | None:
@@ -141,6 +142,13 @@ async def async_setup_entry(
         for description in SENSOR_TYPES
     ]
 
+    entities.extend(
+        [
+            ActiveSavingsEventEntity(hass, device, entry)
+            for device in coordinator.get_devices()
+        ]
+    )
+
     async_add_entities(entities)
 
 
@@ -197,3 +205,54 @@ class SensiSensorEntity(SensiDescriptionEntity, SensorEntity):
     def icon(self) -> str | None:
         """Return icon for sensor."""
         return self.entity_description.icon
+
+
+class ActiveSavingsEventEntity(SensiEntity, SensorEntity):
+    """Representation of an active energy savings event status sensor."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "active_savings"
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(device, entry)
+
+        self._attr_unique_id = f"{device.identifier}_active_savings"
+        self._attr_options = [state.value for state in ActiveSavingsEventState]
+        self._attr_native_value = ActiveSavingsEventState.NONE.value
+
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.name}_active_savings",
+            hass=hass,
+        )
+
+    @callback
+    @override
+    def _handle_coordinator_update(self) -> None:
+        """Update state when the coordinator updates."""
+
+        demand_response = self._state.demand_response
+
+        if demand_response:
+            (current_state, start_time, end_time) = (
+                demand_response.get_active_savings_event_state()
+            )
+        else:
+            current_state = ActiveSavingsEventState.NONE
+            start_time = None
+            end_time = None
+
+        self._attr_extra_state_attributes = {
+            "start_time": start_time,
+            "end_time": end_time,
+        }
+        self._attr_native_value = current_state.value
+
+        super()._handle_coordinator_update()
