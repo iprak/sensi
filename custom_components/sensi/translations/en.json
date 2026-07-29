@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "data": {
-          "refresh_token":"Refresh token"
+          "refresh_token": "Refresh token"
         },
         "description": "Set up Sensi integration.\n\nLogin with your credentials from https://manager.sensicomfort.com/ and then paste the refresh_token from the response. Refer to integration home page (?) for details.",
         "title": "Sensi Thermostat"
@@ -13,6 +13,20 @@
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid authentication",
       "unknown": "Unexpected error"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "active_savings": {
+        "name": "Active Savings Event",
+        "state": {
+          "opt-out": "Opt-out",
+          "upcoming": "Upcoming",
+          "current": "Current",
+          "none": "None",
+          "unknown": "Unknown"
+        }
+      }
     }
   }
 }
