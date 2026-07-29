@@ -234,7 +234,7 @@ class State:
         self.demand_response = DemandResponse.create(data.get("demand_response"))
 
         # Testing
-        future_start = dt_util.parse_datetime("2026-07-29 06:14:20")
+        future_start = dt_util.parse_datetime("2026-07-30 06:38:20")
         future_end = future_start + timedelta(minutes=1)
         self.demand_response = DemandResponse(
             {
