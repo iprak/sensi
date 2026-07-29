@@ -24,7 +24,7 @@ async def async_setup_entry(
     """Set up Sensi thermostat sensors."""
 
     coordinator = entry.runtime_data
-    onlineDescription = BinarySensorEntityDescription(
+    online_description = BinarySensorEntityDescription(
         key="online",
         name="Online",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
@@ -32,7 +32,7 @@ async def async_setup_entry(
     )
 
     entities = [
-        OnlineBinarySensorEntity(hass, device, onlineDescription, entry)
+        OnlineBinarySensorEntity(hass, device, online_description, entry)
         for device in coordinator.get_devices()
     ]
 
