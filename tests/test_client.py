@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from custom_components.sensi.auth import SensiConnectionError
 from custom_components.sensi.client import ActionResponse, round_humidity
 from custom_components.sensi.data import FanMode, OperatingMode
 from custom_components.sensi.event import (
@@ -17,6 +18,7 @@ from custom_components.sensi.event import (
     SetTemperatureEvent,
     SetTemperatureEventSuccess,
 )
+from homeassistant.exceptions import ConfigEntryNotReady
 
 
 class TestRoundHumidity:
@@ -280,221 +282,305 @@ class TestSetTemperature:
             assert response.data is None
 
 
-@pytest.mark.parametrize(
-    ("enabled", "humidity", "expected_error"),
-    [(True, 45, None), (False, 50, None), (True, 45, "Failed to set humidification")],
-)
-async def test_async_set_humidification(
-    mock_device_with_humidification, mock_coordinator, enabled, humidity, expected_error
-) -> None:
-    """Test of set_humidification method."""
+class TestHumidification:
+    """Test async_set_humidification method."""
 
-    mock_response = None if expected_error else {}
-    expected_request = asdict(
-        SetHumidityEvent(
-            mock_device_with_humidification.identifier,
-            SetHumidityEventValue(enabled, humidity),
-        )
+    @pytest.mark.parametrize(
+        ("enabled", "humidity", "expected_error"),
+        [
+            (True, 45, None),
+            (False, 50, None),
+            (True, 45, "Failed to set humidification"),
+        ],
     )
+    async def test_async_set_humidification(
+        self,
+        mock_device_with_humidification,
+        mock_coordinator,
+        enabled,
+        humidity,
+        expected_error,
+    ) -> None:
+        """Test of set_humidification method."""
 
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(
-            expected_error, mock_response
-        )
-
-        response = await mock_coordinator.client.async_set_humidification(
-            mock_device_with_humidification, enabled, humidity
-        )
-
-        mock_async_invoke_setter.assert_called_once_with(
-            "set_humidification", expected_request
-        )
-
-        assert response.error is expected_error
-
-        if not expected_error:
-            assert response.data == mock_response
-        else:
-            assert response.data is None
-
-
-@pytest.mark.parametrize(
-    ("enabled"),
-    [(True), (False)],
-)
-async def test_async_enable_humidification(
-    mock_device_with_humidification, mock_coordinator, enabled
-) -> None:
-    """Test of enable_humidification method."""
-
-    with patch.object(
-        mock_coordinator.client, "async_set_humidification"
-    ) as mock__set_humidification:
-        await mock_coordinator.client.async_enable_humidification(
-            mock_device_with_humidification, enabled
-        )
-
-        mock__set_humidification.assert_called_once_with(
-            mock_device_with_humidification,
-            enabled,
-            mock_device_with_humidification.state.humidity_control.humidification.target_percent,
-        )
-
-
-@pytest.mark.parametrize(
-    ("enabled", "duty_cycle"),
-    [(True, 35), (False, 10)],
-)
-async def test_set_circulating_fan_mode(
-    mock_device, mock_coordinator, enabled, duty_cycle
-) -> None:
-    """Test async_set_circulating_fan_mode."""
-
-    enabled = True
-    duty_cycle = 30
-
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(None, "")
-
+        mock_response = None if expected_error else {}
         expected_request = asdict(
-            SetCirculatingFanEvent(
-                mock_device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)
+            SetHumidityEvent(
+                mock_device_with_humidification.identifier,
+                SetHumidityEventValue(enabled, humidity),
             )
         )
 
-        await mock_coordinator.client.async_set_circulating_fan_mode(
-            mock_device, enabled, duty_cycle
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(
+                expected_error, mock_response
+            )
+
+            response = await mock_coordinator.client.async_set_humidification(
+                mock_device_with_humidification, enabled, humidity
+            )
+
+            mock_async_invoke_setter.assert_called_once_with(
+                "set_humidification", expected_request
+            )
+
+            assert response.error is expected_error
+
+            if not expected_error:
+                assert response.data == mock_response
+            else:
+                assert response.data is None
+
+    @pytest.mark.parametrize(
+        ("enabled"),
+        [(True), (False)],
+    )
+    async def test_async_enable_humidification(
+        self, mock_device_with_humidification, mock_coordinator, enabled
+    ) -> None:
+        """Test of enable_humidification method."""
+
+        with patch.object(
+            mock_coordinator.client, "async_set_humidification"
+        ) as mock__set_humidification:
+            await mock_coordinator.client.async_enable_humidification(
+                mock_device_with_humidification, enabled
+            )
+
+            mock__set_humidification.assert_called_once_with(
+                mock_device_with_humidification,
+                enabled,
+                mock_device_with_humidification.state.humidity_control.humidification.target_percent,
+            )
+
+
+class TestSetters:
+    """Test async_set_circulating_fan_mode and async_set_fan_mode methods."""
+
+    @pytest.mark.parametrize(
+        ("enabled", "duty_cycle"),
+        [(True, 35), (False, 10)],
+    )
+    async def test_set_circulating_fan_mode(
+        self, mock_device, mock_coordinator, enabled, duty_cycle
+    ) -> None:
+        """Test async_set_circulating_fan_mode."""
+
+        enabled = True
+        duty_cycle = 30
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(None, "")
+
+            expected_request = asdict(
+                SetCirculatingFanEvent(
+                    mock_device.identifier,
+                    SetCirculatingFanEventValue(enabled, duty_cycle),
+                )
+            )
+
+            await mock_coordinator.client.async_set_circulating_fan_mode(
+                mock_device, enabled, duty_cycle
+            )
+
+            mock_async_invoke_setter.assert_called_once_with(
+                "set_circulating_fan", expected_request
+            )
+
+            assert mock_device.state.circulating_fan.enabled == enabled
+            assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
+
+    async def test_set_fan_mode(self, mock_device, mock_coordinator) -> None:
+        """Test async_set_fan_mode."""
+
+        mode = FanMode.ON.value
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(None, "")
+
+            expected_request = asdict(SetFanModeEvent(mock_device.identifier, mode))
+            mock_device.state.fan_mode = (
+                None  # Reset fan mode to ensure it gets updated
+            )
+
+            response = await mock_coordinator.client.async_set_fan_mode(
+                mock_device, mode
+            )
+
+            mock_async_invoke_setter.assert_called_once_with(
+                "set_fan_mode", expected_request
+            )
+
+            assert response.error is None
+            assert mock_device.state.fan_mode == FanMode.ON
+
+    @pytest.mark.parametrize(
+        ("response_error", "response_data", "expect_error"),
+        [
+            (None, None, True),
+            ("Failed", None, True),
+            (None, "not_accepted", True),
+            (None, {"invalid_property": "cool"}, True),
+            (None, "accepted", False),
+            (None, {"mode": "heat"}, False),
+        ],
+    )
+    async def test_async_set_operating_mode(
+        self, mock_device, mock_coordinator, response_error, response_data, expect_error
+    ) -> None:
+        """Test async_set_operating_mode."""
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(
+                response_error, response_data
+            )
+
+            mode = OperatingMode.HEAT
+            expected_request = asdict(
+                SetOperatingModeEvent(mock_device.identifier, mode.value)
+            )
+            mock_device.state.operating_mode = None  # Reset to ensure it gets updated
+
+            response = await mock_coordinator.client.async_set_operating_mode(
+                mock_device, mode
+            )
+
+            mock_async_invoke_setter.assert_called_once_with(
+                "set_operating_mode", expected_request
+            )
+            if expect_error:
+                assert response.error is not None
+            else:
+                assert response.error is None
+                assert mock_device.state.operating_mode == OperatingMode.HEAT
+
+    @pytest.mark.parametrize(
+        ("value", "should_succeed"),
+        [(0, True), (5, True), (-5, True)],
+    )
+    async def test_async_set_temperature_offset_range(
+        self, mock_device, mock_coordinator, value, should_succeed
+    ) -> None:
+        """Test async_set_temperature_offset value range validation."""
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(None, {})
+
+            response = await mock_coordinator.client.async_set_temperature_offset(
+                mock_device, value
+            )
+
+            if should_succeed:
+                mock_async_invoke_setter.assert_called_once()
+                assert response.error is None
+                assert mock_device.state.temp_offset == value
+            else:
+                mock_async_invoke_setter.assert_not_called()
+                assert response.error is not None
+                assert "must be between" in response.error
+
+    @pytest.mark.parametrize(
+        ("value", "should_succeed"),
+        [(0, True), (25, True), (-25, True)],
+    )
+    async def test_async_set_humidity_offset_range(
+        self, mock_device, mock_coordinator, value, should_succeed
+    ) -> None:
+        """Test async_set_humidity_offset value range validation."""
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(None, {})
+
+            response = await mock_coordinator.client.async_set_humidity_offset(
+                mock_device, value
+            )
+
+            if should_succeed:
+                mock_async_invoke_setter.assert_called_once()
+                assert response.error is None
+                assert mock_device.state.humidity_offset == value
+            else:
+                mock_async_invoke_setter.assert_not_called()
+                assert response.error is not None
+                assert "must be between" in response.error
+
+
+class TestWaitForDevices:
+    """Test wait_for_devices method."""
+
+    async def test_wait_for_devices_success(self, mock_coordinator, mock_device):
+        """wait_for_devices completes when events resolve."""
+
+        client = mock_coordinator.client
+        client._devices = {mock_device.identifier: mock_device}
+
+        async def _nop(*a, **k):
+            return None
+
+        async def _resolved_future(event, icd_id):
+            fut = client._hass.loop.create_future()
+            fut.set_result({})
+            return fut
+
+        with (
+            patch.object(client, "_connect", new=_nop),
+            patch.object(client, "_wait_for_event", new=_nop),
+            patch.object(client, "_create_event_future", new=_resolved_future),
+        ):
+            await client.wait_for_devices()
+
+    async def test_wait_for_devices_connect_error(self, mock_coordinator):
+        """wait_for_devices raises ConfigEntryNotReady when connect fails."""
+
+        client = mock_coordinator.client
+
+        async def _raise(*a, **k):
+            raise SensiConnectionError("boom")
+
+        with (
+            patch.object(client, "_connect", new=_raise),
+            pytest.raises(ConfigEntryNotReady),
+        ):
+            await client.wait_for_devices()
+
+    async def test_wait_for_devices_timeout_then_retry_fails(
+        self, mock_coordinator, mock_device, monkeypatch
+    ):
+        """If device info times out, the retry path raises ConfigEntryNotReady."""
+
+        # shorten timeouts so the test completes quickly
+        monkeypatch.setattr(
+            "custom_components.sensi.client.PREPARE_DEVICES_TIMEOUT", 0.01
         )
 
-        mock_async_invoke_setter.assert_called_once_with(
-            "set_circulating_fan", expected_request
-        )
+        client = mock_coordinator.client
+        client._devices = {mock_device.identifier: mock_device}
 
-        assert mock_device.state.circulating_fan.enabled == enabled
-        assert mock_device.state.circulating_fan.duty_cycle == duty_cycle
+        async def _nop(*a, **k):
+            return None
 
+        async def _pending_future(event, icd_id):
+            # Return a future that never completes to simulate timeout
+            return client._hass.loop.create_future()
 
-async def test_set_fan_mode(mock_device, mock_coordinator) -> None:
-    """Test async_set_fan_mode."""
+        with (
+            patch.object(client, "_connect", new=_nop),
+            patch.object(client, "_wait_for_event", new=_nop),
+            patch.object(client, "_create_event_future", new=_pending_future),
+            pytest.raises(ConfigEntryNotReady),
+        ):
+            await client.wait_for_devices()
 
-    mode = FanMode.ON.value
-
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(None, "")
-
-        expected_request = asdict(SetFanModeEvent(mock_device.identifier, mode))
-        mock_device.state.fan_mode = None  # Reset fan mode to ensure it gets updated
-
-        response = await mock_coordinator.client.async_set_fan_mode(mock_device, mode)
-
-        mock_async_invoke_setter.assert_called_once_with(
-            "set_fan_mode", expected_request
-        )
-
-        assert response.error is None
         assert mock_device.state.fan_mode == FanMode.ON
-
-
-@pytest.mark.parametrize(
-    ("response_error", "response_data", "expect_error"),
-    [
-        (None, None, True),
-        ("Failed", None, True),
-        (None, "not_accepted", True),
-        (None, {"invalid_property": "cool"}, True),
-        (None, "accepted", False),
-        (None, {"mode": "heat"}, False),
-    ],
-)
-async def test_async_set_operating_mode(
-    mock_device, mock_coordinator, response_error, response_data, expect_error
-) -> None:
-    """Test async_set_operating_mode."""
-
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(
-            response_error, response_data
-        )
-
-        mode = OperatingMode.HEAT
-        expected_request = asdict(
-            SetOperatingModeEvent(mock_device.identifier, mode.value)
-        )
-        mock_device.state.operating_mode = None  # Reset to ensure it gets updated
-
-        response = await mock_coordinator.client.async_set_operating_mode(
-            mock_device, mode
-        )
-
-        mock_async_invoke_setter.assert_called_once_with(
-            "set_operating_mode", expected_request
-        )
-        if expect_error:
-            assert response.error is not None
-        else:
-            assert response.error is None
-            assert mock_device.state.operating_mode == OperatingMode.HEAT
-
-
-@pytest.mark.parametrize(
-    ("value", "should_succeed"),
-    [(0, True), (5, True), (-5, True)],
-)
-async def test_async_set_temperature_offset_range(
-    mock_device, mock_coordinator, value, should_succeed
-) -> None:
-    """Test async_set_temperature_offset value range validation."""
-
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(None, {})
-
-        response = await mock_coordinator.client.async_set_temperature_offset(
-            mock_device, value
-        )
-
-        if should_succeed:
-            mock_async_invoke_setter.assert_called_once()
-            assert response.error is None
-            assert mock_device.state.temp_offset == value
-        else:
-            mock_async_invoke_setter.assert_not_called()
-            assert response.error is not None
-            assert "must be between" in response.error
-
-
-@pytest.mark.parametrize(
-    ("value", "should_succeed"),
-    [(0, True), (25, True), (-25, True)],
-)
-async def test_async_set_humidity_offset_range(
-    mock_device, mock_coordinator, value, should_succeed
-) -> None:
-    """Test async_set_humidity_offset value range validation."""
-
-    with patch.object(
-        mock_coordinator.client, "_async_invoke_setter"
-    ) as mock_async_invoke_setter:
-        mock_async_invoke_setter.return_value = ActionResponse(None, {})
-
-        response = await mock_coordinator.client.async_set_humidity_offset(
-            mock_device, value
-        )
-
-        if should_succeed:
-            mock_async_invoke_setter.assert_called_once()
-            assert response.error is None
-            assert mock_device.state.humidity_offset == value
-        else:
-            mock_async_invoke_setter.assert_not_called()
-            assert response.error is not None
-            assert "must be between" in response.error

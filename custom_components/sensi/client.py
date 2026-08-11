@@ -104,19 +104,40 @@ class SensiClient:
         async def _wait_for_device_info() -> None:
             """Wait for info and capabilities getter events."""
 
-            if self._devices:
-                tasks = []
-                for icd_id in self._devices:
-                    data = {"icd_id": icd_id}
-                    await self._send_event("get_info", data)
-                    await self._send_event("get_capabilities", data)
+            if not self._devices:
+                return
 
-                    tasks.append(await self._create_event_future("info", icd_id))
-                    tasks.append(
-                        await self._create_event_future("capabilities", icd_id)
-                    )
+            tasks = []
+            task_icd_ids: dict[asyncio.Future, str] = {}
+            for icd_id in self._devices:
+                data = {"icd_id": icd_id}
+                await self._send_event("get_info", data)
+                await self._send_event("get_capabilities", data)
 
-                await asyncio.wait_for(asyncio.gather(*tasks), PREPARE_DEVICES_TIMEOUT)
+                info_future = await self._create_event_future("info", icd_id)
+                capabilities_future = await self._create_event_future(
+                    "capabilities", icd_id
+                )
+                tasks.extend([info_future, capabilities_future])
+                task_icd_ids[info_future] = icd_id
+                task_icd_ids[capabilities_future] = icd_id
+
+            done, pending = await asyncio.wait(tasks, timeout=PREPARE_DEVICES_TIMEOUT)
+
+            # Handle partial success, this can happen if a device is permanently offline (can't even be removed from the account)
+            if pending:
+                unresponsive = {task_icd_ids[t] for t in pending}
+                for t in pending:
+                    t.cancel()
+                LOGGER.warning(
+                    "Timed out waiting for info/capabilities from device(s) %s; continuing without them",
+                    ", ".join(sorted(unresponsive)),
+                )
+
+            if not done:
+                raise TimeoutError(
+                    f"No devices responded within {PREPARE_DEVICES_TIMEOUT} seconds"
+                )
 
         async def _wait_for_state_and_device_info() -> None:
             """Wait for the initial `state` event so that we can iterate and issue info and capabilities getter events."""
