@@ -496,9 +496,9 @@ class SensiClient:
 
         return future
 
-    async def _on_event(self, event: str, data: any) -> None:
+    def _on_event(self, event: str, data: any) -> None:
         if event == "state":
-            await self._update_state(data)
+            self._update_state(data)
         elif event == "capabilities":
             self._update_capabilities(data)
         elif event == "info":
@@ -580,7 +580,7 @@ class SensiClient:
         @sio.event
         async def connect():
             self._ensure_emit_loop()
-            await self._on_event("connected", None)
+            self._on_event("connected", None)
 
         @sio.event
         async def connect_error(data):
@@ -657,7 +657,7 @@ class SensiClient:
 
         @sio.on("*")
         async def any_event(event, data):
-            await self._on_event(event, data)
+            self._on_event(event, data)
 
         # raise SensiConnectionError("Fake error, could not connect")   # For testing
 
@@ -743,7 +743,7 @@ class SensiClient:
             name=f"{SENSI_DOMAIN}._emit_loop.{self._config.user_id}",
         )
 
-    async def _update_state(self, data):
+    def _update_state(self, data):
         """Handle state event from socketio."""
         if not data or len(data) == 0:
             return
