@@ -524,13 +524,13 @@ class TestWaitForDevices:
         """wait_for_devices completes when events resolve."""
 
         client = mock_coordinator.client
-        client._devices = {mock_device.identifier: mock_device}
+        client._devices = {mock_device.identifier: mock_device}  # noqa: SLF001
 
         async def _nop(*a, **k):
             return None
 
         async def _resolved_future(event, icd_id):
-            fut = client._hass.loop.create_future()
+            fut = client._hass.loop.create_future()  # noqa: SLF001
             fut.set_result({})
             return fut
 
@@ -566,14 +566,14 @@ class TestWaitForDevices:
         )
 
         client = mock_coordinator.client
-        client._devices = {mock_device.identifier: mock_device}
+        client._devices = {mock_device.identifier: mock_device}  # noqa: SLF001
 
         async def _nop(*a, **k):
             return None
 
         async def _pending_future(event, icd_id):
             # Return a future that never completes to simulate timeout
-            return client._hass.loop.create_future()
+            return client._hass.loop.create_future()  # noqa: SLF005
 
         with (
             patch.object(client, "_connect", new=_nop),

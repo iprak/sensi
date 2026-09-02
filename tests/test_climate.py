@@ -276,8 +276,8 @@ async def test_process_energy_saving_event_schedules_start_and_end(
         thermostat._process_energy_saving_event()  # noqa: SLF001
 
         mock_fire.assert_not_called()
-        assert thermostat._cancel_event_start is mock_cancel_start
-        assert thermostat._cancel_event_end is mock_cancel_end
+        assert thermostat._cancel_event_start is mock_cancel_start  # noqa: SLF001
+        assert thermostat._cancel_event_end is mock_cancel_end  # noqa: SLF001
         assert mock_track.call_count == 2
         assert mock_track.call_args_list[0][0][2] == future_start
         assert mock_track.call_args_list[1][0][2] == future_end
@@ -322,7 +322,7 @@ async def test_process_energy_saving_event_fires_start_when_already_started(
         thermostat._process_energy_saving_event()  # noqa: SLF001
 
         mock_fire.assert_called_once_with(ENERGY_SAVINGS_START, {None: None})
-        assert thermostat._cancel_event_end is mock_cancel_end
+        assert thermostat._cancel_event_end is mock_cancel_end  # noqa: SLF001
         assert mock_track.call_count == 1
         assert mock_track.call_args_list[0][0][2] == future_end
 

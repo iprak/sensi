@@ -108,7 +108,7 @@ class TestSensiFlowHandler:
             "custom_components.sensi.config_flow.refresh_access_token"
         ) as mock_refresh:
             mock_refresh.return_value = new_config
-            result = await handler._try_login(config)
+            result = await handler._try_login(config)  # noqa: SLF001
 
         assert result.errors is None
         assert result.config == new_config
@@ -125,7 +125,7 @@ class TestSensiFlowHandler:
             "custom_components.sensi.config_flow.refresh_access_token"
         ) as mock_refresh:
             mock_refresh.side_effect = SensiConnectionError("Connection failed")
-            result = await handler._try_login(config)
+            result = await handler._try_login(config)  # noqa: SLF001
 
         assert result.errors == {"base": "cannot_connect"}
         assert result.config is None
@@ -142,7 +142,7 @@ class TestSensiFlowHandler:
             "custom_components.sensi.config_flow.refresh_access_token"
         ) as mock_refresh:
             mock_refresh.side_effect = AuthenticationError("Invalid credentials")
-            result = await handler._try_login(config)
+            result = await handler._try_login(config)  # noqa: SLF001
 
         assert result.errors == {"base": "invalid_auth"}
         assert result.config is None
@@ -159,7 +159,7 @@ class TestSensiFlowHandler:
             "custom_components.sensi.config_flow.refresh_access_token"
         ) as mock_refresh:
             mock_refresh.side_effect = ValueError("Unexpected error")
-            result = await handler._try_login(config)
+            result = await handler._try_login(config)  # noqa: SLF001
 
         assert result.errors == {"base": "unknown"}
         assert result.config is None
@@ -245,7 +245,7 @@ class TestSensiFlowHandler:
 
             await handler.async_step_reauth({"refresh_token": "token"})
 
-            assert handler._reauth_unique_id == "user123"
+            assert handler._reauth_unique_id == "user123"  # noqa: SLF001
             mock_reauth_confirm.assert_called_once()
 
     @pytest.mark.asyncio
