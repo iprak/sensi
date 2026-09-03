@@ -103,10 +103,25 @@ You can use the Temperature and Humidity offset number entities to alter display
 - Temperature
 
 **Disabled by default:**
+- Active Savings Event
 - Battery
 - Min/Max setpoints
 - Fan speed
 - WiFi strength
+
+
+#### Active Savings Event
+
+This Diagnostics sensor displays the [Active Savings Event status](https://sensi.copeland.com/en-us/support/active-savings-event). If you have opted into such an event with your energy provider, then the provider can temporary make adjustments during peak power demand times to help reduce strain on the power grid
+
+The sensor values are Opt-out, Upcoming, Current, None, Unknown. The sensor also includes the start and end times as additional attributes.
+
+It implementation mirrors the mobile app where visual notification appears (pre_duration + pre_gap + notification_time) minutes before the event. In practice I have found pre_duration to be 120 minutes, pre_gap 0 and notification_time to be 5 minutes.
+
+
+Caveats
+* There is no support for this special status in the default climate card.
+* Temperature control is not locked down by the event.
 
 
 ## Attributes
@@ -136,7 +151,7 @@ max_humidity: 50
 humidity: 5
 ```
 ### Staging and Demand Status
-For thermostats configured with multiple stages (e.g., 2-stage Heat Pumps or multi-stage Auxiliary heat), the integration exposes the raw demand percentages as attributes. 
+For thermostats configured with multiple stages (e.g., 2-stage Heat Pumps or multi-stage Auxiliary heat), the integration exposes the raw demand percentages as attributes.
 
 * **Value 50**: Indicates Stage 1 is active (2-stage system).
 * **Value 100**: Indicates Stage 2 (or single-stage) is active.
