@@ -12,7 +12,7 @@ class TestSensiEntity:
         """Test SensiEntity initialization."""
         entity = SensiEntity(mock_device, mock_coordinator.config_entry)
 
-        assert entity._device == mock_device
+        assert entity._device == mock_device  # noqa: SLF001
         assert entity.coordinator == mock_coordinator
         assert entity.has_entity_name is True
         assert entity.attribution == SENSI_ATTRIBUTION
@@ -48,7 +48,7 @@ class TestSensiDescriptionEntity:
             mock_device, description, mock_coordinator.config_entry
         )
 
-        assert entity._device == mock_device
+        assert entity._device == mock_device  # noqa: SLF001# noqa: SLF001
         assert entity.coordinator == mock_coordinator
         assert entity.entity_description == description
         assert entity.has_entity_name is True

@@ -33,7 +33,7 @@ async def test_setup_platform(
     await async_setup_entry(hass, mock_coordinator.config_entry, async_add_entities)
 
     assert async_add_entities.called
-    assert len(async_add_entities.call_args[0][0]) == 7 * 2  # 7 = from SENSOR_TYPES
+    assert len(async_add_entities.call_args[0][0]) == 8 * 2  # 8 = from SENSOR_TYPES
 
 
 async def test_sensor_native_value(

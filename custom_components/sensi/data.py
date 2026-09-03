@@ -1,12 +1,13 @@
 """Data models for Sensi thermostats."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Self
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.const import UnitOfTemperature
+from homeassistant.util import dt as dt_util
 from homeassistant.util.enum import try_parse_enum
 
 from .capabilities import Capabilities
@@ -32,6 +33,25 @@ class OperatingMode(StrEnum):
     HEAT = "heat"
     COOL = "cool"
     AUTO = "auto"
+    UNKNOWN = "unknown"
+
+
+class DemandResponseEventStatus(StrEnum):
+    """Representation of Demand Response Event Statuses."""
+
+    RECEIVED = "received"
+    STARTED = "started"
+    COMPLETED = "completed"
+    OPT_OUT = "opt-out"
+    OPT_IN = "opt-in"
+    CANCELLED = "cancelled"
+    SUPERSEDED = "superseded"
+    PARTIAL_OPT_OUT = "partial-opt-out"
+    PARTIAL_OPT_IN = "partial-opt-in"
+    COMPLETED_OPT_OUT = "completed-opt-out"
+    REJECTED_INVALID_CANCEL = "rejected-invalid-cancel"
+    REJECTED_EXPIRED = "rejected-expired"
+    REJECTED_LOAD_CONTROL = "rejected-load-control"
     UNKNOWN = "unknown"
 
 
@@ -230,6 +250,8 @@ class State:
         self.temp_offset = to_int(data.get("temp_offset"), 0)
         self.wifi_connection_quality = to_int(data.get("wifi_connection_quality"), None)
 
+        self.demand_response = DemandResponse.create(data.get("demand_response"))
+
         # Calculated fields
         self.temperature_unit = (
             UnitOfTemperature.CELSIUS
@@ -247,7 +269,7 @@ class State:
         return (
             f"State(status={self.status}, operating_mode={self.operating_mode}, "
             f"display_temp={self.display_temp}{self.temperature_unit}, "
-            f"humidity={self.humidity}%"
+            f"humidity={self.humidity}, demand_response={self.demand_response})"
         )
 
 
@@ -348,3 +370,105 @@ class SensiDevice:
         """Update the thermostat info from data dictionary."""
         if source:
             self.info = ThermostatInfo(source)
+
+
+class ActiveSavingsEventState(StrEnum):
+    """Enumeration for active savings event states."""
+
+    OPTOUT = "opt-out"
+    UPCOMING = "upcoming"
+    CURRENT = "current"
+    NONE = "none"
+    UNKNOWN = "unknown"
+
+
+class DemandResponse:
+    """Representation of the event saving DemandResponse model."""
+
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+
+    @classmethod
+    def create(cls, data: dict | None) -> DemandResponse | None:
+        """Create an instance of DemandResponse based on data."""
+        return None if data is None else DemandResponse(data)
+
+    def __init__(self, data: dict) -> None:
+        """Initialize DemandResponse from data dictionary."""
+
+        self.event_id = data.get("event_id")
+        self.event_status = try_parse_enum(
+            DemandResponseEventStatus,
+            data.get("event_status", DemandResponseEventStatus.UNKNOWN),
+        )  # initialize as UNKNOWN till data refresh
+        self.pre_duration = int(data.get("pre_duration", 0))
+        self.pre_gap = int(data.get("pre_gap", 0))
+        self.notification_time = int(data.get("notification_time", 0))
+
+        end_time = data.get("end_time")
+        if end_time is not None:
+            end_time = datetime.fromtimestamp(end_time, tz=UTC)
+            self.end_time = dt_util.as_local(end_time)
+
+        start_time = data.get("start_time")
+        if start_time is not None:
+            start_time = datetime.fromtimestamp(start_time, tz=UTC)
+            self.start_time = dt_util.as_local(start_time)
+
+    def get_active_savings_event_state(
+        self,
+    ) -> tuple[ActiveSavingsEventState, datetime | None, datetime | None]:
+        """Return the status and start/end time stamps of the upcoming event.
+
+        This logic matches the same in mobile app.
+        """
+
+        if (
+            self.event_status == DemandResponseEventStatus.UNKNOWN
+            or self.start_time is None
+            or self.end_time is None
+        ):
+            return (ActiveSavingsEventState.UNKNOWN, None, None)
+
+        current_instant = dt_util.now().timestamp()
+
+        opt_out = self.event_status in (
+            DemandResponseEventStatus.OPT_OUT,
+            DemandResponseEventStatus.PARTIAL_OPT_OUT,
+        )
+        if opt_out and current_instant < self.end_time.timestamp():
+            return (ActiveSavingsEventState.OPTOUT, None, None)
+
+        start_time_pre_duration = self.start_time - timedelta(minutes=self.pre_duration)
+        start_time_pre_duration_gap = start_time_pre_duration - timedelta(
+            minutes=self.pre_gap
+        )
+
+        if current_instant > self.end_time.timestamp():
+            return (ActiveSavingsEventState.NONE, None, None)
+
+        if current_instant < start_time_pre_duration_gap.timestamp():
+            start_time_adjusted_for_notification = (
+                start_time_pre_duration_gap - timedelta(minutes=self.notification_time)
+            )
+            if current_instant <= start_time_adjusted_for_notification.timestamp():
+                return (ActiveSavingsEventState.NONE, None, None)
+
+            if current_instant >= start_time_pre_duration_gap.timestamp():
+                return (ActiveSavingsEventState.NONE, None, None)
+
+            return (
+                ActiveSavingsEventState.UPCOMING,
+                self.start_time,
+                self.end_time,
+            )
+
+        return (
+            ActiveSavingsEventState.CURRENT,
+            self.start_time,
+            self.end_time,
+        )
+
+    def __repr__(self) -> str:
+        """Return the representation."""
+        return f"DemandResponse(event_id={self.event_id!r}, start_time={self.start_time!r}, end_time={self.end_time!r}"
