@@ -11,6 +11,13 @@ MIN_COOL_SETPOINT: Final = 45
 MAX_HEAT_SETPOINT: Final = 99
 MIN_HEAT_SETPOINT: Final = 60
 
+# Offset bounds are reported by the thermostat in its own display scale. These
+# defaults match the app and are only used when the device does not report them.
+MIN_TEMPERATURE_OFFSET: Final = -5
+MAX_TEMPERATURE_OFFSET: Final = 5
+MIN_HUMIDITY_OFFSET: Final = -25
+MAX_HUMIDITY_OFFSET: Final = 25
+
 
 class SystemModes:
     """Representation of System modes capabilities."""
@@ -56,8 +63,8 @@ class HumidityCapabilities:
         """Initialize HumidityCapabilities from data dictionary."""
 
         # "humidification":{"step":5,"min":5,"max":50,"types":["humidifier"]},"dehumidification":{"step":5,"min":40,"max":95,"types":["overcooling"]}
-        self.max = to_int(data.get("max"), DEFAULT_MIN_HUMIDITY)
-        self.min = to_int(data.get("min"), DEFAULT_MAX_HUMIDITY)
+        self.max = to_int(data.get("max"), DEFAULT_MAX_HUMIDITY)
+        self.min = to_int(data.get("min"), DEFAULT_MIN_HUMIDITY)
         self.step = to_int(data.get("step"), DEFAULT_HUMIDITY_STEP)
         self.types = data.get("types", [])
 
@@ -129,6 +136,18 @@ class Capabilities:
         )
         self.operating_mode_settings = SystemModes(
             data.get("operating_mode_settings", {})
+        )
+        self.temp_offset_lower_bound = to_int(
+            data.get("temp_offset_lower_bound"), MIN_TEMPERATURE_OFFSET
+        )
+        self.temp_offset_upper_bound = to_int(
+            data.get("temp_offset_upper_bound"), MAX_TEMPERATURE_OFFSET
+        )
+        self.humidity_offset_lower_bound = to_int(
+            data.get("humidity_offset_lower_bound"), MIN_HUMIDITY_OFFSET
+        )
+        self.humidity_offset_upper_bound = to_int(
+            data.get("humidity_offset_upper_bound"), MAX_HUMIDITY_OFFSET
         )
 
     def __str__(self):

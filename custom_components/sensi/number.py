@@ -21,12 +21,6 @@ from .coordinator import SensiConfigEntry, SensiDevice
 from .data import State
 from .entity import SensiDescriptionEntity
 
-MINIMUM_HUMIDITY_OFFSET: Final = -25
-MAXIMUM_HUMIDITY_OFFSET: Final = 25
-
-MINIMUM_TEMPERATURE_OFFSET: Final = -5
-MAXIMUM_TEMPERATURE_OFFSET: Final = 5
-
 STEP: Final = 1
 
 
@@ -44,15 +38,20 @@ class SensiNumberEntityDescription(NumberEntityDescription):
     ]
     value_fn: Callable[[SensiDevice], int | None]
 
+    # The bounds are per device and are reported in the thermostat's own
+    # display scale, so they cannot be constants on the description.
+    min_fn: Callable[[SensiDevice], int]
+    max_fn: Callable[[SensiDevice], int]
+
 
 NUMBER_TYPES: Final = [
     SensiNumberEntityDescription(
         device_class=NumberDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.CONFIG,
         key="temperature_offset",
+        max_fn=lambda device: device.capabilities.temp_offset_upper_bound,
+        min_fn=lambda device: device.capabilities.temp_offset_lower_bound,
         name="Temperature offset",
-        native_max_value=MAXIMUM_TEMPERATURE_OFFSET,
-        native_min_value=MINIMUM_TEMPERATURE_OFFSET,
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         step=STEP,
         update_fn=lambda client, device, value: client.async_set_temperature_offset(
@@ -64,9 +63,9 @@ NUMBER_TYPES: Final = [
         device_class=NumberDeviceClass.HUMIDITY,
         entity_category=EntityCategory.CONFIG,
         key="humidity_offset",
+        max_fn=lambda device: device.capabilities.humidity_offset_upper_bound,
+        min_fn=lambda device: device.capabilities.humidity_offset_lower_bound,
         name="Humidity offset",
-        native_max_value=MAXIMUM_HUMIDITY_OFFSET,
-        native_min_value=MINIMUM_HUMIDITY_OFFSET,
         native_unit_of_measurement=PERCENTAGE,
         step=STEP,
         update_fn=lambda client, device, value: client.async_set_humidity_offset(
@@ -120,6 +119,16 @@ class SensiNumberEntity(SensiDescriptionEntity, NumberEntity):
     def native_value(self) -> float:
         """Return the value reported by the entity."""
         return self.entity_description.value_fn(self._device)
+
+    @property
+    def native_min_value(self) -> float:
+        """Return the minimum value reported by the thermostat."""
+        return self.entity_description.min_fn(self._device)
+
+    @property
+    def native_max_value(self) -> float:
+        """Return the maximum value reported by the thermostat."""
+        return self.entity_description.max_fn(self._device)
 
     @property
     def native_unit_of_measurement(self) -> str:

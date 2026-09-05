@@ -118,13 +118,14 @@ SENSOR_TYPES: Final = [
         value_fn=lambda device: device.state.demand_status.fan,
     ),
     SensiSensorEntityDescription(
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         icon="mdi:wifi-strength-outline",
         key="wifi_strength",
         name="Wifi strength",
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
-        state_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda device: device.state.wifi_connection_quality,
     ),
 ]

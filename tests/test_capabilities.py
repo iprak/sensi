@@ -3,14 +3,23 @@
 from custom_components.sensi.capabilities import (
     MAX_COOL_SETPOINT,
     MAX_HEAT_SETPOINT,
+    MAX_HUMIDITY_OFFSET,
+    MAX_TEMPERATURE_OFFSET,
     MIN_COOL_SETPOINT,
     MIN_HEAT_SETPOINT,
+    MIN_HUMIDITY_OFFSET,
+    MIN_TEMPERATURE_OFFSET,
     Capabilities,
     CirculatingFanCapabilities,
     FanModes,
     HumidityCapabilities,
     HumidityControlCapabilities,
     SystemModes,
+)
+from custom_components.sensi.const import (
+    DEFAULT_HUMIDITY_STEP,
+    DEFAULT_MAX_HUMIDITY,
+    DEFAULT_MIN_HUMIDITY,
 )
 
 
@@ -108,6 +117,13 @@ class TestHumidityCapabilities:
         data = {}
         humidity = HumidityCapabilities(data)
         assert humidity.types == []
+
+        # The defaults have to stay the right way round, otherwise the climate
+        # entity reports min_humidity > max_humidity.
+        assert humidity.min == DEFAULT_MIN_HUMIDITY
+        assert humidity.max == DEFAULT_MAX_HUMIDITY
+        assert humidity.min < humidity.max
+        assert humidity.step == DEFAULT_HUMIDITY_STEP
 
 
 class TestHumidityControlCapabilities:
@@ -237,3 +253,32 @@ class TestCapabilities:
         capabilities = Capabilities(data)
         assert capabilities.humidity_control.humidification.min == 5
         assert capabilities.humidity_control.dehumidification.max == 95
+
+
+class TestOffsetBounds:
+    """Test cases for the temperature/humidity offset bounds."""
+
+    def test_offset_bounds_from_device(self):
+        """Bounds reported by the thermostat are used."""
+        capabilities = Capabilities(
+            {
+                "temp_offset_lower_bound": -3,
+                "temp_offset_upper_bound": 3,
+                "humidity_offset_lower_bound": -10,
+                "humidity_offset_upper_bound": 10,
+            }
+        )
+
+        assert capabilities.temp_offset_lower_bound == -3
+        assert capabilities.temp_offset_upper_bound == 3
+        assert capabilities.humidity_offset_lower_bound == -10
+        assert capabilities.humidity_offset_upper_bound == 10
+
+    def test_offset_bounds_default(self):
+        """The app defaults are used when the thermostat reports nothing."""
+        capabilities = Capabilities({})
+
+        assert capabilities.temp_offset_lower_bound == MIN_TEMPERATURE_OFFSET
+        assert capabilities.temp_offset_upper_bound == MAX_TEMPERATURE_OFFSET
+        assert capabilities.humidity_offset_lower_bound == MIN_HUMIDITY_OFFSET
+        assert capabilities.humidity_offset_upper_bound == MAX_HUMIDITY_OFFSET

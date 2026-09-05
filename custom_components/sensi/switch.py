@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Any, Final
 
-from homeassistant.components.climate import HVACMode
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
     SwitchEntity,
@@ -41,7 +40,9 @@ class SensiCapabilityEntityDescription(
 ):
     """Representation of a Sensi thermostat setting."""
 
-    entity_category = EntityCategory.CONFIG
+    # This needs the annotation: a bare assignment is not a dataclass field, so
+    # the inherited `entity_category=None` default would overwrite it.
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
 SWITCH_TYPES: Final = [
@@ -206,10 +207,23 @@ class SensiFanSupportSwitch(SensiDescriptionEntity, SwitchEntity):
         self.coordinator.async_update_listeners()
 
 
+def _mode_to_restore(mode: OperatingMode | None) -> OperatingMode:
+    """Return the operating mode to restore when aux heating is turned off.
+
+    AUX is never a valid mode to restore, otherwise turning the switch off
+    would re-apply aux heating and the switch could never go off. This happens
+    when the thermostat is already in AUX as the entity is created.
+    """
+    if mode is None or mode == OperatingMode.AUX:
+        return OperatingMode.HEAT
+
+    return mode
+
+
 class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     """Representation of Sensi thermostat aux heating setting."""
 
-    _last_hvac_mode_before_aux_heat: HVACMode | str | None
+    _last_operating_mode_before_aux_heat: OperatingMode | None
 
     def __init__(
         self,
@@ -234,12 +248,16 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
             hass=hass,
         )
 
-        self._last_operating_mode_before_aux_heat = device.state.operating_mode
+        self._last_operating_mode_before_aux_heat = _mode_to_restore(
+            device.state.operating_mode
+        )
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self._device.capabilities.operating_mode_settings.aux
+        return (
+            super().available and self._device.capabilities.operating_mode_settings.aux
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -249,7 +267,9 @@ class SensiAuxHeatSwitch(SensiDescriptionEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn aux heating on."""
 
-        self._last_operating_mode_before_aux_heat = self._state.operating_mode
+        self._last_operating_mode_before_aux_heat = _mode_to_restore(
+            self._state.operating_mode
+        )
 
         response = await self.coordinator.client.async_set_operating_mode(
             self._device, OperatingMode.AUX

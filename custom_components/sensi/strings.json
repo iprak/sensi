@@ -12,7 +12,11 @@
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "unknown": "Unexpected error",
+      "wrong_account": "That refresh token belongs to a different Sensi account"
+    },
+    "abort": {
+      "entry_not_found": "The configuration entry is no longer available"
     }
   },
   "entity": {
