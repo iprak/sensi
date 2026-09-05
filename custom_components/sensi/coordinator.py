@@ -26,18 +26,24 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize Sensi coordinator."""
 
-        self._last_update_failed = False  # Used for debugging
+        self._consecutive_failed_count = 0
 
         async def async_update_devices() -> None:
             """Update device data."""
 
             try:
                 await self.client.async_update_devices()
+                self._consecutive_failed_count = 0
             except AuthenticationError as err:
                 # The refresh token itself is invalid, trigger HA's reauth flow
                 # instead of retrying forever.
                 raise ConfigEntryAuthFailed from err
             except SensiConnectionError as err:
+                self._consecutive_failed_count += 1
+                LOGGER.info(
+                    "Failed to connect to Sensi API, consecutive failed count: %d",
+                    self._consecutive_failed_count,
+                )
                 raise UpdateFailed(str(err)) from err
 
         super().__init__(
@@ -54,6 +60,11 @@ class SensiUpdateCoordinator(DataUpdateCoordinator):
     def get_devices(self) -> list[SensiDevice]:
         """Sensi devices."""
         return self.client.get_devices()
+
+    @property
+    def consecutive_connection_failures(self) -> int:
+        """Return the number of consecutive failed updates."""
+        return self._consecutive_failed_count
 
     # async def _verify_authentication(self) -> bool:
     #     """Verify that authentication is not expired. Login again if necessary."""
