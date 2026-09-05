@@ -3,7 +3,7 @@
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import SENSI_ATTRIBUTION, SENSI_DOMAIN
+from .const import MAX_CONSECUTIVE_CONNECTION_FAILURES, SENSI_ATTRIBUTION, SENSI_DOMAIN
 from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
 from .data import SensiDevice, State
 
@@ -45,7 +45,11 @@ class SensiEntity(CoordinatorEntity[SensiUpdateCoordinator]):
 
         The entity is not available if the fetch failed or if the device is offline.
         """
-        return super().available and self._state.is_online
+        return (
+            self.coordinator.consecutive_connection_failures
+            <= MAX_CONSECUTIVE_CONNECTION_FAILURES
+            and self._state.is_online
+        )
 
 
 class SensiDescriptionEntity(SensiEntity):

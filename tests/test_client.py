@@ -573,7 +573,7 @@ class TestWaitForDevices:
 
         async def _pending_future(event, icd_id):
             # Return a future that never completes to simulate timeout
-            return client._hass.loop.create_future()  # noqa: SLF005
+            return client._hass.loop.create_future()  # noqa: SLF001
 
         with (
             patch.object(client, "_connect", new=_nop),

@@ -1,6 +1,12 @@
 """Tests for Sensi entity module."""
 
-from custom_components.sensi.const import SENSI_ATTRIBUTION, SENSI_DOMAIN
+import pytest
+
+from custom_components.sensi.const import (
+    MAX_CONSECUTIVE_CONNECTION_FAILURES,
+    SENSI_ATTRIBUTION,
+    SENSI_DOMAIN,
+)
 from custom_components.sensi.entity import SensiDescriptionEntity, SensiEntity
 from homeassistant.helpers.entity import EntityDescription
 
@@ -36,6 +42,32 @@ class TestSensiEntity:
         entity = SensiEntity(mock_device, mock_coordinator.config_entry)
 
         assert entity.unique_id == mock_device.identifier
+
+    @pytest.mark.parametrize(
+        ("failed_count", "expected_available"),
+        [
+            (0, True),
+            (MAX_CONSECUTIVE_CONNECTION_FAILURES, True),
+            (MAX_CONSECUTIVE_CONNECTION_FAILURES + 1, False),
+        ],
+    )
+    def test_sensi_entity_availability_depends_on_connection_failures(
+        self, mock_device, mock_coordinator, failed_count, expected_available
+    ):
+        """Test entity availability respects the connection failure limit."""
+        mock_coordinator._consecutive_failed_count = failed_count  # noqa: SLF001
+        entity = SensiEntity(mock_device, mock_coordinator.config_entry)
+
+        assert entity.available is expected_available
+
+    def test_sensi_entity_unavailable_when_device_offline(
+        self, mock_device, mock_coordinator
+    ):
+        """Test entity is unavailable when the device is offline."""
+        mock_device.state.status = "offline"
+        entity = SensiEntity(mock_device, mock_coordinator.config_entry)
+
+        assert entity.available is False
 
 
 class TestSensiDescriptionEntity:

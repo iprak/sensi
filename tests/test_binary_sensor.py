@@ -92,7 +92,7 @@ class TestOnlineBinarySensorEntity:
         entity = OnlineBinarySensorEntity(
             hass, mock_device, description, mock_coordinator.config_entry
         )
-        mock_coordinator.last_update_success = False
+        mock_coordinator._consecutive_failed_count = 2  # noqa: SLF001
 
         assert entity.available is False
 
