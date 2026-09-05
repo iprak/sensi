@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 from types import TracebackType
 from typing import Self
 
-import aiohttp
 import socketio
 from socketio.exceptions import ConnectionError
 
@@ -60,7 +59,6 @@ class SensiClient:
         self,
         hass: HomeAssistant,
         config: AuthenticationConfig,
-        connector: aiohttp.TCPConnector,
     ) -> None:
         """Initialize the Sensi Client."""
 
@@ -68,7 +66,6 @@ class SensiClient:
 
         self._hass = hass
         self._config = config
-        self._connector = connector
 
         self._event_queue = asyncio.Queue()
         self._futures: dict[tuple[str, str | None], list[asyncio.Future]] = {}
@@ -181,23 +178,32 @@ class SensiClient:
     async def _async_disconnect(self) -> None:
         """Disconnect the client without raising an error.
 
+        `shutdown()` is used rather than `disconnect()` because only the former
+        aborts a reconnection that is already in flight. Without it a client
+        that was dropped between updates keeps retrying in the background while
+        `_connect` installs its replacement, and both keep feeding events into
+        this instance.
+
         Bounded so a wedged socket.io teardown can never hang a coordinator
-        update. With native reconnection disabled (see `_connect`) `wait()`
-        returns promptly; the timeout is defense in depth.
+        update; the timeout is defense in depth.
         """
-        if not self._sio or not self._sio.connected:
+        sio = self._sio
+        if not sio:
             return
+
+        # Drop the reference first, so a failed teardown cannot leave a stale
+        # client installed.
+        self._sio = None
 
         LOGGER.info("Disconnecting")
 
+        # `shutdown()` awaits an in-flight reconnect task, so it is bounded too.
         with contextlib.suppress(Exception):
-            await self._sio.disconnect()
+            await asyncio.wait_for(sio.shutdown(), DISCONNECT_TIMEOUT)
         with contextlib.suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(self._sio.wait(), DISCONNECT_TIMEOUT)
+            await asyncio.wait_for(sio.wait(), DISCONNECT_TIMEOUT)
 
-        self._sio = None
-
-    async def async_update_devices(self) -> list[SensiDevice]:
+    async def async_update_devices(self) -> None:
         """Update the thermostat devices.
 
         This can raise SensiConnectionError.
@@ -305,7 +311,7 @@ class SensiClient:
 
         if not device.capabilities.circulating_fan.capable:
             raise HomeAssistantError(
-                f"{self.identifier}: circulating fan mode was set but the device does not support it"
+                f"{device.identifier}: circulating fan mode was set but the device does not support it"
             )
 
         # "circulating_fan":{"capable":"yes","max_duty_cycle":100,"min_duty_cycle":10,"step":5}

@@ -129,11 +129,34 @@ class TestToFloat:
         ("random", False),
         (True, True),
         (False, False),
+        # A non-string value must not raise.
+        (1, True),
+        (0, False),
+        (1.5, True),
     ],
 )
 def test_to_bool(input_val, expected) -> None:
     """Test to_bool function."""
     assert to_bool(input_val) == expected
+
+
+class TestRedactToken:
+    """Test cases for redact_token function."""
+
+    def test_token_is_not_revealed(self):
+        """The token body must never reach the log."""
+        token = "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoibWUifQ.s1gnatur3"
+
+        redacted = redact_token(token)
+
+        assert "eyJ" not in redacted
+        assert token not in redacted
+        assert redacted == "<redacted:...tur3>"
+
+    @pytest.mark.parametrize("value", [None, ""])
+    def test_missing_token(self, value):
+        """A missing token is reported as such."""
+        assert redact_token(value) == "<missing>"
 
 
 class TestBoolToOnoff:
@@ -194,22 +217,3 @@ class TestRaiseIfError:
         """Test no exception raised when error is 0."""
         # Should not raise
         raise_if_error(ActionResponse(0, {}), "property", "value")
-
-
-class TestRedactToken:
-    """Test cases for redact_token function."""
-
-    def test_token_is_not_revealed(self):
-        """The token body must never reach the log."""
-        token = "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoibWUifQ.s1gnatur3"
-
-        redacted = redact_token(token)
-
-        assert "eyJ" not in redacted
-        assert token not in redacted
-        assert redacted == "<redacted:...tur3>"
-
-    @pytest.mark.parametrize("value", [None, ""])
-    def test_missing_token(self, value):
-        """A missing token is reported as such."""
-        assert redact_token(value) == "<missing>"

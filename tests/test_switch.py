@@ -15,6 +15,7 @@ from custom_components.sensi.event import SettingEventName
 from custom_components.sensi.switch import (
     SWITCH_TYPES,
     SensiAuxHeatSwitch,
+    _mode_to_restore,
     SensiCapabilityEntityDescription,
     SensiCapabilitySettingSwitch,
     SensiFanSupportSwitch,
@@ -430,3 +431,46 @@ class TestSensiHumidificationSwitch:
             mock_async_write_ha_state.assert_called_once()
             mock_async_update_listeners.assert_called_once()
             assert switch.is_on is True
+
+
+class TestModeToRestore:
+    """Test cases for the mode restored when aux heating is turned off."""
+
+    @pytest.mark.parametrize(
+        ("mode", "expected"),
+        [
+            (OperatingMode.HEAT, OperatingMode.HEAT),
+            (OperatingMode.COOL, OperatingMode.COOL),
+            (OperatingMode.OFF, OperatingMode.OFF),
+            (OperatingMode.AUTO, OperatingMode.AUTO),
+            # AUX would leave the switch permanently on, this happens when the
+            # thermostat is already aux heating as the entity is created.
+            (OperatingMode.AUX, OperatingMode.HEAT),
+            (None, OperatingMode.HEAT),
+        ],
+    )
+    def test_mode_to_restore(self, mode, expected) -> None:
+        """Test the mode used to turn aux heating off."""
+        assert _mode_to_restore(mode) == expected
+
+    async def test_aux_switch_can_be_turned_off_when_started_in_aux(
+        self, hass: HomeAssistant, mock_device, mock_coordinator
+    ) -> None:
+        """A thermostat already in AUX must still be able to turn aux off."""
+
+        mock_device.state.operating_mode = OperatingMode.AUX
+        switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
+
+        with (
+            patch.object(switch, "async_write_ha_state"),
+            patch.object(
+                mock_coordinator.client, "async_set_operating_mode"
+            ) as mock_set_operating_mode,
+        ):
+            mock_set_operating_mode.return_value = ActionResponse(None, {})
+
+            await switch.async_turn_off()
+
+            mock_set_operating_mode.assert_called_once_with(
+                mock_device, OperatingMode.HEAT
+            )

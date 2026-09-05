@@ -2,7 +2,6 @@
 
 import json
 import os
-from unittest.mock import MagicMock
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -44,7 +43,7 @@ def mock_auth_data() -> any:
 def mock_coordinator(hass: HomeAssistant, mock_auth_data) -> SensiUpdateCoordinator:
     """Fixture to provide an instance of SensiUpdateCoordinator linked to the mock entry."""
     auth_config = AuthenticationConfig(mock_auth_data)
-    client = SensiClient(hass, auth_config, MagicMock())
+    client = SensiClient(hass, auth_config)
 
     config_entry = MockConfigEntry(domain=SENSI_DOMAIN, data={}, entry_id="id1")
     config_entry.add_to_hass(hass)

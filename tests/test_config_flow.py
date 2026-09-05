@@ -325,6 +325,71 @@ class TestSensiFlowHandler:
             mock_abort.assert_called_once_with(reason="reauth_successful")
 
     @pytest.mark.asyncio
+    async def test_async_step_reauth_confirm_wrong_account(self, hass: HomeAssistant):
+        """A token for a different account must not repoint the entry."""
+        handler = SensiFlowHandler()
+        handler.hass = hass
+        handler.context = {"unique_id": "user123"}
+
+        with patch.object(handler, "async_step_reauth_confirm"):
+            await handler.async_step_reauth({})
+
+        user_input = {CONFIG_REFRESH_TOKEN: "token_for_someone_else"}
+        other_config = AuthenticationConfig(
+            refresh_token="token_for_someone_else",
+            access_token="access_token",
+            expires_at=12345,
+            user_id="someone_else",
+        )
+
+        mock_entry = MockConfigEntry(
+            domain=SENSI_DOMAIN,
+            data={CONFIG_REFRESH_TOKEN: "old_token"},
+            entry_id="test_entry",
+            unique_id="user123",
+        )
+
+        with (
+            patch.object(handler, "async_set_unique_id") as mock_unique_id,
+            patch.object(handler, "_try_login") as mock_login,
+            patch.object(handler, "async_show_form") as mock_form,
+        ):
+            mock_unique_id.return_value = mock_entry
+            mock_login.return_value = LoginResponse(errors=None, config=other_config)
+            mock_form.return_value = {"type": "form", "step_id": "user"}
+
+            hass.config_entries.async_update_entry = Mock()
+            hass.config_entries.async_reload = AsyncMock()
+
+            await handler.async_step_reauth_confirm(user_input)
+
+            hass.config_entries.async_update_entry.assert_not_called()
+            hass.config_entries.async_reload.assert_not_called()
+            mock_form.assert_called_once()
+            assert mock_form.call_args.kwargs["errors"] == {"base": "wrong_account"}
+
+    @pytest.mark.asyncio
+    async def test_async_step_reauth_confirm_missing_entry(self, hass: HomeAssistant):
+        """An entry removed while the flow was open aborts cleanly."""
+        handler = SensiFlowHandler()
+        handler.hass = hass
+        handler.context = {"unique_id": "user123"}
+
+        with patch.object(handler, "async_step_reauth_confirm"):
+            await handler.async_step_reauth({})
+
+        with (
+            patch.object(handler, "async_set_unique_id") as mock_unique_id,
+            patch.object(handler, "async_abort") as mock_abort,
+        ):
+            mock_unique_id.return_value = None
+            mock_abort.return_value = {"type": "abort", "reason": "entry_not_found"}
+
+            await handler.async_step_reauth_confirm({CONFIG_REFRESH_TOKEN: "new_token"})
+
+            mock_abort.assert_called_once_with(reason="entry_not_found")
+
+    @pytest.mark.asyncio
     async def test_async_step_reauth_confirm_login_failure(self, hass: HomeAssistant):
         """Test async_step_reauth_confirm with login failure."""
         handler = SensiFlowHandler()

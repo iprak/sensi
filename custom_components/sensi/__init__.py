@@ -2,17 +2,14 @@
 
 from copy import deepcopy
 
-import aiohttp
-
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.typing import StateType
-from homeassistant.util.ssl import get_default_context
 
 from .auth import AuthenticationError, SensiConnectionError, get_stored_config
 from .client import SensiClient
-from .const import LOGGER, SENSI_DOMAIN
+from .const import LOGGER
 from .coordinator import SensiConfigEntry, SensiUpdateCoordinator
 from .data import SensiDevice
 
@@ -25,32 +22,12 @@ SUPPORTED_PLATFORMS = [
 ]
 
 
-def send_notification(
-    hass: HomeAssistant, notification_id: str, title: str, message: str
-) -> None:
-    """Display a persistent notification."""
-    hass.async_create_task(
-        hass.services.async_call(
-            domain="persistent_notification",
-            service="create",
-            service_data={
-                "title": title,
-                "message": message,
-                "notification_id": f"{SENSI_DOMAIN}.{notification_id}",
-            },
-        )
-    )
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: SensiConfigEntry):
     """Set up the Sensi component."""
 
-    hass.data.setdefault(SENSI_DOMAIN, {})
-
     try:
         config = await get_stored_config(hass)
-        connector = aiohttp.TCPConnector(force_close=True, ssl=get_default_context())
-        client = SensiClient(hass, config, connector)
+        client = SensiClient(hass, config)
         await client.wait_for_devices()
 
         entry.runtime_data = SensiUpdateCoordinator(hass, client, entry)

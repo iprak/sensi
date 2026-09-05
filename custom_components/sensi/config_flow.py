@@ -82,23 +82,32 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
         """Handle reauthentication."""
         errors: dict[str, str] = {}
         existing_entry = await self.async_set_unique_id(self._reauth_unique_id)
+        if existing_entry is None:
+            # The entry was removed while the reauth flow was open.
+            return self.async_abort(reason="entry_not_found")
+
         if user_input is not None:
             config = AuthenticationConfig(
                 refresh_token=user_input[CONFIG_REFRESH_TOKEN],
             )
             result = await self._try_login(config)
             if not result.errors:
-                self.hass.config_entries.async_update_entry(
-                    existing_entry,
-                    data={
-                        **existing_entry.data,
-                        CONFIG_REFRESH_TOKEN: user_input[CONFIG_REFRESH_TOKEN],
-                    },
-                )
-                await self.hass.config_entries.async_reload(existing_entry.entry_id)
-                return self.async_abort(reason="reauth_successful")
-
-            errors = result.errors
+                if result.config.user_id != self._reauth_unique_id:
+                    # The token is valid but belongs to a different Sensi
+                    # account. Accepting it would silently repoint this entry.
+                    errors = {"base": "wrong_account"}
+                else:
+                    self.hass.config_entries.async_update_entry(
+                        existing_entry,
+                        data={
+                            **existing_entry.data,
+                            CONFIG_REFRESH_TOKEN: user_input[CONFIG_REFRESH_TOKEN],
+                        },
+                    )
+                    await self.hass.config_entries.async_reload(existing_entry.entry_id)
+                    return self.async_abort(reason="reauth_successful")
+            else:
+                errors = result.errors
 
         # The input for user and re_config is the same
         return self.async_show_form(

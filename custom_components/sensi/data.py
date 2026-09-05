@@ -174,8 +174,9 @@ class Humidity:
         # "dehumidification":{"target_percent":40,"enabled":"off","mode":"overcooling"}
         self.target_percent = to_int(data.get("target_percent"), DEFAULT_MIN_HUMIDITY)
         self.enabled = to_bool(data.get("enabled"))
-        self.mode = try_parse_enum(
-            DehumidificationMode, data.get("mode", DehumidificationMode.UNKNOWN)
+        self.mode = (
+            try_parse_enum(DehumidificationMode, data.get("mode"))
+            or DehumidificationMode.UNKNOWN
         )
 
     def __repr__(self):
@@ -192,8 +193,9 @@ class HumidityControl:
         # {'humidification': {'target_percent': 5, 'enabled': 'off', 'mode': 'humidifier'}, 'dehumidification': {'target_percent': 40, 'enabled': 'off', 'mode': 'overcooling'}, 'status': 'none'}
         self.humidification = Humidity(data.get("humidification", {}))
         self.dehumidification = Humidity(data.get("dehumidification", {}))
-        self.status = try_parse_enum(
-            HumidityControlStatus, data.get("status", HumidityControlStatus.NONE)
+        self.status = (
+            try_parse_enum(HumidityControlStatus, data.get("status"))
+            or HumidityControlStatus.NONE
         )
 
 
@@ -236,14 +238,15 @@ class State:
         self.display_scale = data.get("display_scale", "")
         self.display_temp = to_float(data.get("display_temp"), None)
         self.display_time = to_bool(data.get("display_time"))
-        self.fan_mode = try_parse_enum(FanMode, data.get("fan_mode", FanMode.UNKNOWN))
+        self.fan_mode = try_parse_enum(FanMode, data.get("fan_mode")) or FanMode.UNKNOWN
         self.heat_max_temp = to_int(data.get("heat_max_temp"), TEMPERATURE_UPPER_LIMIT)
         self.humidity = to_int(data.get("humidity"), None)
         self.humidity_control = HumidityControl(data.get("humidity_control", {}))
         self.humidity_offset = to_int(data.get("humidity_offset"), 0)
         self.keypad_lockout = to_bool(data.get("keypad_lockout"))
-        self.operating_mode = try_parse_enum(
-            OperatingMode, data.get("operating_mode", OperatingMode.UNKNOWN)
+        self.operating_mode = (
+            try_parse_enum(OperatingMode, data.get("operating_mode"))
+            or OperatingMode.UNKNOWN
         )
         self.power_status = data.get("power_status", "")
         self.status = data.get("status", "")
@@ -397,9 +400,9 @@ class DemandResponse:
         """Initialize DemandResponse from data dictionary."""
 
         self.event_id = data.get("event_id")
-        self.event_status = try_parse_enum(
-            DemandResponseEventStatus,
-            data.get("event_status", DemandResponseEventStatus.UNKNOWN),
+        self.event_status = (
+            try_parse_enum(DemandResponseEventStatus, data.get("event_status"))
+            or DemandResponseEventStatus.UNKNOWN
         )  # initialize as UNKNOWN till data refresh
         self.pre_duration = int(data.get("pre_duration", 0))
         self.pre_gap = int(data.get("pre_gap", 0))
@@ -452,9 +455,6 @@ class DemandResponse:
                 start_time_pre_duration_gap - timedelta(minutes=self.notification_time)
             )
             if current_instant <= start_time_adjusted_for_notification.timestamp():
-                return (ActiveSavingsEventState.NONE, None, None)
-
-            if current_instant >= start_time_pre_duration_gap.timestamp():
                 return (ActiveSavingsEventState.NONE, None, None)
 
             return (

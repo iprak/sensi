@@ -19,14 +19,18 @@ def to_float(value: StateType, default: float | None) -> float | None:
     return default
 
 
-def to_bool(value: str | bool) -> bool:
+def to_bool(value: StateType) -> bool:
     """Determine if a value is truthy."""
     if value is None:
         return False
     if isinstance(value, bool):
         return value
-    value_lower = value.lower()
-    return value_lower in {"true", "yes", "on"}
+    if not isinstance(value, str):
+        # The API is expected to send "on"/"yes" strings, but a numeric or
+        # otherwise unexpected value must not raise.
+        return bool(value)
+
+    return value.lower() in {"true", "yes", "on"}
 
 
 def bool_to_onoff(value: bool) -> str:
