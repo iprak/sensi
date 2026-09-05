@@ -618,7 +618,7 @@ class SensiClient:
             # 2026-07-15 17:18:11.852 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 1.97 seconds
             # 2026-07-15 17:18:13.854 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
             # 2026-07-15 17:18:13.854 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 4.37 seconds
-            # 2026-07-15 17:18:14.030 DEBUG (MainThread) [custom_components.sensi] In event emit loop (001C000001QF6aPIAT): 38060
+            # 2026-07-15 17:18:14.030 DEBUG (MainThread) [custom_components.sensi] In event emit loop (<user_id>): 38060
 
             # 3. If token is identified expired during data update, then it is refreshed
 
@@ -630,8 +630,8 @@ class SensiClient:
             # 2026-07-15 23:15:03.398 INFO (MainThread) [custom_components.sensi] Connection to namespace / was rejected
             # 2026-07-15 23:15:03.398 DEBUG (MainThread) [custom_components.sensi] Received connection error ({'message': 'jwt expired', 'data': {'message': 'jwt expired', 'code': 'invalid_token', 'type': 'UnauthorizedError'}})
             # 2026-07-15 23:15:03.399 INFO (MainThread) [custom_components.sensi] Engine.IO connection dropped
-            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Using supplied refresh_token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJmbGVldCIsInVzZXJfaWQiOiJsZW9saXRlMUBnbWFpbC5jb20iLCJkZXZpY2UiOiJGTDMzVC1sZW9saXRlMS00NzYxNzEyODE1Iiwic2FsZXNmb3JjZV9pZCI6IjAwMUMwMDAwMDFRRjZhUElBVCIsImZsZWV0X2VuYWJsZWQiOmZhbHNlLCJpYXQiOjE3NTg5NzIzOTAsImV4cCI6MjA3NDU0ODM5MH0.IqE5VrT7WnhEr_suspOo07NU7DpEwXnWkOGmVjSOnDw
-            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Getting access token using refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJmbGVldCIsInVzZXJfaWQiOiJsZW9saXRlMUBnbWFpbC5jb20iLCJkZXZpY2UiOiJGTDMzVC1sZW9saXRlMS00NzYxNzEyODE1Iiwic2FsZXNmb3JjZV9pZCI6IjAwMUMwMDAwMDFRRjZhUElBVCIsImZsZWV0X2VuYWJsZWQiOmZhbHNlLCJpYXQiOjE3NTg5NzIzOTAsImV4cCI6MjA3NDU0ODM5MH0.IqE5VrT7WnhEr_suspOo07NU7DpEwXnWkOGmVjSOnDw
+            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Using supplied refresh_token <redacted>
+            # 2026-07-15 23:15:03.432 DEBUG (MainThread) [custom_components.sensi] Getting access token using refresh_token=<redacted>
             # 2026-07-15 23:15:03.756 INFO (MainThread) [custom_components.sensi] Engine.IO connection established
             # 2026-07-15 23:15:03.790 INFO (MainThread) [custom_components.sensi] Namespace / is connected
             # 2026-07-15 23:15:03.790 DEBUG (MainThread) [custom_components.sensi] Creating future (state, 36-6f-92-ff-fe-0c-0b-07)
@@ -652,7 +652,7 @@ class SensiClient:
             # 2026-07-16 04:27:43.033 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 4.18 seconds
             # 2026-07-16 04:27:47.239 DEBUG (MainThread) [custom_components.sensi] Received connection error (Connection error)
             # 2026-07-16 04:27:47.239 INFO (MainThread) [custom_components.sensi] Connection failed, new attempt in 5.26 seconds
-            # 2026-07-16 04:27:47.679 DEBUG (MainThread) [custom_components.sensi] In event emit loop (001C000001QF6aPIAT): 116000
+            # 2026-07-16 04:27:47.679 DEBUG (MainThread) [custom_components.sensi] In event emit loop (<user_id>): 116000
             # 2026-07-16 04:27:51.173 INFO (MainThread) [custom_components.sensi] Updating devices - reconnecting and updating
 
         @sio.on("*")

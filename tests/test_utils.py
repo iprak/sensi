@@ -3,7 +3,13 @@
 import pytest
 
 from custom_components.sensi.client import ActionResponse, raise_if_error
-from custom_components.sensi.utils import bool_to_onoff, to_bool, to_float, to_int
+from custom_components.sensi.utils import (
+    bool_to_onoff,
+    redact_token,
+    to_bool,
+    to_float,
+    to_int,
+)
 from homeassistant.exceptions import HomeAssistantError
 
 
@@ -188,3 +194,22 @@ class TestRaiseIfError:
         """Test no exception raised when error is 0."""
         # Should not raise
         raise_if_error(ActionResponse(0, {}), "property", "value")
+
+
+class TestRedactToken:
+    """Test cases for redact_token function."""
+
+    def test_token_is_not_revealed(self):
+        """The token body must never reach the log."""
+        token = "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoibWUifQ.s1gnatur3"
+
+        redacted = redact_token(token)
+
+        assert "eyJ" not in redacted
+        assert token not in redacted
+        assert redacted == "<redacted:...tur3>"
+
+    @pytest.mark.parametrize("value", [None, ""])
+    def test_missing_token(self, value):
+        """A missing token is reported as such."""
+        assert redact_token(value) == "<missing>"

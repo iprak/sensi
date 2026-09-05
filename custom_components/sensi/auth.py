@@ -12,7 +12,7 @@ from homeassistant.helpers import aiohttp_client, storage
 
 from .const import LOGGER, STORAGE_KEY, STORAGE_VERSION
 from .data import AuthenticationConfig
-from .utils import to_int
+from .utils import redact_token, to_int
 
 DEFAULT_TIMEOUT = 10
 
@@ -42,7 +42,9 @@ async def _get_new_tokens(hass: HomeAssistant, refresh_token: str) -> any:
     """
 
     result = {}
-    LOGGER.debug("Getting access token using refresh_token=%s", refresh_token)
+    LOGGER.debug(
+        "Getting access token using refresh_token=%s", redact_token(refresh_token)
+    )
 
     post_data = {
         "client_id": CLIENT_ID2,
@@ -135,9 +137,9 @@ async def refresh_access_token(
     # Data can be missing in older installations, use get()
     if refresh_token is None:
         refresh_token = persistent_data.get(KEY_REFRESH_TOKEN)
-        LOGGER.debug("Using stored refresh_token %s", refresh_token)
+        LOGGER.debug("Using stored refresh_token %s", redact_token(refresh_token))
     else:
-        LOGGER.debug("Using supplied refresh_token %s", refresh_token)
+        LOGGER.debug("Using supplied refresh_token %s", redact_token(refresh_token))
 
     if refresh_token is None:
         raise AuthenticationError("Stored config is missing refresh_token")

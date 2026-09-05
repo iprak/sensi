@@ -32,3 +32,15 @@ def to_bool(value: str | bool) -> bool:
 def bool_to_onoff(value: bool) -> str:
     """Determine if a value is truthy."""
     return "on" if value else "off"
+
+
+def redact_token(value: str | None) -> str:
+    """Return a token rendering that is safe to write to the log.
+
+    Refresh and access tokens are bearer credentials for the account. Logging
+    them verbatim leaks account control into any debug log that gets shared.
+    """
+    if not value:
+        return "<missing>"
+
+    return f"<redacted:...{value[-4:]}>"
