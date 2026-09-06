@@ -41,8 +41,6 @@ CONFIG_AUX_HEATING: Final = "aux_heat"
 COORDINATOR_UPDATE_INTERVAL: Final = 30
 MAX_CONSECUTIVE_CONNECTION_FAILURES: Final = 1
 
-ATTR_CIRCULATING_FAN: Final = "circulating_fan"
-ATTR_CIRCULATING_FAN_DUTY_CYCLE: Final = "circulating_fan_duty_cycle"
 ATTR_BATTERY_VOLTAGE: Final = "battery_voltage"
 ATTR_POWER_STATUS: Final = "power_status"
 

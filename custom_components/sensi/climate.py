@@ -22,8 +22,6 @@ from . import SensiConfigEntry, get_config_option
 from .client import raise_if_error
 from .const import (
     ATTR_AUX_STAGE,
-    ATTR_CIRCULATING_FAN,
-    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_COOL_STAGE,
     ATTR_HEAT_STAGE,
     ATTR_POWER_STATUS,
@@ -93,8 +91,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # Standard attributes that are always present
         attrs = {
-            ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
-            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
             ATTR_POWER_STATUS: self._state.power_status,
         }
 
