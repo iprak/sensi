@@ -27,6 +27,14 @@
           "unknown": "Unknown"
         }
       }
+    },
+    "number": {
+      "temperature_offset": {
+        "name": "Temperature Offset"
+      },
+      "humidity_offset": {
+        "name": "Humidity Offset"
+      }
     }
   }
 }
