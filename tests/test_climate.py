@@ -10,7 +10,7 @@ from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
-    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    FAN_CIRCULATE_DUTY_CYCLE_DEFAULT,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
@@ -95,7 +95,7 @@ async def test_set_fan_mode_auto(
         await mock_thermostat.async_set_fan_mode(SENSI_FAN_AUTO)
 
         mock_set_circulating_fan_mode.assert_called_once_with(
-            mock_device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            mock_device, False, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
         )
         mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
 
@@ -121,7 +121,7 @@ async def test_set_fan_mode_circulate(
 
         mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
         mock_set_circulating_fan_mode.assert_called_once_with(
-            mock_device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            mock_device, True, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
         )
 
 

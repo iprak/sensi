@@ -28,6 +28,9 @@
         }
       },
       "number": {
+        "circulating_duty_cycle": {
+          "name": "Circulating Fan Duty Cycle"
+        },
         "temperature_offset": {
           "name": "Temperature Offset"
         },

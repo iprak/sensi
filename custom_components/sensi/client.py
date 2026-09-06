@@ -16,7 +16,13 @@ from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.util.enum import try_parse_enum
 
 from .auth import SensiConnectionError, refresh_access_token
-from .const import LOGGER, SENSI_DOMAIN
+from .const import (
+    FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_MINIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_STEP,
+    LOGGER,
+    SENSI_DOMAIN,
+)
 from .data import AuthenticationConfig, FanMode, OperatingMode, SensiDevice
 from .event import (
     BoolEventData,
@@ -307,6 +313,15 @@ class SensiClient:
             raise HomeAssistantError(
                 f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
+
+        duty_cycle = (
+            round(duty_cycle / FAN_CIRCULATE_DUTY_CYCLE_STEP)
+            * FAN_CIRCULATE_DUTY_CYCLE_STEP
+        )
+        duty_cycle = max(
+            FAN_CIRCULATE_DUTY_CYCLE_MINIMUM,
+            min(FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM, duty_cycle),
+        )
 
         # "circulating_fan":{"capable":"yes","max_duty_cycle":100,"min_duty_cycle":10,"step":5}
         request = SetCirculatingFanEvent(

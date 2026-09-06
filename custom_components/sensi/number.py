@@ -43,6 +43,30 @@ class SensiNumberEntityDescription(NumberEntityDescription):
         [SensiClient, SensiDevice, int], Coroutine[Any, Any, ActionResponse]
     ]
     value_fn: Callable[[SensiDevice], int | None]
+    available_fn: Callable[[SensiDevice], bool] | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class SensiCirculatingFanEntityDescription(SensiNumberEntityDescription):
+    """Representation of a Sensi cirulating fan duty cycle numeric setting."""
+
+    def __init__(self, device: SensiDevice) -> None:
+        """Initialize the circulating fan entity description."""
+
+        super().__init__(
+            key="circulating_duty_cycle",
+            update_fn=lambda client, device, value: (
+                client.async_set_circulating_fan_mode(device, True, value)
+            ),
+            value_fn=lambda device: get_state(device).circulating_fan.duty_cycle,
+            native_max_value=device.capabilities.circulating_fan.max_duty_cycle,
+            native_min_value=device.capabilities.circulating_fan.min_duty_cycle,
+            native_step=device.capabilities.circulating_fan.step,
+            entity_category=EntityCategory.CONFIG,
+            translation_key="circulating_duty_cycle",
+            native_unit_of_measurement=PERCENTAGE,
+            available_fn=lambda device: get_state(device).circulating_fan.enabled,
+        )
 
 
 NUMBER_TYPES: Final = [
@@ -54,7 +78,7 @@ NUMBER_TYPES: Final = [
         native_max_value=MAXIMUM_TEMPERATURE_OFFSET,
         native_min_value=MINIMUM_TEMPERATURE_OFFSET,
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
-        step=STEP,
+        native_step=STEP,
         update_fn=lambda client, device, value: client.async_set_temperature_offset(
             device, value
         ),
@@ -68,7 +92,7 @@ NUMBER_TYPES: Final = [
         native_max_value=MAXIMUM_HUMIDITY_OFFSET,
         native_min_value=MINIMUM_HUMIDITY_OFFSET,
         native_unit_of_measurement=PERCENTAGE,
-        step=STEP,
+        native_step=STEP,
         update_fn=lambda client, device, value: client.async_set_humidity_offset(
             device, value
         ),
@@ -91,6 +115,16 @@ async def async_setup_entry(
         for description in NUMBER_TYPES
     ]
 
+    entities.extend(
+        [
+            SensiNumberEntity(
+                hass, device, SensiCirculatingFanEntityDescription(device), entry
+            )
+            for device in coordinator.get_devices()
+            if device.capabilities.circulating_fan.capable
+        ]
+    )
+
     async_add_entities(entities)
 
 
@@ -107,6 +141,7 @@ class SensiNumberEntity(SensiDescriptionEntity, NumberEntity):
         entry: SensiConfigEntry,
     ) -> None:
         """Initialize the entity."""
+
         super().__init__(device, description, entry)
 
         # Note: self.hass is not set at this point
@@ -140,3 +175,13 @@ class SensiNumberEntity(SensiDescriptionEntity, NumberEntity):
 
         # Force data update since offsets control the thermostat state
         await self.coordinator.async_refresh()
+
+    @property
+    def available(self) -> bool:
+        """Return if the entity is available and circulating_fan capable and circulation is enabled."""
+
+        return super().available and (
+            self.entity_description.available_fn(self._device)
+            if self.entity_description.available_fn is not None
+            else True
+        )

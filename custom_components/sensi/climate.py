@@ -27,7 +27,7 @@ from .const import (
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
-    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    FAN_CIRCULATE_DUTY_CYCLE_DEFAULT,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
@@ -492,12 +492,12 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
             # Next enable the circulating fan state
             response = await self.coordinator.client.async_set_circulating_fan_mode(
-                self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+                self._device, True, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
             )
             raise_if_error(
                 response,
                 "fan mode",
-                f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
+                f"{FAN_CIRCULATE_DUTY_CYCLE_DEFAULT} duty cycle",
             )
 
         else:
@@ -505,7 +505,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             # The min duty cycle is 10. Otherwise the error "Attempted to set /circulating_fan/min_duty_cycle:0 below allowable value 10" is returned.
             if self._device.capabilities.circulating_fan.capable:
                 response = await self.coordinator.client.async_set_circulating_fan_mode(
-                    self._device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+                    self._device, False, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
                 )
 
                 raise_if_error(
