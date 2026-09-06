@@ -394,6 +394,28 @@ class TestSetters:
             assert mock_device.state.circulating_fan.enabled == enabled
             assert mock_device.state.circulating_fan.duty_cycle == expected_duty_cycle
 
+    async def test_set_circulating_fan_mode_rounds_from_minimum(
+        self, mock_device, mock_coordinator
+    ) -> None:
+        """Test duty cycle rounding uses the capability minimum as its origin."""
+
+        circulating_fan = mock_device.capabilities.circulating_fan
+        circulating_fan.min_duty_cycle = 3
+        circulating_fan.max_duty_cycle = 18
+        circulating_fan.step = 5
+
+        with patch.object(
+            mock_coordinator.client, "_async_invoke_setter"
+        ) as mock_async_invoke_setter:
+            mock_async_invoke_setter.return_value = ActionResponse(None, "")
+
+            await mock_coordinator.client.async_set_circulating_fan_mode(
+                mock_device, True, 10
+            )
+
+            request = mock_async_invoke_setter.call_args.args[1]
+            assert request["value"]["duty_cycle"] == 8
+
     async def test_set_fan_mode(self, mock_device, mock_coordinator) -> None:
         """Test async_set_fan_mode."""
 
