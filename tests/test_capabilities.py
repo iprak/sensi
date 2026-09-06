@@ -12,6 +12,11 @@ from custom_components.sensi.capabilities import (
     HumidityControlCapabilities,
     SystemModes,
 )
+from custom_components.sensi.const import (
+    FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_MINIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_STEP,
+)
 
 
 class TestSystemModes:
@@ -66,9 +71,9 @@ class TestCirculatingFanCapabilities:
         data = {}
         fan = CirculatingFanCapabilities(data)
         assert fan.capable is False
-        assert fan.max_duty_cycle == 0
-        assert fan.min_duty_cycle == 0
-        assert fan.step == 0
+        assert fan.max_duty_cycle == FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM
+        assert fan.min_duty_cycle == FAN_CIRCULATE_DUTY_CYCLE_MINIMUM
+        assert fan.step == FAN_CIRCULATE_DUTY_CYCLE_STEP
 
 
 class TestFanModes:
