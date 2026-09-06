@@ -49,26 +49,26 @@ SWITCH_TYPES: Final = [
     # These switches do not need to update the climate entity.
     SensiCapabilityEntityDescription(
         key="display_humidity",
+        translation_key="display_humidity",
         setting=SettingEventName.DISPLAY_HUMIDITY,
-        name="Display Humidity",
         icon="mdi:water-percent",
     ),
     SensiCapabilityEntityDescription(
         key="continuous_backlight",
+        translation_key="continuous_backlight",
         setting=SettingEventName.CONTINUOUS_BACKLIGHT,
-        name="Continuous Backlight",
         icon="mdi:wall-sconce-round",
     ),
     SensiCapabilityEntityDescription(
         key="display_time",
+        translation_key="display_time",
         setting=SettingEventName.DISPLAY_TIME,
-        name="Display Time",
         icon="mdi:clock",
     ),
     SensiCapabilityEntityDescription(
         key="keypad_lockout",
+        translation_key="keypad_lockout",
         setting=SettingEventName.KEYPAD_LOCKOUT,
-        name="Keypad lockout",
         icon="mdi:lock",
     ),
 ]

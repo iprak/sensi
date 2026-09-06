@@ -35,6 +35,20 @@
       "humidity_offset": {
         "name": "Humidity Offset"
       }
+    },
+    "switch": {
+      "display_humidity": {
+        "name": "Display Humidity"
+      },
+      "continuous_backlight": {
+        "name": "Continuous Backlight"
+      },
+      "display_time": {
+        "name": "Display Time"
+      },
+      "keypad_lockout": {
+        "name": "Keypad Lockout"
+      }
     }
   }
 }
