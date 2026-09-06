@@ -17,6 +17,7 @@ from custom_components.sensi.switch import (
     SensiAuxHeatSwitch,
     SensiCapabilityEntityDescription,
     SensiCapabilitySettingSwitch,
+    SensiCirculatingFanSwitch,
     SensiFanSupportSwitch,
     SensiHumidificationSwitch,
     async_setup_entry,
@@ -53,9 +54,9 @@ async def test_setup_platform(
 
     assert async_add_entities.called
 
-    # 6 = 4 from SWITCH_TYPES + SensiFanSupportSwitch + SensiAuxHeatSwitch
-    # 7 = 4 from SWITCH_TYPES + SensiFanSupportSwitch + SensiAuxHeatSwitch + SensiHumidificationSwitch
-    assert len(async_add_entities.call_args[0][0]) == 13
+    # 7 = 4 from SWITCH_TYPES + SensiFanSupportSwitch + SensiAuxHeatSwitch + SensiCirculatingFanSwitch
+    # 8 = 4 from SWITCH_TYPES + SensiFanSupportSwitch + SensiAuxHeatSwitch + SensiCirculatingFanSwitch + SensiHumidificationSwitch
+    assert len(async_add_entities.call_args[0][0]) == 15
 
 
 def test_capability_entity_description_creation() -> None:
@@ -430,3 +431,69 @@ class TestSensiHumidificationSwitch:
             mock_async_write_ha_state.assert_called_once()
             mock_async_update_listeners.assert_called_once()
             assert switch.is_on is True
+
+
+class TestSensiCirculatingFanSwitch:
+    """Test cases for SensiCirculatingFanSwitch."""
+
+    def test_circulating_fan_switch_initialization(
+        self, hass: HomeAssistant, mock_device, mock_coordinator
+    ) -> None:
+        """Test SensiCirculatingFanSwitch initialization."""
+
+        switch = SensiCirculatingFanSwitch(
+            hass, mock_device, mock_coordinator.config_entry
+        )
+
+        assert switch._device == mock_device  # noqa: SLF001
+        assert switch.coordinator == mock_coordinator
+        assert switch.entity_description.key == "circulating_fan"
+        assert switch.entity_description.entity_category == EntityCategory.CONFIG
+        assert switch.entity_description.icon == "mdi:fan"
+
+    @pytest.mark.parametrize("enabled", [True, False])
+    def test_circulating_fan_switch_is_on(
+        self, hass: HomeAssistant, mock_device, mock_coordinator, enabled
+    ) -> None:
+        """Test is_on reflects the circulating fan state."""
+
+        mock_device.state.circulating_fan.enabled = enabled
+        switch = SensiCirculatingFanSwitch(
+            hass, mock_device, mock_coordinator.config_entry
+        )
+
+        assert switch.is_on is enabled
+
+    async def test_circulating_fan_switch_update(
+        self, hass: HomeAssistant, mock_device, mock_coordinator
+    ) -> None:
+        """Test updates to the circulating fan switch."""
+
+        switch = SensiCirculatingFanSwitch(
+            hass, mock_device, mock_coordinator.config_entry
+        )
+        duty_cycle = mock_device.state.circulating_fan.duty_cycle
+
+        with (
+            patch.object(
+                mock_coordinator.client, "async_set_circulating_fan_mode"
+            ) as mock_set_circulating_fan_mode,
+            patch.object(switch, "async_write_ha_state") as mock_async_write_ha_state,
+            patch.object(
+                mock_coordinator, "async_update_listeners"
+            ) as mock_async_update_listeners,
+        ):
+            mock_set_circulating_fan_mode.return_value = ActionResponse(None, {})
+
+            await switch.async_turn_off()
+            await switch.async_turn_on()
+
+            mock_set_circulating_fan_mode.assert_has_calls(
+                [
+                    call(mock_device, False, duty_cycle),
+                    call(mock_device, True, duty_cycle),
+                ]
+            )
+            assert mock_set_circulating_fan_mode.call_count == 2
+            assert mock_async_write_ha_state.call_count == 2
+            assert mock_async_update_listeners.call_count == 2

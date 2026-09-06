@@ -308,6 +308,15 @@ class SensiClient:
                 f"{self.identifier}: circulating fan mode was set but the device does not support it"
             )
 
+        step = device.capabilities.circulating_fan.step
+        minimum = device.capabilities.circulating_fan.min_duty_cycle
+
+        duty_cycle = minimum + round((duty_cycle - minimum) / step) * step
+        duty_cycle = max(
+            minimum,
+            min(device.capabilities.circulating_fan.max_duty_cycle, duty_cycle),
+        )
+
         # "circulating_fan":{"capable":"yes","max_duty_cycle":100,"min_duty_cycle":10,"step":5}
         request = SetCirculatingFanEvent(
             device.identifier, SetCirculatingFanEventValue(enabled, duty_cycle)

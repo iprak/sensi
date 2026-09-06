@@ -26,6 +26,34 @@
           "none": "None",
           "unknown": "Unknown"
         }
+      },
+      "number": {
+        "circulating_duty_cycle": {
+          "name": "Circulating Fan Duty Cycle"
+        },
+        "temperature_offset": {
+          "name": "Temperature Offset"
+        },
+        "humidity_offset": {
+          "name": "Humidity Offset"
+        }
+      },
+      "switch": {
+        "display_humidity": {
+          "name": "Display Humidity"
+        },
+        "continuous_backlight": {
+          "name": "Continuous Backlight"
+        },
+        "display_time": {
+          "name": "Display Time"
+        },
+        "keypad_lockout": {
+          "name": "Keypad Lockout"
+        },
+        "circulating_fan": {
+          "name": "Circulating Fan"
+        }
       }
     }
   }

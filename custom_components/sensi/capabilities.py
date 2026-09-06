@@ -2,7 +2,14 @@
 
 from typing import Final
 
-from .const import DEFAULT_HUMIDITY_STEP, DEFAULT_MAX_HUMIDITY, DEFAULT_MIN_HUMIDITY
+from .const import (
+    DEFAULT_HUMIDITY_STEP,
+    DEFAULT_MAX_HUMIDITY,
+    DEFAULT_MIN_HUMIDITY,
+    FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_MINIMUM,
+    FAN_CIRCULATE_DUTY_CYCLE_STEP,
+)
 from .utils import to_bool, to_int
 
 # Default limits based on the app
@@ -32,9 +39,13 @@ class CirculatingFanCapabilities:
 
         # "circulating_fan":{"capable":"yes","max_duty_cycle":100,"min_duty_cycle":10,"step":5}
         self.capable = to_bool(data.get("capable"))
-        self.max_duty_cycle = to_int(data.get("max_duty_cycle"), 0)
-        self.min_duty_cycle = to_int(data.get("min_duty_cycle"), 0)
-        self.step = to_int(data.get("step"), 0)
+        self.max_duty_cycle = to_int(
+            data.get("max_duty_cycle"), FAN_CIRCULATE_DUTY_CYCLE_MAXIMUM
+        )
+        self.min_duty_cycle = to_int(
+            data.get("min_duty_cycle"), FAN_CIRCULATE_DUTY_CYCLE_MINIMUM
+        )
+        self.step = to_int(data.get("step"), FAN_CIRCULATE_DUTY_CYCLE_STEP)
 
 
 class FanModes:

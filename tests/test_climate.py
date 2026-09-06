@@ -8,11 +8,9 @@ from custom_components.sensi import set_config_option
 from custom_components.sensi.client import ActionResponse
 from custom_components.sensi.climate import SensiThermostat, async_setup_entry
 from custom_components.sensi.const import (
-    ATTR_CIRCULATING_FAN,
-    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
-    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    FAN_CIRCULATE_DUTY_CYCLE_DEFAULT,
     SENSI_FAN_AUTO,
     SENSI_FAN_CIRCULATE,
 )
@@ -97,7 +95,7 @@ async def test_set_fan_mode_auto(
         await mock_thermostat.async_set_fan_mode(SENSI_FAN_AUTO)
 
         mock_set_circulating_fan_mode.assert_called_once_with(
-            mock_device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            mock_device, False, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
         )
         mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
 
@@ -123,7 +121,7 @@ async def test_set_fan_mode_circulate(
 
         mock_set_fan_mode.assert_called_once_with(mock_device, SENSI_FAN_AUTO)
         mock_set_circulating_fan_mode.assert_called_once_with(
-            mock_device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+            mock_device, True, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
         )
 
 
@@ -389,25 +387,7 @@ class TestSensiThermostatExtraStateAttributes:
 
         attrs = mock_thermostat.extra_state_attributes
         assert attrs is not None
-        assert ATTR_CIRCULATING_FAN in attrs
-        assert ATTR_CIRCULATING_FAN_DUTY_CYCLE in attrs
         assert ATTR_POWER_STATUS in attrs
-
-    def test_extra_state_attributes_fan_enabled(self, mock_device, mock_thermostat):
-        """Test extra_state_attributes shows fan enabled state."""
-
-        mock_device.state.circulating_fan.enabled = True
-
-        attrs = mock_thermostat.extra_state_attributes
-        assert attrs[ATTR_CIRCULATING_FAN] is True
-
-    def test_extra_state_attributes_fan_duty_cycle(self, mock_device, mock_thermostat):
-        """Test extra_state_attributes shows fan duty cycle."""
-
-        mock_device.state.circulating_fan.duty_cycle = 50
-
-        attrs = mock_thermostat.extra_state_attributes
-        assert attrs[ATTR_CIRCULATING_FAN_DUTY_CYCLE] == 50
 
 
 def test_supported_features(mock_device, mock_thermostat) -> None:

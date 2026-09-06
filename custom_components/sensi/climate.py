@@ -22,14 +22,12 @@ from . import SensiConfigEntry, get_config_option
 from .client import raise_if_error
 from .const import (
     ATTR_AUX_STAGE,
-    ATTR_CIRCULATING_FAN,
-    ATTR_CIRCULATING_FAN_DUTY_CYCLE,
     ATTR_COOL_STAGE,
     ATTR_HEAT_STAGE,
     ATTR_POWER_STATUS,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
-    FAN_CIRCULATE_DEFAULT_DUTY_CYCLE,
+    FAN_CIRCULATE_DUTY_CYCLE_DEFAULT,
     LOGGER,
     SENSI_DOMAIN,
     SENSI_FAN_AUTO,
@@ -93,8 +91,6 @@ class SensiThermostat(SensiEntity, ClimateEntity):
 
         # Standard attributes that are always present
         attrs = {
-            ATTR_CIRCULATING_FAN: self._state.circulating_fan.enabled,
-            ATTR_CIRCULATING_FAN_DUTY_CYCLE: self._state.circulating_fan.duty_cycle,
             ATTR_POWER_STATUS: self._state.power_status,
         }
 
@@ -495,13 +491,19 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             raise_if_error(response, "fan mode", fan_mode)
 
             # Next enable the circulating fan state
+            duty_cycle_value = (
+                self._state.circulating_fan.duty_cycle
+                or FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
+            )
             response = await self.coordinator.client.async_set_circulating_fan_mode(
-                self._device, True, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+                self._device,
+                True,
+                duty_cycle_value,
             )
             raise_if_error(
                 response,
                 "fan mode",
-                f"{FAN_CIRCULATE_DEFAULT_DUTY_CYCLE} duty cycle",
+                f"{duty_cycle_value} duty cycle",
             )
 
         else:
@@ -509,7 +511,7 @@ class SensiThermostat(SensiEntity, ClimateEntity):
             # The min duty cycle is 10. Otherwise the error "Attempted to set /circulating_fan/min_duty_cycle:0 below allowable value 10" is returned.
             if self._device.capabilities.circulating_fan.capable:
                 response = await self.coordinator.client.async_set_circulating_fan_mode(
-                    self._device, False, FAN_CIRCULATE_DEFAULT_DUTY_CYCLE
+                    self._device, False, FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
                 )
 
                 raise_if_error(

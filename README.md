@@ -69,6 +69,7 @@ On adding the Sensi integration, you should see one device and related entities.
 
 Available settings (support varies by thermostat):
 - Auxiliary Heating
+- Circulating Fan and Circulating Fan Duty Cycle
 - Continuous Backlight
 - Display Humidity
 - Display Time
