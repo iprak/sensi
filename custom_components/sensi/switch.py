@@ -20,6 +20,7 @@ from .const import (
     CONFIG_AUX_HEATING,
     CONFIG_FAN_SUPPORT,
     DEFAULT_CONFIG_FAN_SUPPORT,
+    FAN_CIRCULATE_DUTY_CYCLE_DEFAULT,
     SENSI_DOMAIN,
 )
 from .coordinator import SensiConfigEntry, SensiDevice
@@ -95,6 +96,7 @@ async def async_setup_entry(
 
         entities.append(SensiFanSupportSwitch(hass, device, entry))
         entities.append(SensiAuxHeatSwitch(hass, device, entry))
+        entities.append(SensiCirculatingFanSwitch(hass, device, entry))
 
         if device.capabilities.humidity_control.humidification:
             entities.append(SensiHumidificationSwitch(hass, device, entry))
@@ -326,3 +328,68 @@ class SensiHumidificationSwitch(SensiDescriptionEntity, SwitchEntity):
 
         # Use coordinator to notify climate entity
         self.coordinator.async_update_listeners()
+
+
+class SensiCirculatingFanSwitch(SensiDescriptionEntity, SwitchEntity):
+    """Representation of Sensi thermostat ciruclating fan setting."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        device: SensiDevice,
+        entry: SensiConfigEntry,
+    ) -> None:
+        """Initialize the setting."""
+
+        description = SwitchEntityDescription(
+            key="circulating_fan",
+            translation_key="circulating_fan",
+            icon="mdi:fan",
+            entity_category=EntityCategory.CONFIG,
+        )
+
+        super().__init__(device, description, entry)
+
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT,
+            f"{SENSI_DOMAIN}_{device.name}_{description.key}",
+            hass=hass,
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if entity is on."""
+        return self._state.circulating_fan.enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._set_value(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._set_value(False)
+
+    async def _set_value(self, enabled: bool) -> None:
+        value = (
+            (
+                self._device.state.circulating_fan.duty_cycle
+                or FAN_CIRCULATE_DUTY_CYCLE_DEFAULT
+            )
+            if enabled
+            else self._device.state.circulating_fan.duty_cycle
+        )
+
+        response = await self.coordinator.client.async_set_circulating_fan_mode(
+            self._device, enabled, value
+        )
+
+        raise_if_error(response, "circulating_fan", enabled)
+        self.async_write_ha_state()
+
+        # Use coordinator to notify other entities
+        self.coordinator.async_update_listeners()
+
+    @property
+    def available(self) -> bool:
+        """Return if the entity is available and circulating_fan capable."""
+        return self._device.capabilities.circulating_fan.capable and super().available

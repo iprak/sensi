@@ -50,6 +50,9 @@
         },
         "keypad_lockout": {
           "name": "Keypad Lockout"
+        },
+        "circulating_fan": {
+          "name": "Circulating Fan"
         }
       }
     }
