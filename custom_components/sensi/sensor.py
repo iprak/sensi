@@ -30,23 +30,42 @@ from .entity import SensiDescriptionEntity, SensiEntity
 
 
 def calculate_battery_level(voltage: float) -> int | None:
-    """Calculate the battery level."""
+    """Calculate the battery leve as a percentage.
+
+    Uses an approximated discharge curve for better accuracy than pure linear mapping.
+    """
+
     # https://devzone.nordicsemi.com/f/nordic-q-a/28101/how-to-calculate-battery-voltage-into-percentage-for-aa-2-batteries-without-fluctuations
     # https://forum.arduino.cc/t/calculate-battery-percentage-of-alkaline-batteries-using-the-voltage/669958/17
-    if voltage is None:
-        return None
-    mvolts = voltage * 1000
-    # return "low" if (((voltage * 1000) - 900) * 100) / (600) <= 30 else "good"
-    if mvolts >= 3000:
+
+    # Force bounds for extreme voltage readings
+    if voltage >= 3.0:
         return 100
-    if mvolts > 2900:
-        return 100 - int(((3000 - mvolts) * 58) / 100)
-    if mvolts > 2740:
-        return 42 - int(((2900 - mvolts) * 24) / 160)
-    if mvolts > 2440:
-        return 18 - int(((2740 - mvolts) * 12) / 300)
-    if mvolts > 2100:
-        return 6 - int(((2440 - mvolts) * 6) / 340)
+    if voltage <= 2.0:
+        return 0
+
+    # Piecewise curve mapping (Voltage points mapped to estimated capacity percentages)
+    # Most of an alkaline battery's life is spent between 2.4V and 2.7V
+    points = [
+        (3.0, 100),
+        (2.8, 90),
+        (2.6, 70),
+        (2.4, 40),
+        (2.2, 15),
+        (2.0, 0),
+    ]
+
+    # Find the interval the current voltage falls into and perform linear interpolation
+    for i in range(len(points) - 1):
+        v_high, p_high = points[i]
+        v_low, p_low = points[i + 1]
+
+        if v_high >= voltage >= v_low:
+            # Linear interpolation formula
+            percentage = p_low + ((voltage - v_low) / (v_high - v_low)) * (
+                p_high - p_low
+            )
+            return round(percentage)
 
     return 0
 
