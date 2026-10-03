@@ -130,7 +130,8 @@ class SensiClient:
                 for t in pending:
                     t.cancel()
                 LOGGER.warning(
-                    "Timed out waiting for info/capabilities from device(s) %s; continuing without them",
+                    "Timed out waiting for info/capabilities from device(s) %s; "
+                    "continuing without them",
                     ", ".join(sorted(unresponsive)),
                 )
 
@@ -145,7 +146,7 @@ class SensiClient:
             """
 
             await self._wait_for_event("state", None, PREPARE_DEVICES_TIMEOUT)
-            LOGGER.info(f"{len(self._devices)} devices found")
+            LOGGER.info("%d devices found", len(self._devices))
             await _wait_for_device_info()
 
         try:
@@ -155,7 +156,8 @@ class SensiClient:
             raise ConfigEntryNotReady from err
         except TimeoutError:
             LOGGER.warning(
-                f"Unable to gather device information in {PREPARE_DEVICES_TIMEOUT} seconds, retrying"
+                "Unable to gather device information in %d seconds, retrying",
+                PREPARE_DEVICES_TIMEOUT,
             )
         else:
             return
@@ -488,14 +490,14 @@ class SensiClient:
         try:
             return await asyncio.wait_for(future, timeout)
         except asyncio.exceptions.TimeoutError:
-            LOGGER.error(f"Timed out waiting for event '{event}' on device {icd_id}")
+            LOGGER.error("Timed out waiting for event '%s' on device %s", event, icd_id)
 
     async def _create_event_future(
         self, event: str, icd_id: str | None
     ) -> asyncio.Future:
         """Create an event future."""
 
-        LOGGER.debug(f"Creating future ({event}, {icd_id})")
+        LOGGER.debug("Creating future (%s, %s)", event, icd_id)
         future_key = (event, icd_id)
         futures = self._futures.get(future_key)
 
@@ -531,7 +533,7 @@ class SensiClient:
 
         count = len(pending_futures)
         if count:
-            LOGGER.debug(f"Resolving {count} futures for ({event}, {icd_id})")
+            LOGGER.debug("Resolving %d futures for (%s, %s)", count, event, icd_id)
 
             with contextlib.suppress(asyncio.exceptions.InvalidStateError):
                 for future in pending_futures:
@@ -540,7 +542,7 @@ class SensiClient:
     async def _send_event(
         self, name: str, data: dict, callback: Callable[[any, any], None] | None = None
     ) -> None:
-        LOGGER.debug(f"Queuing event {name}")
+        LOGGER.debug("Queuing event %s", name)
         await self._event_queue.put(EventInfo(name, data, callback))
 
     async def _emit_loop(self):
@@ -561,7 +563,8 @@ class SensiClient:
                             )
                         else:
                             LOGGER.info(
-                                f"Not connected. Putting {item.name} back on queue and quitting"
+                                "Not connected. Putting %s back on queue and quitting",
+                                item.name,
                             )
                             self._event_queue.put_nowait(item)
                             break
@@ -576,7 +579,7 @@ class SensiClient:
 
             # Log approximately every 10 seconds based on EMIT_LOOP_DELAY
             if (count % 20) == 0:
-                LOGGER.debug(f"In event emit loop ({self._config.user_id}): {count}")
+                LOGGER.debug("In event emit loop (%s): %d", self._config.user_id, count)
 
             count = count + 1
 
@@ -597,7 +600,7 @@ class SensiClient:
 
         @sio.event
         async def connect_error(data):
-            LOGGER.debug(f"Received connection error ({data})")
+            LOGGER.debug("Received connection error (%s)", data)
             self._connect_error_data = data
 
             # Only the first connection error has useful data, i.e. jwt expired in it.
@@ -608,7 +611,7 @@ class SensiClient:
 
         @sio.event
         async def disconnect(reason) -> None:
-            LOGGER.debug(f"Disconnected ({reason})")
+            LOGGER.debug("Disconnected (%s)", reason)
 
             # Log samples
             # pylint: disable=line-too-long
@@ -763,7 +766,8 @@ class SensiClient:
             return
 
         LOGGER.debug(
-            f"Creating background task for the event emit loop ({self._config.user_id})"
+            "Creating background task for the event emit loop (%s)",
+            self._config.user_id,
         )
         self._emit_loop_task = self._hass.async_create_background_task(
             self._emit_loop(),
