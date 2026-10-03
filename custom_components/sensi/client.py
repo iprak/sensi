@@ -12,7 +12,6 @@ import socketio
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.util.enum import try_parse_enum
-from socketio.exceptions import ConnectionError
 
 from .auth import SensiConnectionError, refresh_access_token
 from .const import LOGGER, SENSI_DOMAIN
@@ -691,7 +690,7 @@ class SensiClient:
             await self._connect_client()
         except TimeoutError as ex:
             raise SensiConnectionError("Timed out making the connection") from ex
-        except ConnectionError as connect_ex:
+        except socketio.exceptions.ConnectionError as connect_ex:
             if not is_token_expired(self._connect_error_data):
                 raise SensiConnectionError(
                     f"Connection failed but token was not expired. ConnectError={self._connect_error_data}"
@@ -707,7 +706,7 @@ class SensiClient:
                 raise SensiConnectionError(
                     "Timed out making the connection after token refresh"
                 ) from ex
-            except ConnectionError as connect_ex2:
+            except socketio.exceptions.ConnectionError as connect_ex2:
                 raise SensiConnectionError(
                     "Connection attempt after token refresh failed"
                 ) from connect_ex2
