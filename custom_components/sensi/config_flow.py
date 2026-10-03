@@ -23,6 +23,14 @@ AUTH_DATA_SCHEMA = vol.Schema(
 )
 
 
+@dataclass
+class LoginResponse:
+    """Response from login attempt."""
+
+    errors: dict[str, str] | None
+    config: AuthenticationConfig
+
+
 class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
     """Config flow for Sensi thermostat."""
 
@@ -105,11 +113,3 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
             data_schema=AUTH_DATA_SCHEMA,
             errors=errors,
         )
-
-
-@dataclass
-class LoginResponse:
-    """Response from login attempt."""
-
-    errors: dict[str, str] | None
-    config: AuthenticationConfig
