@@ -18,7 +18,7 @@ class TestSensiEntity:
         """Test SensiEntity initialization."""
         entity = SensiEntity(mock_device, mock_coordinator.config_entry)
 
-        assert entity._device == mock_device  # noqa: SLF001
+        assert entity._device == mock_device
         assert entity.coordinator == mock_coordinator
         assert entity.has_entity_name is True
         assert entity.attribution == SENSI_ATTRIBUTION
@@ -55,7 +55,7 @@ class TestSensiEntity:
         self, mock_device, mock_coordinator, failed_count, expected_available
     ):
         """Test entity availability respects the connection failure limit."""
-        mock_coordinator._consecutive_failed_count = failed_count  # noqa: SLF001
+        mock_coordinator._consecutive_failed_count = failed_count
         entity = SensiEntity(mock_device, mock_coordinator.config_entry)
 
         assert entity.available is expected_available
@@ -80,7 +80,7 @@ class TestSensiDescriptionEntity:
             mock_device, description, mock_coordinator.config_entry
         )
 
-        assert entity._device == mock_device  # noqa: SLF001# noqa: SLF001
+        assert entity._device == mock_device
         assert entity.coordinator == mock_coordinator
         assert entity.entity_description == description
         assert entity.has_entity_name is True

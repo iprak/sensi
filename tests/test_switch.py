@@ -114,7 +114,7 @@ class TestSensiCapabilitySettingSwitch:
             hass, mock_device, description, mock_coordinator.config_entry
         )
 
-        assert switch._device == mock_device  # noqa: SLF001
+        assert switch._device == mock_device
         assert switch.entity_description == description
         assert switch.coordinator == mock_coordinator
 
@@ -249,7 +249,7 @@ class TestSensiAuxHeatSwitch:
 
         switch = SensiAuxHeatSwitch(hass, mock_device, mock_coordinator.config_entry)
 
-        assert switch._device == mock_device  # noqa: SLF001
+        assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
         assert switch.entity_description.key == CONFIG_AUX_HEATING
 
@@ -332,7 +332,7 @@ class TestSensiFanSupportSwitch:
 
         switch = SensiFanSupportSwitch(hass, mock_device, mock_coordinator.config_entry)
 
-        assert switch._device == mock_device  # noqa: SLF001
+        assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
         assert switch.entity_description.key == CONFIG_FAN_SUPPORT
         assert switch.entity_description.entity_category == EntityCategory.CONFIG
@@ -377,7 +377,7 @@ class TestSensiHumidificationSwitch:
             hass, mock_device, mock_coordinator.config_entry
         )
 
-        assert switch._device == mock_device  # noqa: SLF001
+        assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
         assert switch.entity_description.entity_category == EntityCategory.CONFIG
         assert switch.entity_description.icon == "mdi:air-humidifier"
@@ -445,7 +445,7 @@ class TestSensiCirculatingFanSwitch:
             hass, mock_device, mock_coordinator.config_entry
         )
 
-        assert switch._device == mock_device  # noqa: SLF001
+        assert switch._device == mock_device
         assert switch.coordinator == mock_coordinator
         assert switch.entity_description.key == "circulating_fan"
         assert switch.entity_description.entity_category == EntityCategory.CONFIG

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 
@@ -22,6 +21,14 @@ AUTH_DATA_SCHEMA = vol.Schema(
         vol.Required(CONFIG_REFRESH_TOKEN): str,
     }
 )
+
+
+@dataclass
+class LoginResponse:
+    """Response from login attempt."""
+
+    errors: dict[str, str] | None
+    config: AuthenticationConfig
 
 
 class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
@@ -106,11 +113,3 @@ class SensiFlowHandler(config_entries.ConfigFlow, domain=SENSI_DOMAIN):
             data_schema=AUTH_DATA_SCHEMA,
             errors=errors,
         )
-
-
-@dataclass
-class LoginResponse:
-    """Response from login attempt."""
-
-    errors: dict[str, str] | None
-    config: AuthenticationConfig

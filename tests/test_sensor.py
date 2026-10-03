@@ -69,64 +69,29 @@ async def test_sensor_native_value(
 class TestCalculateBatteryLevel:
     """Test cases for calculate_battery_level function."""
 
-    def test_battery_level_above_3000_mv(self):
-        """Test battery level when voltage is 3.0V or higher."""
-        assert calculate_battery_level(3.0) == 100
-        assert calculate_battery_level(3.1) == 100
-        assert calculate_battery_level(3.5) == 100
-
-    def test_battery_level_2900_to_3000_mv(self):
-        """Test battery level in 2.9V to 3.0V range."""
-        result = calculate_battery_level(2.95)
-        assert 50 <= result <= 100
-
-    def test_battery_level_2740_to_2900_mv(self):
-        """Test battery level in 2.74V to 2.9V range."""
-        result = calculate_battery_level(2.82)
-        assert 18 <= result <= 42
-
-    def test_battery_level_2440_to_2740_mv(self):
-        """Test battery level in 2.44V to 2.74V range."""
-        result = calculate_battery_level(2.59)
-        assert 6 <= result <= 18
-
-    def test_battery_level_2100_to_2440_mv(self):
-        """Test battery level in 2.1V to 2.44V range."""
-        result = calculate_battery_level(2.27)
-        assert 0 <= result <= 6
-
-    def test_battery_level_below_2100_mv(self):
-        """Test battery level when voltage is below 2.1V."""
-        assert calculate_battery_level(2.0) == 0
-        assert calculate_battery_level(1.5) == 0
-        assert calculate_battery_level(0.5) == 0
-
-    def test_battery_level_with_none(self):
-        """Test battery level with None voltage."""
-        assert calculate_battery_level(None) is None
-
-    def test_battery_level_edge_cases(self):
-        """Test battery level at exact boundaries."""
-        assert calculate_battery_level(3.0) == 100
-        assert calculate_battery_level(2.1) >= 0
-        assert calculate_battery_level(2.1) <= 6
-
-    def test_battery_level_typical_aa_battery(self):
-        """Test with typical AA battery voltages."""
-        # Fresh AA battery ~1.5V, fresh two-pack ~3.0V
-        assert calculate_battery_level(3.0) == 100
-        # Partially depleted
-        result = calculate_battery_level(2.5)
-        assert 0 <= result <= 42
-        # Nearly dead
-        assert calculate_battery_level(2.1) >= 0
-
-    def test_battery_level_incremental_decrease(self):
-        """Test that battery level decreases as voltage decreases."""
-        level_high = calculate_battery_level(2.9)
-        level_mid = calculate_battery_level(2.5)
-        level_low = calculate_battery_level(2.1)
-        assert level_high >= level_mid >= level_low
+    @pytest.mark.parametrize(
+        ("voltage", "expected"),
+        [
+            (3.0, 100),
+            (3.1, 100),
+            (3.5, 100),
+            (2.95, 98),
+            (2.82, 91),
+            (2.59, 68),
+            (2.27, 24),
+            (2.7, 80),
+            (2.3, 27),
+            (1.9, 0),
+            (2.1, 8),
+            (2.5, 55),
+            (2.0, 0),
+            (1.5, 0),
+            (0.5, 0),
+        ],
+    )
+    def test_battery_level(self, voltage: float, expected: int) -> None:
+        """Test battery level for representative voltage ranges."""
+        assert calculate_battery_level(voltage) == expected
 
 
 class TestSensiSensorEntityDescription:

@@ -1,16 +1,14 @@
 """Sensi Client for connecting to Sensi thermostats via socketio."""
 
 import asyncio
-from collections.abc import Callable
 import contextlib
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from types import TracebackType
 from typing import Self
 
 import aiohttp
 import socketio
-from socketio.exceptions import ConnectionError
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.util.enum import try_parse_enum
@@ -124,13 +122,15 @@ class SensiClient:
 
             done, pending = await asyncio.wait(tasks, timeout=PREPARE_DEVICES_TIMEOUT)
 
-            # Handle partial success, this can happen if a device is permanently offline (can't even be removed from the account)
+            # Handle partial success, this can happen if a device is permanently offline
+            # (can't even be removed from the account)
             if pending:
                 unresponsive = {task_icd_ids[t] for t in pending}
                 for t in pending:
                     t.cancel()
                 LOGGER.warning(
-                    "Timed out waiting for info/capabilities from device(s) %s; continuing without them",
+                    "Timed out waiting for info/capabilities from device(s) %s; "
+                    "continuing without them",
                     ", ".join(sorted(unresponsive)),
                 )
 
@@ -140,10 +140,12 @@ class SensiClient:
                 )
 
         async def _wait_for_state_and_device_info() -> None:
-            """Wait for the initial `state` event so that we can iterate and issue info and capabilities getter events."""
+            """Wait for the initial `state` event so that we can iterate and issue
+            info and capabilities getter events.
+            """
 
             await self._wait_for_event("state", None, PREPARE_DEVICES_TIMEOUT)
-            LOGGER.info(f"{len(self._devices)} devices found")
+            LOGGER.info("%d devices found", len(self._devices))
             await _wait_for_device_info()
 
         try:
@@ -153,7 +155,8 @@ class SensiClient:
             raise ConfigEntryNotReady from err
         except TimeoutError:
             LOGGER.warning(
-                f"Unable to gather device information in {PREPARE_DEVICES_TIMEOUT} seconds, retrying"
+                "Unable to gather device information in %d seconds, retrying",
+                PREPARE_DEVICES_TIMEOUT,
             )
         else:
             return
@@ -305,7 +308,8 @@ class SensiClient:
 
         if not device.capabilities.circulating_fan.capable:
             raise HomeAssistantError(
-                f"{self.identifier}: circulating fan mode was set but the device does not support it"
+                f"{device.identifier}: circulating fan mode was set "
+                "but the device does not support it"
             )
 
         step = device.capabilities.circulating_fan.step
@@ -485,14 +489,14 @@ class SensiClient:
         try:
             return await asyncio.wait_for(future, timeout)
         except asyncio.exceptions.TimeoutError:
-            LOGGER.error(f"Timed out waiting for event '{event}' on device {icd_id}")
+            LOGGER.error("Timed out waiting for event '%s' on device %s", event, icd_id)
 
     async def _create_event_future(
         self, event: str, icd_id: str | None
     ) -> asyncio.Future:
         """Create an event future."""
 
-        LOGGER.debug(f"Creating future ({event}, {icd_id})")
+        LOGGER.debug("Creating future (%s, %s)", event, icd_id)
         future_key = (event, icd_id)
         futures = self._futures.get(future_key)
 
@@ -528,7 +532,7 @@ class SensiClient:
 
         count = len(pending_futures)
         if count:
-            LOGGER.debug(f"Resolving {count} futures for ({event}, {icd_id})")
+            LOGGER.debug("Resolving %d futures for (%s, %s)", count, event, icd_id)
 
             with contextlib.suppress(asyncio.exceptions.InvalidStateError):
                 for future in pending_futures:
@@ -537,7 +541,7 @@ class SensiClient:
     async def _send_event(
         self, name: str, data: dict, callback: Callable[[any, any], None] | None = None
     ) -> None:
-        LOGGER.debug(f"Queuing event {name}")
+        LOGGER.debug("Queuing event %s", name)
         await self._event_queue.put(EventInfo(name, data, callback))
 
     async def _emit_loop(self):
@@ -558,7 +562,8 @@ class SensiClient:
                             )
                         else:
                             LOGGER.info(
-                                f"Not connected. Putting {item.name} back on queue and quitting"
+                                "Not connected. Putting %s back on queue and quitting",
+                                item.name,
                             )
                             self._event_queue.put_nowait(item)
                             break
@@ -573,7 +578,7 @@ class SensiClient:
 
             # Log approximately every 10 seconds based on EMIT_LOOP_DELAY
             if (count % 20) == 0:
-                LOGGER.debug(f"In event emit loop ({self._config.user_id}): {count}")
+                LOGGER.debug("In event emit loop (%s): %d", self._config.user_id, count)
 
             count = count + 1
 
@@ -583,7 +588,8 @@ class SensiClient:
         This can raise SensiConnectionError, AuthenticationError.
         """
 
-        # Create SocketIO client with reconnection limited to 1 attempt. Add engineio_logger=LOGGER for deeper debugging
+        # Create SocketIO client with reconnection limited to 1 attempt.
+        # Add engineio_logger=LOGGER for deeper debugging
         sio = self._sio = socketio.AsyncClient(logger=LOGGER, reconnection_attempts=1)
 
         @sio.event
@@ -593,19 +599,21 @@ class SensiClient:
 
         @sio.event
         async def connect_error(data):
-            LOGGER.debug(f"Received connection error ({data})")
+            LOGGER.debug("Received connection error (%s)", data)
             self._connect_error_data = data
 
-            # Only the first connection error has useful data i.e. jwt expired in it. The connect_error due to automatic retires
-            # just has "Connection error" in it. So we only check for token expiry in the first connect_error.
+            # Only the first connection error has useful data, i.e. jwt expired in it.
+            # The connect_error due to automatic retries just has "Connection error"
+            # in it. So we only check for token expiry in the first connect_error.
             if is_token_expired(data):
                 self._did_token_expire_midway = True
 
         @sio.event
         async def disconnect(reason) -> None:
-            LOGGER.debug(f"Disconnected ({reason})")
+            LOGGER.debug("Disconnected (%s)", reason)
 
             # Log samples
+            # pylint: disable=line-too-long
 
             # 1. Disconnect is recoverable
 
@@ -682,7 +690,7 @@ class SensiClient:
             await self._connect_client()
         except TimeoutError as ex:
             raise SensiConnectionError("Timed out making the connection") from ex
-        except ConnectionError as connect_ex:
+        except socketio.exceptions.ConnectionError as connect_ex:
             if not is_token_expired(self._connect_error_data):
                 raise SensiConnectionError(
                     f"Connection failed but token was not expired. ConnectError={self._connect_error_data}"
@@ -698,7 +706,7 @@ class SensiClient:
                 raise SensiConnectionError(
                     "Timed out making the connection after token refresh"
                 ) from ex
-            except ConnectionError as connect_ex2:
+            except socketio.exceptions.ConnectionError as connect_ex2:
                 raise SensiConnectionError(
                     "Connection attempt after token refresh failed"
                 ) from connect_ex2
@@ -727,7 +735,19 @@ class SensiClient:
 
         self._reset_connection_state()
 
-        query = "?capabilities=display_humidity,operating_mode_settings,fan_mode_settings,indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,compressor_lockout,boost,heat_cycle_rate,heat_cycle_rate_steps,cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,early_start,min_heat_setpoint,max_heat_setpoint,min_cool_setpoint,max_cool_setpoint,circulating_fan,humidity_control,humidity_offset,humidity_offset_lower_bound,humidity_offset_upper_bound,temp_offset_lower_bound,temp_offset_upper_bound,lowest_heat_setpoint_ceiling,heat_setpoint_ceiling,highest_cool_setpoint_floor,cool_setpoint_floor"
+        query = (
+            "?capabilities=display_humidity,operating_mode_settings,fan_mode_settings,"
+            "indoor_equipment,outdoor_equipment,indoor_stages,outdoor_stages,"
+            "continuous_backlight,degrees_fc,display_time,keypad_lockout,temp_offset,"
+            "compressor_lockout,boost,heat_cycle_rate,heat_cycle_rate_steps,"
+            "cool_cycle_rate,cool_cycle_rate_steps,aux_cycle_rate,aux_cycle_rate_steps,"
+            "early_start,min_heat_setpoint,max_heat_setpoint,min_cool_setpoint,"
+            "max_cool_setpoint,circulating_fan,humidity_control,humidity_offset,"
+            "humidity_offset_lower_bound,humidity_offset_upper_bound,"
+            "temp_offset_lower_bound,temp_offset_upper_bound,"
+            "lowest_heat_setpoint_ceiling,heat_setpoint_ceiling,"
+            "highest_cool_setpoint_floor,cool_setpoint_floor"
+        )
         await self._sio.connect(
             SOCKET_URL + query,
             headers=self._config.headers,
@@ -745,7 +765,8 @@ class SensiClient:
             return
 
         LOGGER.debug(
-            f"Creating background task for the event emit loop ({self._config.user_id})"
+            "Creating background task for the event emit loop (%s)",
+            self._config.user_id,
         )
         self._emit_loop_task = self._hass.async_create_background_task(
             self._emit_loop(),
@@ -764,8 +785,10 @@ class SensiClient:
             if icd_id:
                 have_state = False
 
-                # The first state event received on connect usually only contains registration and capabilities.
-                # The second state event received on connect contains registration, capabilities and state.
+                # The first state event received on connect usually only contains
+                # registration and capabilities.
+                # The second state event received on connect contains registration,
+                # capabilities and state.
                 # Only resolve `state` futures if we received state data.
 
                 if icd_id not in self._devices:
@@ -854,15 +877,16 @@ class EventInfo:
     callback: Callable[[any, any], None]
 
 
-def raise_if_error(response: ActionResponse, property: str, value: any) -> None:
+def raise_if_error(response: ActionResponse, property_name: str, value: any) -> None:
     """Raise HomeAssistantError if error is defined.
 
-    The exception is raised with the message `Unable to set {property} to {value}. {error}`.
+    The exception is raised with the message `Unable to set {property_name} to {value}. {error}`.
     """
 
-    # Potential error codes returned from Sensi end point: ThermostatOffline, OutOfRange, Bad Request
+    # Potential error codes returned from Sensi end point: ThermostatOffline,
+    # OutOfRange, Bad Request
 
     if response.error:
         raise HomeAssistantError(
-            f"Unable to set {property} to {value}. {response.error}"
+            f"Unable to set {property_name} to {value}. {response.error}"
         )

@@ -328,9 +328,9 @@ class SensiDevice:
         self.name = registration.get("name", "")
         self.state = State(state)
 
-        LOGGER.debug(f"{self.identifier} Capabilities={self.capabilities}")
-        LOGGER.debug(f"{self.identifier} Info={self.info}")
-        LOGGER.debug(f"{self.identifier} State={self.state}")
+        LOGGER.debug("%s Capabilities=%s", self.identifier, self.capabilities)
+        LOGGER.debug("  Info=%s", self.info)
+        LOGGER.debug("  State=%s", self.state)
 
     @classmethod
     def create(cls, data: any) -> tuple[bool, Self]:
@@ -356,7 +356,7 @@ class SensiDevice:
         source = data.get("state")
         if source:
             self.state = State(source)
-            LOGGER.debug(f"{self.identifier} State updated to {self.state}")
+            LOGGER.debug("%s State updated to %s", self.identifier, self.state)
             return True
 
         return False
@@ -389,9 +389,9 @@ class DemandResponse:
     end_time: datetime | None = None
 
     @classmethod
-    def create(cls, data: dict | None) -> DemandResponse | None:
+    def create(cls, data: dict | None) -> Self | None:
         """Create an instance of DemandResponse based on data."""
-        return None if data is None else DemandResponse(data)
+        return None if data is None else cls(data)
 
     def __init__(self, data: dict) -> None:
         """Initialize DemandResponse from data dictionary."""
