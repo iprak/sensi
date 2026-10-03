@@ -307,7 +307,8 @@ class SensiClient:
 
         if not device.capabilities.circulating_fan.capable:
             raise HomeAssistantError(
-                f"{self.identifier}: circulating fan mode was set but the device does not support it"
+                f"{device.identifier}: circulating fan mode was set "
+                "but the device does not support it"
             )
 
         step = device.capabilities.circulating_fan.step
