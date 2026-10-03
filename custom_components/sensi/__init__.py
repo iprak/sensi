@@ -3,7 +3,6 @@
 from copy import deepcopy
 
 import aiohttp
-
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
