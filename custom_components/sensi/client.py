@@ -1,14 +1,15 @@
 """Sensi Client for connecting to Sensi thermostats via socketio."""
 
 import asyncio
-import contextlib
 from collections.abc import Callable
+import contextlib
 from dataclasses import asdict, dataclass
 from types import TracebackType
 from typing import Self
 
 import aiohttp
 import socketio
+
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.util.enum import try_parse_enum
