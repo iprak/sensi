@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-import voluptuous as vol
+import probatio
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
@@ -17,9 +17,9 @@ from .auth import (
 )
 from .const import CONFIG_REFRESH_TOKEN, LOGGER, SENSI_DOMAIN, SENSI_NAME
 
-AUTH_DATA_SCHEMA = vol.Schema(
+AUTH_DATA_SCHEMA = probatio.Schema(
     {
-        vol.Required(CONFIG_REFRESH_TOKEN): str,
+        probatio.Required(CONFIG_REFRESH_TOKEN): str,
     }
 )
 
