@@ -1,2 +1,2 @@
 # Custom requirements
-python-socketio==5.15.0
+python-socketio==5.18.1
