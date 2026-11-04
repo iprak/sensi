@@ -317,15 +317,31 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
+        return self.native_current_temperature
+
+    @property
+    def native_current_temperature(self) -> float | None:
+        """Return the current temperature."""
         return self._state.display_temp
 
     @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
+        return self.native_temperature_unit
+
+    @property
+    def native_temperature_unit(self) -> str:
+        """Return the unit of measurement used by the platform."""
         return self._state.temperature_unit.value
 
     @property
     def target_temperature(self) -> float | None:
+        """Return the temperature we try to reach."""
+
+        return self.native_target_temperature
+
+    @property
+    def native_target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
 
         state = self._state
@@ -348,10 +364,20 @@ class SensiThermostat(SensiEntity, ClimateEntity):
     @property
     def target_temperature_high(self) -> float:
         """Return the highbound target temperature we try to reach."""
+        return self.native_target_temperature_high
+
+    @property
+    def native_target_temperature_high(self) -> float:
+        """Return the highbound target temperature we try to reach."""
         return self._state.current_cool_temp
 
     @property
     def target_temperature_low(self) -> float:
+        """Return the lowbound target temperature we try to reach."""
+        return self.native_target_temperature_low
+
+    @property
+    def native_target_temperature_low(self) -> float:
         """Return the lowbound target temperature we try to reach."""
         return self._state.current_heat_temp
 

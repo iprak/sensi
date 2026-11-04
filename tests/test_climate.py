@@ -486,3 +486,12 @@ class TestSensiThermostatHumidity:
         max_humid = mock_thermostat_with_humidification.max_humidity
         assert isinstance(max_humid, int)
         assert 0 <= max_humid <= 100
+
+
+def test_no_deprecated_api_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """Test deprecated API warning."""
+
+    class _SensiThermostat(SensiThermostat):
+        """Subclass to inspect logging from Home Assistant."""
+
+    assert "provides the deprecated" not in caplog.text
