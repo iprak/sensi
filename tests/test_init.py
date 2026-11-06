@@ -10,7 +10,6 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_failed_missing_refresh_token(
     hass: HomeAssistant, mock_coordinator
 ) -> None:
@@ -28,7 +27,6 @@ async def test_init_failed_missing_refresh_token(
         assert mock_entry.state is ConfigEntryState.SETUP_ERROR
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_auth_failed(
     hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
@@ -52,7 +50,6 @@ async def test_init_auth_failed(
         assert mock_entry.state is ConfigEntryState.SETUP_ERROR
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_exception_retry(
     hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
@@ -76,7 +73,6 @@ async def test_init_exception_retry(
         assert mock_entry.state is ConfigEntryState.SETUP_RETRY
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_success(
     hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
@@ -100,7 +96,6 @@ async def test_init_success(
         assert mock_entry.state is ConfigEntryState.LOADED
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_removes_unused_devices(
     hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
@@ -127,9 +122,7 @@ async def test_init_removes_unused_devices(
     )
 
     with (
-        patch(
-            "custom_components.sensi.client.SensiClient.wait_for_devices"
-        ),
+        patch("custom_components.sensi.client.SensiClient.wait_for_devices"),
         patch(
             "homeassistant.helpers.storage.Store.async_load",
             return_value=mock_auth_data,
@@ -142,7 +135,6 @@ async def test_init_removes_unused_devices(
     assert device_registry.async_get(used_device.id) is not None
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_init_keeps_devices_with_entities(
     hass: HomeAssistant, mock_coordinator, mock_auth_data
 ) -> None:
@@ -165,9 +157,7 @@ async def test_init_keeps_devices_with_entities(
     )
 
     with (
-        patch(
-            "custom_components.sensi.client.SensiClient.wait_for_devices"
-        ),
+        patch("custom_components.sensi.client.SensiClient.wait_for_devices"),
         patch(
             "homeassistant.helpers.storage.Store.async_load",
             return_value=mock_auth_data,
