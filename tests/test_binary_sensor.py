@@ -28,7 +28,6 @@ def create_description() -> BinarySensorEntityDescription:
     )
 
 
-@pytest.mark.usefixtures("enable_custom_integrations")
 async def test_setup_platform(
     hass: HomeAssistant,
     mock_coordinator: SensiUpdateCoordinator,
